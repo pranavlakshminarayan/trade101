@@ -147,25 +147,28 @@ export default function Research({ data, onBack, onSearch }) {
           <Metrics indicators={indicators} ticker={ticker} />
 
           <NewsPanel ai={ai} loading={aiLoading} ticker={ticker} />
+
+          <div className="card">
+            <div className="lbl">Ecosystem &amp; index<span className="phase">M4</span></div>
+            <div className="placeholder">Supply-chain chain + the index {ticker} lives in (S&amp;P/NASDAQ) with beta — Milestone 4.</div>
+          </div>
+
+          <div className="card">
+            <div className="lbl">📎 References — every source used</div>
+            <div className="reflist">
+              <div><a href="#">Yahoo Finance</a> <span className="faint">— price &amp; indicators</span></div>
+              {sources.map((s, i) => (
+                <div key={i}>
+                  <a href={s.url} target="_blank" rel="noreferrer" title={s.url}>{s.label}</a>
+                  {s.source ? <span className="faint"> — {s.source}</span> : null}
+                </div>
+              ))}
+            </div>
+          </div>
         </div>
 
         {/* RIGHT: AI read (tall) */}
         <AiRead ai={ai} loading={aiLoading} />
-      </div>
-
-      <div className="card">
-        <div className="lbl">Ecosystem &amp; index<span className="phase">M4</span></div>
-        <div className="placeholder">Supply-chain chain + the index {ticker} lives in (S&amp;P/NASDAQ) with beta — Milestone 4.</div>
-      </div>
-
-      <div className="card" style={{ marginTop: 20 }}>
-        <div className="lbl">📎 References — every source used</div>
-        <div className="refs">
-          <a href="#">Yahoo Finance</a> — price &amp; indicators
-          {sources.map((s, i) => (
-            <span key={i}> · <a href={s.url} target="_blank" rel="noreferrer">{s.label}</a></span>
-          ))}
-        </div>
       </div>
     </div>
   )

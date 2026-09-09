@@ -28,9 +28,12 @@ def analyze(ticker: str) -> dict | None:
     sources = []
     for it in news_items:
         if it.get("url"):
-            sources.append({"label": it.get("source") or "News", "url": it["url"]})
+            # descriptive: the headline is the link text, source shown alongside
+            sources.append({"label": it.get("headline") or it.get("source") or "News",
+                            "source": it.get("source"), "url": it["url"]})
     for f in filings:
-        sources.append({"label": f"SEC {f['form']} · {f['date']}", "url": f["url"]})
+        sources.append({"label": f"SEC {f['form']} filing ({f['date']})",
+                        "source": "SEC EDGAR", "url": f["url"]})
 
     return {
         "ticker": quote["symbol"],

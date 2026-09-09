@@ -26,13 +26,14 @@ export default function NewsPanel({ ai, loading, ticker }) {
       {!loading && ai?.available && tab === 'feed' && (
         feed.length ? (
           feed.slice(0, 8).map((n, i) => (
-            <div className="newsitem" key={i}>
-              <span className="when">{n.datetime || ''}</span>
-              <div>
-                <b>{n.headline}</b>
-                {n.url && <a className="src" href={n.url} target="_blank" rel="noreferrer"> {n.source || 'source'} ↗</a>}
+            <a className="newsbox" key={i} href={n.url || '#'} target="_blank" rel="noreferrer">
+              <div className="newsbox-head">
+                <span className="newsbox-src">{n.source || 'source'}</span>
+                <span className="when">{n.datetime || ''}</span>
               </div>
-            </div>
+              <div className="newsbox-title">{n.headline}</div>
+              {n.summary && <div className="newsbox-sum">{n.summary}</div>}
+            </a>
           ))
         ) : (
           <div className="placeholder">{news.note || `No recent news returned for ${ticker}.`}</div>
