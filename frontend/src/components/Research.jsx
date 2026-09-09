@@ -4,7 +4,7 @@ import PriceChart from './PriceChart.jsx'
 import Metrics from './Metrics.jsx'
 import AiRead from './AiRead.jsx'
 import NewsPanel from './NewsPanel.jsx'
-import { analyze, research } from '../api.js'
+import { analyze, research, patterns as fetchPatterns } from '../api.js'
 
 const REFRESH_MS = 7 * 60 * 1000 // auto-refresh every 7 minutes
 
@@ -33,6 +33,8 @@ export default function Research({ data, onBack, onSearch }) {
   const [timeframe, setTimeframe] = useState('1Y')
   const [tfData, setTfData] = useState({})         // { [tf]: ohlcv } cache (1Y comes from `live`)
   const [tfLoading, setTfLoading] = useState(false)
+  const [showPatterns, setShowPatterns] = useState(false)
+  const [patData, setPatData] = useState({}) // { [tf]: patterns[] }
   const [updatedAt, setUpdatedAt] = useState(new Date())
   const [q, setQ] = useState('')
 
@@ -40,8 +42,19 @@ export default function Research({ data, onBack, onSearch }) {
 
   // New stock → reset.
   useEffect(() => {
-    setLive(data); setTfData({}); setChartType('candles'); setTimeframe('1Y'); setUpdatedAt(new Date())
+    setLive(data); setTfData({}); setPatData({}); setShowPatterns(false)
+    setChartType('candles'); setTimeframe('1Y'); setUpdatedAt(new Date())
   }, [data])
+
+  // Detect patterns for the current timeframe when the overlay is on.
+  useEffect(() => {
+    if (!showPatterns || patData[timeframe]) return
+    let alive = true
+    fetchPatterns(ticker, TF[timeframe]).then((r) => {
+      if (alive) setPatData((c) => ({ ...c, [timeframe]: r.patterns || [] }))
+    })
+    return () => { alive = false }
+  }, [showPatterns, timeframe, ticker, patData])
 
   // AI narration (once per stock).
   useEffect(() => {
@@ -134,14 +147,31 @@ export default function Research({ data, onBack, onSearch }) {
                   <button key={t} className={timeframe === t ? 'on' : ''} onClick={() => setTimeframe(t)}>{t}</button>
                 ))}
               </div>
-              <button className="patbtn">🔍 Patterns<span className="phase">M4</span></button>
+              <button className={'patbtn' + (showPatterns ? ' on' : '')} onClick={() => setShowPatterns((s) => !s)}>
+                🔍 Patterns{showPatterns ? ' ✓' : ''}
+              </button>
             </div>
             {chartLoading || !chartOhlcv.length
               ? <div className="chartwrap placeholder" style={{ display: 'grid', placeItems: 'center' }}>Loading {timeframe}…</div>
-              : <PriceChart ohlcv={chartOhlcv} type={chartType} />}
+              : <PriceChart ohlcv={chartOhlcv} type={chartType} patterns={patData[timeframe] || []} showPatterns={showPatterns} />}
             <div className="note">
               {timeframe} · {TF[timeframe].interval} bars · updated {updatedAt.toLocaleTimeString()} · auto-refreshes every 7 min · {meta.note}
             </div>
+            {showPatterns && (
+              <div className="patterns-panel">
+                {(patData[timeframe] || []).length ? (patData[timeframe]).map((p, i) => (
+                  <div className="pat" key={i}>
+                    <div>
+                      <span className={'chip ' + (p.direction === 'bullish' ? 'up' : 'down')}>{p.name}</span>
+                      <span className="faint" style={{ marginLeft: 8, fontSize: 12 }}>{p.direction} · confidence {p.confidence}</span>
+                    </div>
+                    <p>{p.explanation}</p>
+                  </div>
+                )) : (
+                  <div className="placeholder">No clear pattern on the {timeframe} chart — try another timeframe. (Detection is a heuristic learning aid, not a signal.)</div>
+                )}
+              </div>
+            )}
           </div>
 
           <Metrics indicators={indicators} ticker={ticker} />

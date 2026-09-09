@@ -24,6 +24,21 @@ export async function search(q) {
   }
 }
 
+// Chart-pattern detection for a given timeframe.
+export async function patterns(ticker, { period, interval } = {}) {
+  const qs = new URLSearchParams()
+  if (period) qs.set('period', period)
+  if (interval) qs.set('interval', interval)
+  const q = qs.toString()
+  try {
+    const res = await fetch(`${BASE}/patterns/${encodeURIComponent(ticker.trim())}${q ? '?' + q : ''}`)
+    if (!res.ok) return { patterns: [] }
+    return res.json()
+  } catch {
+    return { patterns: [] }
+  }
+}
+
 // AI narration — fetched separately so the chart never waits on it.
 // In-flight dedupe: React StrictMode double-invokes effects in dev, which would
 // otherwise fire two identical (paid) analysis calls; sharing the promise avoids that.

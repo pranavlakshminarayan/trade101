@@ -18,7 +18,7 @@ from fastapi.middleware.cors import CORSMiddleware
 load_dotenv(Path(__file__).resolve().parent.parent / ".env")
 
 from agents import llm, orchestrator
-from services import indicators, marketdata, search
+from services import indicators, marketdata, patterns, search
 
 app = FastAPI(title="Trade101 API", version="0.1.0")
 
@@ -85,6 +85,20 @@ def research(ticker: str, period: str = "1y", interval: str = "1d"):
             "interval": interval,
         },
     }
+
+
+@app.get("/patterns/{ticker}")
+def detect_patterns(ticker: str, period: str = "1y", interval: str = "1d"):
+    """Detect chart patterns on the given timeframe — works for any period/interval,
+    so the magnifier applies across all chart tabs."""
+    data = marketdata.get(ticker, period=period, interval=interval)
+    if data is None:
+        raise HTTPException(status_code=404, detail=f"No data for '{ticker}'.")
+    hist, _ = data
+    closes = hist["Close"].tolist()
+    times = [int(idx.timestamp()) for idx in hist.index]
+    return {"ticker": ticker.upper(), "period": period, "interval": interval,
+            "patterns": patterns.detect(closes, times)}
 
 
 @app.get("/analyze/{ticker}")

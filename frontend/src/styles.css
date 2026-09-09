@@ -62,6 +62,11 @@ button{font:inherit;cursor:pointer}
 
 .charthead{display:flex;justify-content:space-between;align-items:center;margin-bottom:8px}
 .patbtn{font-size:13px;font-weight:600;color:var(--teal);background:var(--teal-soft);border:1px solid #1d4551;border-radius:980px;padding:6px 13px}
+.patbtn.on{background:var(--amber);color:#231a06;border-color:var(--amber)}
+
+/* patterns overlay panel */
+.patterns-panel{margin-top:12px;border-top:1px solid var(--hair);padding-top:12px;display:flex;flex-direction:column;gap:12px}
+.pat p{margin:6px 0 0;font-size:13px;color:var(--muted);line-height:1.5}
 .chartwrap{height:340px;width:100%}
 
 /* deterministic snapshot */
