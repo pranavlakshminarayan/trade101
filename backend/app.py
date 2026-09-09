@@ -1,0 +1,71 @@
+"""
+Trade101 backend — FastAPI.
+
+Milestone 1: real-time, ticker-agnostic research endpoint returning exact
+market data + indicators. No AI yet (that arrives in Milestone 3); this is the
+deterministic foundation everything else stands on.
+"""
+from __future__ import annotations
+
+from fastapi import FastAPI, HTTPException
+from fastapi.middleware.cors import CORSMiddleware
+
+from services import indicators, marketdata
+
+app = FastAPI(title="Trade101 API", version="0.1.0")
+
+# Allow the local React dev server to call the API.
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=["http://localhost:5173", "http://127.0.0.1:5173"],
+    allow_methods=["*"],
+    allow_headers=["*"],
+)
+
+
+@app.get("/health")
+def health():
+    return {"status": "ok", "service": "trade101", "version": app.version}
+
+
+@app.get("/research/{ticker}")
+def research(ticker: str, period: str = "1y", interval: str = "1d"):
+    """
+    Live research bundle for ANY ticker: quote + indicators + OHLCV (for the
+    chart). Ticker-agnostic — nothing is hardcoded to a specific symbol.
+    """
+    data = marketdata.get(ticker, period=period, interval=interval)
+    if data is None:
+        raise HTTPException(
+            status_code=404,
+            detail=f"No market data found for '{ticker}'. Check the symbol "
+                   f"(non-US markets need an exchange suffix, e.g. 005930.KS, RELIANCE.NS).",
+        )
+    hist, quote = data
+    ind = indicators.compute_indicators(hist)
+
+    ohlcv = [
+        {
+            "time": idx.strftime("%Y-%m-%d"),
+            "open": round(float(row.Open), 2),
+            "high": round(float(row.High), 2),
+            "low": round(float(row.Low), 2),
+            "close": round(float(row.Close), 2),
+            "volume": int(row.Volume),
+        }
+        for idx, row in hist.iterrows()
+    ]
+
+    return {
+        "ticker": quote["symbol"],
+        "quote": quote,
+        "indicators": ind,
+        "ohlcv": ohlcv,
+        "meta": {
+            "source": "Yahoo Finance",
+            "delayed": True,
+            "note": "Data delayed ~15m; not real-time trading data.",
+            "asOf": ohlcv[-1]["time"] if ohlcv else None,
+            "bars": len(ohlcv),
+        },
+    }
