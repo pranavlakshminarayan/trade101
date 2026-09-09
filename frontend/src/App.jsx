@@ -1,18 +1,19 @@
 import { useState } from 'react'
 import Welcome from './components/Welcome.jsx'
 import Research from './components/Research.jsx'
-import { research as fetchResearch } from './api.js'
+import { research as fetchResearch, search as searchSymbols } from './api.js'
 
 export default function App() {
   const [data, setData] = useState(null)
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState(null)
   const [recent, setRecent] = useState([])
+  const [candidates, setCandidates] = useState(null) // disambiguation list
 
-  async function runSearch(ticker) {
-    setLoading(true); setError(null); setData(null)
+  async function doResearch(symbol) {
+    setLoading(true); setError(null); setCandidates(null)
     try {
-      const bundle = await fetchResearch(ticker)
+      const bundle = await fetchResearch(symbol)
       setData(bundle)
       setRecent((r) => [bundle.ticker, ...r.filter((x) => x !== bundle.ticker)].slice(0, 6))
     } catch (e) {
@@ -22,27 +23,58 @@ export default function App() {
     }
   }
 
-  const goHome = () => { setData(null); setError(null) }
-
-  if (loading) {
-    return (
-      <div className="loading">
-        <div className="spinner" />
-        Pulling live data…
-      </div>
-    )
+  // Resolve a name/ticker → research, or show a picker when ambiguous.
+  async function submitQuery(query) {
+    const qn = query.trim()
+    if (!qn) return
+    setLoading(true); setError(null); setCandidates(null)
+    const { candidates: cands = [] } = await searchSymbols(qn)
+    if (cands.length === 0) {
+      // maybe it's an exact ticker Yahoo search didn't surface — try it directly
+      return doResearch(qn)
+    }
+    if (cands.length === 1 || cands[0].symbol.toUpperCase() === qn.toUpperCase()) {
+      return doResearch(cands[0].symbol)
+    }
+    setCandidates(cands); setLoading(false)
   }
 
-  if (data) return <Research data={data} onBack={goHome} />
+  const goHome = () => { setData(null); setError(null); setCandidates(null) }
 
-  return (
-    <>
-      <Welcome onSearch={runSearch} recent={recent} />
-      {error && (
-        <div style={{ position: 'fixed', left: 0, right: 0, bottom: 20, display: 'flex', justifyContent: 'center' }}>
-          <div className="err" style={{ maxWidth: 560 }}>⚠️ {error}</div>
-        </div>
-      )}
-    </>
+  const picker = candidates && (
+    <div className="modal-bg" onClick={() => setCandidates(null)}>
+      <div className="modal" onClick={(e) => e.stopPropagation()}>
+        <div className="lbl">Did you mean… — pick the one you want</div>
+        {candidates.map((c) => (
+          <button key={c.symbol} className="cand" onClick={() => doResearch(c.symbol)}>
+            <span className="cand-sym mono">{c.symbol}</span>
+            <span className="cand-name">{c.name}</span>
+            <span className="cand-exch faint">{c.exchange}{c.type === 'ETF' ? ' · ETF' : ''}</span>
+          </button>
+        ))}
+        <button className="cand-cancel" onClick={() => setCandidates(null)}>Cancel</button>
+      </div>
+    </div>
   )
+
+  if (loading) {
+    return <div className="loading"><div className="spinner" />Working…</div>
+  }
+
+  if (data) {
+    return (<>
+      <Research data={data} onBack={goHome} onSearch={submitQuery} />
+      {picker}
+    </>)
+  }
+
+  return (<>
+    <Welcome onSearch={submitQuery} recent={recent} />
+    {picker}
+    {error && (
+      <div style={{ position: 'fixed', left: 0, right: 0, bottom: 20, display: 'flex', justifyContent: 'center' }}>
+        <div className="err" style={{ maxWidth: 560 }}>⚠️ {error}</div>
+      </div>
+    )}
+  </>)
 }

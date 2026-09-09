@@ -18,7 +18,7 @@ from fastapi.middleware.cors import CORSMiddleware
 load_dotenv(Path(__file__).resolve().parent.parent / ".env")
 
 from agents import llm, orchestrator
-from services import indicators, marketdata
+from services import indicators, marketdata, search
 
 app = FastAPI(title="Trade101 API", version="0.1.0")
 
@@ -34,6 +34,12 @@ app.add_middleware(
 @app.get("/health")
 def health():
     return {"status": "ok", "service": "trade101", "version": app.version}
+
+
+@app.get("/search")
+def search_symbols(q: str):
+    """Resolve a company name or partial ticker to candidate symbols."""
+    return {"query": q, "candidates": search.resolve(q)}
 
 
 @app.get("/research/{ticker}")
@@ -52,9 +58,10 @@ def research(ticker: str, period: str = "1y", interval: str = "1d"):
     hist, quote = data
     ind = indicators.compute_indicators(hist)
 
+    # UNIX seconds so both daily and intraday intervals render correctly.
     ohlcv = [
         {
-            "time": idx.strftime("%Y-%m-%d"),
+            "time": int(idx.timestamp()),
             "open": round(float(row.Open), 2),
             "high": round(float(row.High), 2),
             "low": round(float(row.Low), 2),
@@ -73,8 +80,9 @@ def research(ticker: str, period: str = "1y", interval: str = "1d"):
             "source": "Yahoo Finance",
             "delayed": True,
             "note": "Data delayed ~15m; not real-time trading data.",
-            "asOf": ohlcv[-1]["time"] if ohlcv else None,
+            "asOf": hist.index[-1].date().isoformat() if len(hist) else None,
             "bars": len(ohlcv),
+            "interval": interval,
         },
     }
 

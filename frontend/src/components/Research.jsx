@@ -1,10 +1,12 @@
-import { useEffect, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import Logo from './Logo.jsx'
 import PriceChart from './PriceChart.jsx'
 import Metrics from './Metrics.jsx'
 import AiRead from './AiRead.jsx'
 import NewsPanel from './NewsPanel.jsx'
-import { analyze } from '../api.js'
+import { analyze, research } from '../api.js'
+
+const REFRESH_MS = 7 * 60 * 1000 // auto-refresh the chart every 7 minutes
 
 function changeChip(pct) {
   if (pct == null) return <span className="chip flat">—</span>
@@ -13,38 +15,67 @@ function changeChip(pct) {
   return <span className={'chip ' + cls}>{arrow} {pct > 0 ? '+' : ''}{pct}%</span>
 }
 
-// Deterministic, factual technical snapshot (NOT an AI opinion) — grounds the AI read.
-function snapshot(ind) {
-  const items = []
-  if (ind.above_sma50 != null && ind.sma50 != null)
-    items.push([`Price ${ind.above_sma50 ? 'above' : 'below'} the 50-day avg`, `${ind.price} vs ${ind.sma50}`])
-  if (ind.above_sma200 != null && ind.sma200 != null)
-    items.push([`Price ${ind.above_sma200 ? 'above' : 'below'} the 200-day avg`, `${ind.price} vs ${ind.sma200}`])
-  if (ind.rsi14 != null) {
-    const z = ind.rsi14 >= 70 ? 'overbought' : ind.rsi14 <= 30 ? 'oversold' : 'neutral'
-    items.push([`RSI(14) ${ind.rsi14} — ${z}`, ''])
-  }
-  if (ind.macd?.hist != null)
-    items.push([`MACD histogram ${ind.macd.hist > 0 ? 'positive' : 'negative'}`, `${ind.macd.hist}`])
-  if (ind.volume_vs_20d_pct != null)
-    items.push([`Volume ${ind.volume_vs_20d_pct > 0 ? 'above' : 'below'} 20-day avg`, `${ind.volume_vs_20d_pct}%`])
-  return items
-}
-
-export default function Research({ data, onBack }) {
-  const { ticker, quote, indicators, ohlcv, meta } = data
+export default function Research({ data, onBack, onSearch }) {
+  const [live, setLive] = useState(data)          // refreshable market bundle
   const [ai, setAi] = useState(null)
   const [aiLoading, setAiLoading] = useState(true)
+  const [chartMode, setChartMode] = useState('candles') // 'candles' | 'line'
+  const [lineData, setLineData] = useState(null)  // intraday ohlcv for line view
+  const [updatedAt, setUpdatedAt] = useState(new Date())
+  const [q, setQ] = useState('')
 
+  const ticker = live.ticker
+
+  // New stock selected → reset everything.
+  useEffect(() => {
+    setLive(data); setLineData(null); setChartMode('candles'); setUpdatedAt(new Date())
+  }, [data])
+
+  // AI narration (once per stock).
   useEffect(() => {
     let alive = true
     setAiLoading(true); setAi(null)
-    analyze(ticker).then((r) => { if (alive) { setAi(r); setAiLoading(false) } })
+    analyze(data.ticker).then((r) => { if (alive) { setAi(r); setAiLoading(false) } })
     return () => { alive = false }
-  }, [ticker])
+  }, [data.ticker])
 
+  // Fetch intraday data when switching to the line view.
+  // Yahoo has no "10d" period (it jumps 5d→1mo), so fetch 1mo of 30-min bars
+  // and slice to the most recent ~10 sessions below.
+  useEffect(() => {
+    if (chartMode !== 'line' || lineData) return
+    let alive = true
+    research(ticker, { period: '1mo', interval: '30m' })
+      .then((r) => { if (alive) setLineData(r) })
+      .catch(() => {})
+    return () => { alive = false }
+  }, [chartMode, lineData, ticker])
+
+  // Auto-refresh the active chart + indicators every REFRESH_MS.
+  const modeRef = useRef(chartMode)
+  modeRef.current = chartMode
+  useEffect(() => {
+    const id = setInterval(async () => {
+      try {
+        const fresh = await research(data.ticker)
+        setLive(fresh); setUpdatedAt(new Date())
+        if (modeRef.current === 'line') {
+          const l = await research(data.ticker, { period: '1mo', interval: '30m' })
+          setLineData(l)
+        }
+      } catch { /* keep last good data */ }
+    }, REFRESH_MS)
+    return () => clearInterval(id)
+  }, [data.ticker])
+
+  const { quote, indicators, ohlcv, meta } = live
   const sym = quote.currency === 'INR' ? '₹' : quote.currency === 'USD' ? '$' : ''
   const sources = ai?.available ? (ai.sources || []) : []
+  const lean = ai?.available ? ai.momentum?.lean : null
+  // Line view: last ~10 trading days of 30-min bars (≈13 bars/session).
+  const chartOhlcv = chartMode === 'line' ? (lineData?.ohlcv || []).slice(-130) : ohlcv
+
+  const submit = () => { const s = q.trim(); if (s) onSearch(s) }
 
   return (
     <div className="research">
@@ -56,37 +87,51 @@ export default function Research({ data, onBack }) {
         <button className="backbtn" onClick={onBack}>← New search</button>
       </div>
 
+      {/* top strip: search + current stock status */}
+      <div className="strip">
+        <div className="strip-search">
+          <span className="faint">🔍</span>
+          <input placeholder="Search another company or ticker…" value={q}
+                 onChange={(e) => setQ(e.target.value)} onKeyDown={(e) => { if (e.key === 'Enter') submit() }} />
+        </div>
+        <span className="strip-tk"><b>{ticker}</b> — {quote.name}</span>
+        {lean && <span className={'chip ' + (lean === 'bullish' ? 'up' : lean === 'bearish' ? 'down' : 'flat')}>{lean === 'bullish' ? '▲' : lean === 'bearish' ? '▼' : '■'} {lean}</span>}
+        <span className="strip-meta">{quote.exchange}</span>
+        <span className="strip-meta faint">delayed ~15m</span>
+      </div>
+
       <div className="headline">
         <h1>{ticker}</h1>
         <span className="px mono">{sym}{quote.price}</span>
         {changeChip(quote.changePercent)}
-        <span className="mkt">{quote.name} · {quote.exchange} · {meta.note}</span>
       </div>
 
       <div className="row cockpit">
+        {/* LEFT: chart + metrics (flows tall to fill the column) */}
         <div className="row" style={{ gridTemplateColumns: '1fr', margin: 0 }}>
           <div className="card">
             <div className="charthead">
-              <span className="lbl" style={{ margin: 0 }}>Live chart · {meta.bars} sessions · as of {meta.asOf}</span>
+              <div className="chart-toggle">
+                <button className={chartMode === 'candles' ? 'on' : ''} onClick={() => setChartMode('candles')}>Candles · 1Y</button>
+                <button className={chartMode === 'line' ? 'on' : ''} onClick={() => setChartMode('line')}>Line · 10D intraday</button>
+              </div>
               <button className="patbtn">🔍 Patterns<span className="phase">M4</span></button>
             </div>
-            <PriceChart ohlcv={ohlcv} />
+            {chartMode === 'line' && !lineData
+              ? <div className="chartwrap placeholder" style={{ display: 'grid', placeItems: 'center' }}>Loading intraday…</div>
+              : <PriceChart ohlcv={chartOhlcv} type={chartMode === 'line' ? 'line' : 'candles'} />}
+            <div className="note">
+              {chartMode === 'candles' ? `${meta.bars} daily sessions` : '10 days · 15-min bars'} · updated {updatedAt.toLocaleTimeString()} · auto-refreshes every 7 min · {meta.note}
+            </div>
           </div>
-          <div className="card snap">
-            <div className="lbl">Technical snapshot <span className="faint" style={{ textTransform: 'none', letterSpacing: 0 }}>(facts, not advice)</span></div>
-            <ul>
-              {snapshot(indicators).map(([main, sub], i) => (
-                <li key={i}><b>{main}</b>{sub ? <span className="mono" style={{ marginLeft: 8 }}>{sub}</span> : null}</li>
-              ))}
-            </ul>
-          </div>
+          <Metrics indicators={indicators} ticker={ticker} />
         </div>
-        <AiRead ai={ai} loading={aiLoading} />
-      </div>
 
-      <div className="row midrow">
-        <Metrics indicators={indicators} ticker={ticker} />
-        <NewsPanel ai={ai} loading={aiLoading} ticker={ticker} />
+        {/* RIGHT: AI read + news */}
+        <div className="row" style={{ gridTemplateColumns: '1fr', margin: 0 }}>
+          <AiRead ai={ai} loading={aiLoading} />
+          <NewsPanel ai={ai} loading={aiLoading} ticker={ticker} />
+        </div>
       </div>
 
       <div className="card">

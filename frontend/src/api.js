@@ -1,12 +1,27 @@
-const BASE = 'http://localhost:8000'
+const BASE = 'http://127.0.0.1:8000'
 
-export async function research(ticker) {
-  const res = await fetch(`${BASE}/research/${encodeURIComponent(ticker.trim())}`)
+export async function research(ticker, { period, interval } = {}) {
+  const qs = new URLSearchParams()
+  if (period) qs.set('period', period)
+  if (interval) qs.set('interval', interval)
+  const q = qs.toString()
+  const res = await fetch(`${BASE}/research/${encodeURIComponent(ticker.trim())}${q ? '?' + q : ''}`)
   if (!res.ok) {
     const err = await res.json().catch(() => ({ detail: `Request failed (HTTP ${res.status})` }))
     throw new Error(err.detail || `HTTP ${res.status}`)
   }
   return res.json()
+}
+
+// Resolve a company name or partial ticker to candidate symbols.
+export async function search(q) {
+  try {
+    const res = await fetch(`${BASE}/search?q=${encodeURIComponent(q.trim())}`)
+    if (!res.ok) return { candidates: [] }
+    return res.json()
+  } catch {
+    return { candidates: [] }
+  }
 }
 
 // AI narration — fetched separately so the chart never waits on it.

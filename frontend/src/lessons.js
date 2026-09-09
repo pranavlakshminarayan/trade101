@@ -1,17 +1,17 @@
-// Contextual metric lessons — explain each indicator ON the current stock,
-// using its real value. Static text for Milestone 2; the AI agent deepens
-// these in Milestone 3. Every lesson is factual about the number shown.
+// Metric learning: clicking a metric shows a FACT (deterministic, on this stock)
+// then a richer LESSON (what it means and how to read it). Static text for
+// Milestone 3; the AI read deepens the synthesis. Every fact uses the real value.
 
-const fmt = (v) => (v == null ? '—' : v)
+const f = (v) => (v == null ? '—' : v)
 
 export const METRICS = ['RSI', 'MACD', 'SMA50', 'SMA200', 'Bollinger', 'Volume']
 
 export function metricValue(metric, ind) {
   switch (metric) {
-    case 'RSI': return fmt(ind.rsi14)
+    case 'RSI': return f(ind.rsi14)
     case 'MACD': return ind.macd?.macd == null ? '—' : (ind.macd.macd > 0 ? '+' : '') + ind.macd.macd
-    case 'SMA50': return fmt(ind.sma50)
-    case 'SMA200': return fmt(ind.sma200)
+    case 'SMA50': return f(ind.sma50)
+    case 'SMA200': return f(ind.sma200)
     case 'Bollinger': return ind.bollinger?.middle == null ? '—' : 'mid ' + ind.bollinger.middle
     case 'Volume': return ind.volume_vs_20d_pct == null ? '—' : (ind.volume_vs_20d_pct > 0 ? '+' : '') + ind.volume_vs_20d_pct + '%'
     default: return '—'
@@ -22,57 +22,57 @@ export function metricLabel(metric) {
   return { RSI: 'RSI (14)', MACD: 'MACD (12,26,9)', SMA50: 'SMA 50', SMA200: 'SMA 200', Bollinger: 'Bollinger (20,2)', Volume: 'Volume vs 20d' }[metric]
 }
 
-export function lessonFor(metric, ind, ticker) {
-  const t = ticker
+// The deterministic fact for THIS stock (what the old Technical Snapshot showed).
+export function factFor(metric, ind, t) {
+  const p = ind.price
   switch (metric) {
     case 'RSI': {
       const v = ind.rsi14
-      const zone = v == null ? 'unavailable' : v >= 70 ? 'overbought territory (≥70)' : v <= 30 ? 'oversold territory (≤30)' : 'the neutral zone'
-      const lean = v == null ? '' : v > 50 ? ' Above 50 leans toward upward momentum.' : ' Below 50 leans toward downward momentum.'
-      return {
-        title: `RSI (14) = ${fmt(v)} on ${t}`,
-        body: `The Relative Strength Index runs 0–100 and measures the speed of recent price moves — above 70 is "overbought," below 30 is "oversold." ${t} is currently at ${fmt(v)}, in ${zone}.${lean} RSI is a momentum gauge, not a buy/sell trigger — it's most useful read alongside the trend (the moving averages).`,
-      }
+      const z = v == null ? 'n/a' : v >= 70 ? 'overbought' : v <= 30 ? 'oversold' : 'neutral'
+      return `${t}'s RSI(14) is ${f(v)} — ${z}.`
     }
     case 'MACD': {
       const m = ind.macd || {}
-      const state = m.hist == null ? '' : m.hist > 0 ? 'The histogram is positive — short-term momentum is above the longer trend (bullish tilt).' : 'The histogram is negative — short-term momentum is below the longer trend (bearish tilt).'
-      return {
-        title: `MACD on ${t}: line ${fmt(m.macd)}, signal ${fmt(m.signal)}`,
-        body: `MACD compares a fast (12-day) and slow (26-day) moving average; the "signal" is a 9-day average of that difference. When the MACD line is above the signal, momentum is building up; below, it's fading. ${state}`,
-      }
+      return `MACD line ${f(m.macd)} vs signal ${f(m.signal)}; histogram ${m.hist > 0 ? 'positive' : 'negative'} (${f(m.hist)}).`
     }
-    case 'SMA50': {
-      const above = ind.above_sma50
-      return {
-        title: `50-day SMA = ${fmt(ind.sma50)} on ${t}`,
-        body: `The 50-day simple moving average is the average closing price over the last 50 sessions — a medium-term trend line. ${t} is trading ${above ? 'ABOVE' : 'BELOW'} it (price ${fmt(ind.price)}), which is generally read as a ${above ? 'constructive medium-term' : 'weak medium-term'} trend.`,
-      }
-    }
-    case 'SMA200': {
-      if (ind.sma200 == null) return { title: `200-day SMA on ${t}`, body: `Not enough history yet to compute the 200-day average for ${t} — shown honestly as unavailable rather than guessed.` }
-      const above = ind.above_sma200
-      return {
-        title: `200-day SMA = ${ind.sma200} on ${t}`,
-        body: `The 200-day SMA is the classic long-term trend line. Trading above it is widely treated as a long-term uptrend; below, a long-term downtrend. ${t} is ${above ? 'ABOVE' : 'BELOW'} its 200-day average.`,
-      }
-    }
+    case 'SMA50':
+      return ind.sma50 == null ? `50-day average not available for ${t}.`
+        : `Price ${f(p)} is ${ind.above_sma50 ? 'above' : 'below'} the 50-day average ${ind.sma50}.`
+    case 'SMA200':
+      return ind.sma200 == null ? `Not enough history for a 200-day average on ${t}.`
+        : `Price ${f(p)} is ${ind.above_sma200 ? 'above' : 'below'} the 200-day average ${ind.sma200}.`
     case 'Bollinger': {
       const b = ind.bollinger || {}
-      return {
-        title: `Bollinger Bands (20,2) on ${t}`,
-        body: `Bollinger Bands wrap the 20-day average (${fmt(b.middle)}) with a band two standard deviations above (${fmt(b.upper)}) and below (${fmt(b.lower)}). Price near the upper band = stretched high; near the lower band = stretched low; the bands widen when volatility rises. ${t}'s price is ${fmt(ind.price)}.`,
-      }
+      return `Price ${f(p)} sits within bands ${f(b.lower)} – ${f(b.upper)} (middle ${f(b.middle)}).`
     }
     case 'Volume': {
       const v = ind.volume_vs_20d_pct
-      const dir = v == null ? '' : v > 0 ? `${v}% ABOVE its 20-day average — heavier participation` : `${Math.abs(v)}% BELOW its 20-day average — lighter participation`
-      return {
-        title: `Volume on ${t}`,
-        body: `Volume is how many shares traded. Today's volume is ${dir}. Rising volume behind a price move suggests conviction; a move on thin volume is less reliable. Latest volume: ${ind.volume?.toLocaleString?.() ?? ind.volume}.`,
-      }
+      return `Latest volume is ${v == null ? 'n/a' : (v > 0 ? v + '% above' : Math.abs(v) + '% below')} the 20-day average.`
     }
+    default: return ''
+  }
+}
+
+// The richer teaching explanation.
+export function lessonFor(metric, ind, t) {
+  const p = ind.price
+  switch (metric) {
+    case 'RSI': {
+      const v = ind.rsi14
+      const lean = v == null ? '' : v > 50 ? ' Sitting above 50 tilts momentum upward,' : ' Sitting below 50 tilts momentum downward,'
+      return `The Relative Strength Index compresses recent up-moves vs down-moves into a 0–100 score. Above 70 is "overbought" (the rally may be stretched); below 30 is "oversold" (the selloff may be stretched); the middle is the ordinary working range.${lean} but RSI is a *momentum* gauge, not a trend or a signal — its real value is as a cross-check: strong trend + mid-50s RSI is healthy; strong trend + 80 RSI is stretched. On its own it never tells you what happens next.`
+    }
+    case 'MACD':
+      return `MACD is the distance between a fast (12-day) and slow (26-day) moving average, with a 9-day "signal" line smoothing it. When the MACD line is above the signal and the histogram (their gap) is positive and widening, short-term momentum is pulling ahead of the trend — accelerating. Negative and widening means it's fading. The *direction of the histogram* often matters more than the raw number: a shrinking positive histogram is momentum cooling even while still green.`
+    case 'SMA50':
+      return `The 50-day simple moving average is the average close over the last 50 sessions — a medium-term trend line that smooths daily noise. Price above it is generally read as a constructive medium-term trend; below it, a weak one. Traders also watch how the 50-day sits relative to the 200-day: 50 above 200 is a "stacked," healthy structure (a golden-cross regime); 50 below 200 is the opposite.`
+    case 'SMA200':
+      return `The 200-day average is the classic long-term trend line — many desks treat "above the 200-day" as a bull regime and "below" as a bear regime. The *distance* from it is a tell too: price far above the 200-day (like a stock up big on the year) shows strong trend but also room to mean-revert, so a single bad datapoint can snap it back hard.`
+    case 'Bollinger':
+      return `Bollinger Bands draw the 20-day average with an envelope two standard deviations above and below it. Price near the upper band means you're at the top of the recent statistical range — that can mean *strength* or *short-term overextension*, which is why it's read with the trend, not alone. The bands widening means volatility is rising; squeezing means it's calming.`
+    case 'Volume':
+      return `Volume is how many shares changed hands. It's the *confirmation* layer: a price move on heavy volume shows real participation and conviction, while the same move on light volume is a weaker, less-trusted signal. An up-day well below the 20-day average volume is exactly that — a move the crowd hasn't fully backed yet.`
     default:
-      return { title: metric, body: '' }
+      return ''
   }
 }

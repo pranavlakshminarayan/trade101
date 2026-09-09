@@ -1,7 +1,8 @@
 import { useEffect, useState } from 'react'
-import { METRICS, metricLabel, metricValue, lessonFor } from '../lessons.js'
+import { METRICS, metricLabel, metricValue, factFor, lessonFor } from '../lessons.js'
 
-// Merged metric analyzer + learning: click a metric → its lesson opens; Esc closes.
+// Metric analyzer + learning in ONE block: click a metric → the fact for this
+// stock first, then the deeper lesson. Esc closes.
 export default function Metrics({ indicators, ticker }) {
   const [selected, setSelected] = useState(null)
 
@@ -10,8 +11,6 @@ export default function Metrics({ indicators, ticker }) {
     window.addEventListener('keydown', onKey)
     return () => window.removeEventListener('keydown', onKey)
   }, [])
-
-  const lesson = selected ? lessonFor(selected, indicators, ticker) : null
 
   return (
     <div className="card">
@@ -28,11 +27,12 @@ export default function Metrics({ indicators, ticker }) {
           </button>
         ))}
       </div>
-      {lesson && (
+      {selected && (
         <div className="lesson">
           <button className="esc" onClick={() => setSelected(null)}>Esc ✕</button>
-          <h4>{lesson.title}</h4>
-          <p style={{ margin: 0 }}>{lesson.body}</p>
+          <h4>{metricLabel(selected)} on {ticker}</h4>
+          <p className="fact">{factFor(selected, indicators, ticker)}</p>
+          <p style={{ margin: '8px 0 0' }}>{lessonFor(selected, indicators, ticker)}</p>
         </div>
       )}
     </div>
