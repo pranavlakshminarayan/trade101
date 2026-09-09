@@ -13,7 +13,9 @@ import os
 
 import anthropic
 
-MODEL = os.environ.get("TRADE101_MODEL", "claude-opus-5")
+# Default to Sonnet 5 (cheaper than Opus, strong reasoning). Override with
+# TRADE101_MODEL in .env (e.g. claude-opus-5 for max depth, claude-haiku-4-5 for cheapest).
+MODEL = os.environ.get("TRADE101_MODEL", "claude-sonnet-5")
 
 
 class MissingKeyError(RuntimeError):

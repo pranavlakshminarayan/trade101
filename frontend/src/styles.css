@@ -79,6 +79,12 @@ button{font:inherit;cursor:pointer}
 /* loading widget */
 .scraping{display:flex;align-items:center;gap:12px;padding:6px 0}
 .scraping .spinner{margin:0;width:22px;height:22px;flex:none}
+
+/* ecosystem */
+.eco-facts{display:grid;grid-template-columns:1fr 1fr;gap:10px 16px}
+.eco-facts > div{display:flex;flex-direction:column;gap:2px;font-size:13.5px}
+.eco-facts .faint{font-size:11px;text-transform:uppercase;letter-spacing:.05em}
+.eco-peers{display:flex;gap:8px;flex-wrap:wrap}
 .chartwrap{height:340px;width:100%}
 
 /* deterministic snapshot */

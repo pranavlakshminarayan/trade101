@@ -24,6 +24,17 @@ export async function search(q) {
   }
 }
 
+// Company profile / ecosystem: sector, industry, beta, market cap, peers.
+export async function ecosystem(ticker) {
+  try {
+    const res = await fetch(`${BASE}/ecosystem/${encodeURIComponent(ticker.trim())}`)
+    if (!res.ok) return null
+    return res.json()
+  } catch {
+    return null
+  }
+}
+
 // Chart-pattern detection for a given timeframe.
 export async function patterns(ticker, { period, interval } = {}) {
   const qs = new URLSearchParams()

@@ -18,7 +18,7 @@ from fastapi.middleware.cors import CORSMiddleware
 load_dotenv(Path(__file__).resolve().parent.parent / ".env")
 
 from agents import llm, orchestrator
-from services import indicators, marketdata, patterns, search
+from services import company, indicators, marketdata, patterns, search
 
 app = FastAPI(title="Trade101 API", version="0.1.0")
 
@@ -85,6 +85,15 @@ def research(ticker: str, period: str = "1y", interval: str = "1d"):
             "interval": interval,
         },
     }
+
+
+@app.get("/ecosystem/{ticker}")
+def ecosystem(ticker: str):
+    """Company profile + peers: sector, industry, beta, market cap, peer symbols."""
+    data = marketdata.get(ticker, period="5d")  # confirm the symbol exists
+    if data is None:
+        raise HTTPException(status_code=404, detail=f"No data for '{ticker}'.")
+    return {"ticker": ticker.upper(), **company.get_profile(ticker)}
 
 
 @app.get("/patterns/{ticker}")

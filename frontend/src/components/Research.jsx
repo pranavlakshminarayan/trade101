@@ -4,6 +4,7 @@ import PriceChart from './PriceChart.jsx'
 import Metrics from './Metrics.jsx'
 import AiRead from './AiRead.jsx'
 import NewsPanel from './NewsPanel.jsx'
+import Ecosystem from './Ecosystem.jsx'
 import { analyze, research, patterns as fetchPatterns } from '../api.js'
 
 const REFRESH_MS = 7 * 60 * 1000
@@ -126,12 +127,7 @@ export default function Research({ data, onBack, onSearch }) {
   const blocks = {
     metrics: <Metrics indicators={indicators} ticker={ticker} />,
     news: <NewsPanel ai={ai} loading={aiLoading} ticker={ticker} />,
-    ecosystem: (
-      <div className="card">
-        <div className="lbl">Ecosystem &amp; index<span className="phase">M4</span></div>
-        <div className="placeholder">Supply-chain chain + the index {ticker} lives in (S&amp;P/NASDAQ) with beta — coming next in M4.</div>
-      </div>
-    ),
+    ecosystem: <Ecosystem ticker={ticker} onSearch={onSearch} />,
     references: (
       <div className="card">
         <div className="lbl">📎 References — every source used</div>

@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
 import Welcome from './components/Welcome.jsx'
 import Research from './components/Research.jsx'
 import { research as fetchResearch, search as searchSymbols } from './api.js'
@@ -10,18 +10,34 @@ export default function App() {
   const [recent, setRecent] = useState([])
   const [candidates, setCandidates] = useState(null) // disambiguation list
 
-  async function doResearch(symbol) {
+  async function doResearch(symbol, push = true) {
     setLoading(true); setError(null); setCandidates(null)
     try {
       const bundle = await fetchResearch(symbol)
       setData(bundle)
       setRecent((r) => [bundle.ticker, ...r.filter((x) => x !== bundle.ticker)].slice(0, 6))
+      if (push) window.history.pushState({ ticker: bundle.ticker }, '', '#' + bundle.ticker)
     } catch (e) {
       setError(e.message || 'Something went wrong')
     } finally {
       setLoading(false)
     }
   }
+
+  // Browser back/forward + shareable #TICKER links.
+  useEffect(() => {
+    const hashTicker = () => decodeURIComponent(window.location.hash.replace('#', '')).trim()
+    const initial = hashTicker()
+    if (initial) doResearch(initial, false)
+    const onPop = (e) => {
+      const t = e.state?.ticker || hashTicker()
+      if (t) doResearch(t, false)
+      else { setData(null); setError(null); setCandidates(null) }
+    }
+    window.addEventListener('popstate', onPop)
+    return () => window.removeEventListener('popstate', onPop)
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [])
 
   // Resolve a name/ticker → research, or show a picker when ambiguous.
   async function submitQuery(query) {
@@ -39,7 +55,7 @@ export default function App() {
     setCandidates(cands); setLoading(false)
   }
 
-  const goHome = () => { setData(null); setError(null); setCandidates(null) }
+  const goHome = () => { setData(null); setError(null); setCandidates(null); window.history.pushState({}, '', '#') }
 
   const picker = candidates && (
     <div className="modal-bg" onClick={() => setCandidates(null)}>
