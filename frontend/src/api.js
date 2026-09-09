@@ -8,3 +8,23 @@ export async function research(ticker) {
   }
   return res.json()
 }
+
+// AI narration — fetched separately so the chart never waits on it.
+// In-flight dedupe: React StrictMode double-invokes effects in dev, which would
+// otherwise fire two identical (paid) analysis calls; sharing the promise avoids that.
+const _inflight = {}
+export async function analyze(ticker) {
+  const key = ticker.trim().toUpperCase()
+  if (_inflight[key]) return _inflight[key]
+  const p = (async () => {
+    const res = await fetch(`${BASE}/analyze/${encodeURIComponent(key)}`)
+    if (!res.ok) return { available: false, reason: `AI request failed (HTTP ${res.status})` }
+    return res.json()
+  })()
+  _inflight[key] = p
+  try {
+    return await p
+  } finally {
+    delete _inflight[key]
+  }
+}

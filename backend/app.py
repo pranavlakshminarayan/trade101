@@ -10,6 +10,7 @@ from __future__ import annotations
 from fastapi import FastAPI, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
 
+from agents import llm, orchestrator
 from services import indicators, marketdata
 
 app = FastAPI(title="Trade101 API", version="0.1.0")
@@ -69,3 +70,22 @@ def research(ticker: str, period: str = "1y", interval: str = "1d"):
             "bars": len(ohlcv),
         },
     }
+
+
+@app.get("/analyze/{ticker}")
+def analyze(ticker: str):
+    """
+    AI narration for a ticker: momentum read (sourced), news Feed + "What it
+    means" inference. Separate from /research so the chart renders instantly and
+    never blocks on the AI. Degrades gracefully: missing key / AI error →
+    available:false with a reason, not a crash.
+    """
+    try:
+        result = orchestrator.analyze(ticker)
+    except llm.MissingKeyError as e:
+        return {"available": False, "reason": str(e)}
+    except Exception as e:  # network/API/parse — chart still works without this
+        return {"available": False, "reason": f"AI narration error: {e}"}
+    if result is None:
+        raise HTTPException(status_code=404, detail=f"No market data found for '{ticker}'.")
+    return {"available": True, **result}
