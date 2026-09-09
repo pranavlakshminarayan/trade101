@@ -7,8 +7,15 @@ deterministic foundation everything else stands on.
 """
 from __future__ import annotations
 
+from pathlib import Path
+
+from dotenv import load_dotenv
 from fastapi import FastAPI, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
+
+# Load .env from the project root (one level up from backend/) so the named
+# API keys are available as environment variables.
+load_dotenv(Path(__file__).resolve().parent.parent / ".env")
 
 from agents import llm, orchestrator
 from services import indicators, marketdata
