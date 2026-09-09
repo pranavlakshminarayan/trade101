@@ -65,8 +65,20 @@ button{font:inherit;cursor:pointer}
 .patbtn.on{background:var(--amber);color:#231a06;border-color:var(--amber)}
 
 /* patterns overlay panel */
-.patterns-panel{margin-top:12px;border-top:1px solid var(--hair);padding-top:12px;display:flex;flex-direction:column;gap:12px}
-.pat p{margin:6px 0 0;font-size:13px;color:var(--muted);line-height:1.5}
+.patterns-panel{margin-top:12px;border-top:1px solid var(--hair);padding-top:12px;display:flex;flex-direction:column;gap:10px}
+.pat p{margin:6px 0 0;font-size:13px;color:var(--muted);line-height:1.55}
+.pat-select{display:flex;gap:6px;flex-wrap:wrap}
+.pat-tab{background:var(--bg);border:1px solid var(--hair);color:var(--muted);font-size:12.5px;padding:5px 12px;border-radius:8px}
+.pat-tab.on{background:var(--amber);color:#231a06;border-color:var(--amber);font-weight:600}
+
+/* self-balancing masonry */
+.cols{display:grid;grid-template-columns:1fr 1fr;gap:20px;align-items:start}
+@media(max-width:900px){.cols{grid-template-columns:1fr}}
+.col{display:flex;flex-direction:column;gap:20px;min-width:0}
+
+/* loading widget */
+.scraping{display:flex;align-items:center;gap:12px;padding:6px 0}
+.scraping .spinner{margin:0;width:22px;height:22px;flex:none}
 .chartwrap{height:340px;width:100%}
 
 /* deterministic snapshot */

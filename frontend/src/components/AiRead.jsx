@@ -16,7 +16,13 @@ export default function AiRead({ ai, loading }) {
     return (
       <div className="card">
         <div className="lbl">AI momentum read</div>
-        <div className="placeholder">Reading the signals…</div>
+        <div className="scraping">
+          <div className="spinner" />
+          <div>
+            <div style={{ fontWeight: 500, color: 'var(--ink)' }}>Scraping &amp; analysing…</div>
+            <div className="faint" style={{ fontSize: 12 }}>Gathering news + filings and reading the signals. This takes a few seconds.</div>
+          </div>
+        </div>
       </div>
     )
   }

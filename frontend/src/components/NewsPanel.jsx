@@ -17,7 +17,12 @@ export default function NewsPanel({ ai, loading, ticker }) {
         <button className={'ntab' + (tab === 'means' ? ' on' : '')} onClick={() => setTab('means')}>What it means ✦</button>
       </div>
 
-      {loading && <div className="placeholder">Gathering and reading the news…</div>}
+      {loading && (
+        <div className="scraping">
+          <div className="spinner" />
+          <div className="faint" style={{ fontSize: 13 }}>Gathering the news feed…</div>
+        </div>
+      )}
 
       {!loading && !ai?.available && (
         <div className="placeholder">{ai?.reason || 'News analysis unavailable.'}</div>
