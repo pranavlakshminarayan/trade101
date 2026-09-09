@@ -6,7 +6,17 @@ import AiRead from './AiRead.jsx'
 import NewsPanel from './NewsPanel.jsx'
 import { analyze, research } from '../api.js'
 
-const REFRESH_MS = 7 * 60 * 1000 // auto-refresh the chart every 7 minutes
+const REFRESH_MS = 7 * 60 * 1000 // auto-refresh every 7 minutes
+
+// Timeframe presets → Yahoo period/interval (+ optional slice to trim bars).
+const TF = {
+  '1Y':  { period: '1y',  interval: '1d' },
+  '1M':  { period: '1mo', interval: '1d' },
+  '10D': { period: '1mo', interval: '30m', slice: 130 }, // Yahoo has no 10d; slice ~10 sessions
+  '5D':  { period: '5d',  interval: '15m' },
+  '1D':  { period: '1d',  interval: '5m' },  // 24h / intraday
+}
+const TF_ORDER = ['1Y', '1M', '10D', '5D', '1D']
 
 function changeChip(pct) {
   if (pct == null) return <span className="chip flat">—</span>
@@ -16,19 +26,21 @@ function changeChip(pct) {
 }
 
 export default function Research({ data, onBack, onSearch }) {
-  const [live, setLive] = useState(data)          // refreshable market bundle
+  const [live, setLive] = useState(data)           // main 1Y bundle: quote, indicators, 1Y chart
   const [ai, setAi] = useState(null)
   const [aiLoading, setAiLoading] = useState(true)
-  const [chartMode, setChartMode] = useState('candles') // 'candles' | 'line'
-  const [lineData, setLineData] = useState(null)  // intraday ohlcv for line view
+  const [chartType, setChartType] = useState('candles') // 'candles' | 'line'
+  const [timeframe, setTimeframe] = useState('1Y')
+  const [tfData, setTfData] = useState({})         // { [tf]: ohlcv } cache (1Y comes from `live`)
+  const [tfLoading, setTfLoading] = useState(false)
   const [updatedAt, setUpdatedAt] = useState(new Date())
   const [q, setQ] = useState('')
 
   const ticker = live.ticker
 
-  // New stock selected → reset everything.
+  // New stock → reset.
   useEffect(() => {
-    setLive(data); setLineData(null); setChartMode('candles'); setUpdatedAt(new Date())
+    setLive(data); setTfData({}); setChartType('candles'); setTimeframe('1Y'); setUpdatedAt(new Date())
   }, [data])
 
   // AI narration (once per stock).
@@ -39,31 +51,31 @@ export default function Research({ data, onBack, onSearch }) {
     return () => { alive = false }
   }, [data.ticker])
 
-  // Fetch intraday data when switching to the line view.
-  // Yahoo has no "10d" period (it jumps 5d→1mo), so fetch 1mo of 30-min bars
-  // and slice to the most recent ~10 sessions below.
+  // Ensure data for the selected timeframe (1Y comes from `live`).
   useEffect(() => {
-    if (chartMode !== 'line' || lineData) return
+    if (timeframe === '1Y' || tfData[timeframe]) return
     let alive = true
-    research(ticker, { period: '1mo', interval: '30m' })
-      .then((r) => { if (alive) setLineData(r) })
+    setTfLoading(true)
+    research(ticker, TF[timeframe])
+      .then((r) => { if (alive) setTfData((c) => ({ ...c, [timeframe]: r.ohlcv })) })
       .catch(() => {})
+      .finally(() => { if (alive) setTfLoading(false) })
     return () => { alive = false }
-  }, [chartMode, lineData, ticker])
+  }, [timeframe, ticker, tfData])
 
-  // Auto-refresh the active chart + indicators every REFRESH_MS.
-  const modeRef = useRef(chartMode)
-  modeRef.current = chartMode
+  // Auto-refresh the live bundle (+ active timeframe) every REFRESH_MS.
+  const tfRef = useRef(timeframe); tfRef.current = timeframe
   useEffect(() => {
     const id = setInterval(async () => {
       try {
         const fresh = await research(data.ticker)
         setLive(fresh); setUpdatedAt(new Date())
-        if (modeRef.current === 'line') {
-          const l = await research(data.ticker, { period: '1mo', interval: '30m' })
-          setLineData(l)
+        const tf = tfRef.current
+        if (tf !== '1Y') {
+          const r = await research(data.ticker, TF[tf])
+          setTfData((c) => ({ ...c, [tf]: r.ohlcv }))
         }
-      } catch { /* keep last good data */ }
+      } catch { /* keep last good */ }
     }, REFRESH_MS)
     return () => clearInterval(id)
   }, [data.ticker])
@@ -72,8 +84,11 @@ export default function Research({ data, onBack, onSearch }) {
   const sym = quote.currency === 'INR' ? '₹' : quote.currency === 'USD' ? '$' : ''
   const sources = ai?.available ? (ai.sources || []) : []
   const lean = ai?.available ? ai.momentum?.lean : null
-  // Line view: last ~10 trading days of 30-min bars (≈13 bars/session).
-  const chartOhlcv = chartMode === 'line' ? (lineData?.ohlcv || []).slice(-130) : ohlcv
+
+  const rawTf = timeframe === '1Y' ? ohlcv : (tfData[timeframe] || [])
+  const slice = TF[timeframe].slice
+  const chartOhlcv = slice ? rawTf.slice(-slice) : rawTf
+  const chartLoading = timeframe !== '1Y' && !tfData[timeframe] && tfLoading
 
   const submit = () => { const s = q.trim(); if (s) onSearch(s) }
 
@@ -87,7 +102,6 @@ export default function Research({ data, onBack, onSearch }) {
         <button className="backbtn" onClick={onBack}>← New search</button>
       </div>
 
-      {/* top strip: search + current stock status */}
       <div className="strip">
         <div className="strip-search">
           <span className="faint">🔍</span>
@@ -107,31 +121,36 @@ export default function Research({ data, onBack, onSearch }) {
       </div>
 
       <div className="row cockpit">
-        {/* LEFT: chart + metrics (flows tall to fill the column) */}
+        {/* LEFT: chart → metrics → news (fills the column) */}
         <div className="row" style={{ gridTemplateColumns: '1fr', margin: 0 }}>
           <div className="card">
             <div className="charthead">
               <div className="chart-toggle">
-                <button className={chartMode === 'candles' ? 'on' : ''} onClick={() => setChartMode('candles')}>Candles · 1Y</button>
-                <button className={chartMode === 'line' ? 'on' : ''} onClick={() => setChartMode('line')}>Line · 10D intraday</button>
+                <button className={chartType === 'candles' ? 'on' : ''} onClick={() => setChartType('candles')}>Candles</button>
+                <button className={chartType === 'line' ? 'on' : ''} onClick={() => setChartType('line')}>Line</button>
+              </div>
+              <div className="chart-toggle">
+                {TF_ORDER.map((t) => (
+                  <button key={t} className={timeframe === t ? 'on' : ''} onClick={() => setTimeframe(t)}>{t}</button>
+                ))}
               </div>
               <button className="patbtn">🔍 Patterns<span className="phase">M4</span></button>
             </div>
-            {chartMode === 'line' && !lineData
-              ? <div className="chartwrap placeholder" style={{ display: 'grid', placeItems: 'center' }}>Loading intraday…</div>
-              : <PriceChart ohlcv={chartOhlcv} type={chartMode === 'line' ? 'line' : 'candles'} />}
+            {chartLoading || !chartOhlcv.length
+              ? <div className="chartwrap placeholder" style={{ display: 'grid', placeItems: 'center' }}>Loading {timeframe}…</div>
+              : <PriceChart ohlcv={chartOhlcv} type={chartType} />}
             <div className="note">
-              {chartMode === 'candles' ? `${meta.bars} daily sessions` : '10 days · 15-min bars'} · updated {updatedAt.toLocaleTimeString()} · auto-refreshes every 7 min · {meta.note}
+              {timeframe} · {TF[timeframe].interval} bars · updated {updatedAt.toLocaleTimeString()} · auto-refreshes every 7 min · {meta.note}
             </div>
           </div>
-          <Metrics indicators={indicators} ticker={ticker} />
-        </div>
 
-        {/* RIGHT: AI read + news */}
-        <div className="row" style={{ gridTemplateColumns: '1fr', margin: 0 }}>
-          <AiRead ai={ai} loading={aiLoading} />
+          <Metrics indicators={indicators} ticker={ticker} />
+
           <NewsPanel ai={ai} loading={aiLoading} ticker={ticker} />
         </div>
+
+        {/* RIGHT: AI read (tall) */}
+        <AiRead ai={ai} loading={aiLoading} />
       </div>
 
       <div className="card">

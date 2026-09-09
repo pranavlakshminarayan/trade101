@@ -18,9 +18,13 @@ export default function PriceChart({ ohlcv, type = 'candles' }) {
     })
 
     if (type === 'line') {
+      // Color the line by the window's net direction — green if it closed up
+      // over the shown range, red if down (like a real ticker).
+      const up = ohlcv[ohlcv.length - 1].close >= ohlcv[0].close
+      const line = up ? '#00D68F' : '#F0616D'
+      const top = up ? 'rgba(0,214,143,.28)' : 'rgba(240,97,109,.26)'
       const area = chart.addAreaSeries({
-        lineColor: '#34A9BE', lineWidth: 2,
-        topColor: 'rgba(52,169,190,.28)', bottomColor: 'rgba(52,169,190,0)',
+        lineColor: line, lineWidth: 2, topColor: top, bottomColor: 'rgba(10,20,30,0)',
       })
       area.setData(ohlcv.map((b) => ({ time: b.time, value: b.close })))
     } else {
