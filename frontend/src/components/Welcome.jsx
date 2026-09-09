@@ -1,9 +1,9 @@
 import { useState } from 'react'
 import Logo from './Logo.jsx'
 
-const SUGGEST = ['NVDA', 'AAPL', 'MSFT', 'TSM', 'RELIANCE.NS', '005930.KS']
+const SUGGEST = ['NVDA', 'Apple', 'Samsung', 'Toyota', 'Tencent', 'Reliance']
 
-export default function Welcome({ onSearch, recent }) {
+export default function Welcome({ onSearch, recent, onNavigate }) {
   const [value, setValue] = useState('')
   const submit = (t) => { const q = (t ?? value).trim(); if (q) onSearch(q) }
 
@@ -13,7 +13,7 @@ export default function Welcome({ onSearch, recent }) {
         <div className="logo"><Logo /> Trade101</div>
         <button className="railitem on" style={{ marginTop: 12 }}>✚ New research</button>
         <button className="railitem">⚖️ Comparison <span className="faint" style={{ marginLeft: 'auto', fontSize: 11 }}>soon</span></button>
-        <button className="railitem">🕘 History <span className="faint" style={{ marginLeft: 'auto', fontSize: 11 }}>soon</span></button>
+        <button className="railitem" onClick={() => onNavigate('history')}>🕘 History</button>
         {recent?.length > 0 && <div className="railsec">Recent research</div>}
         {recent?.map((r) => (
           <button key={r} className="railitem" onClick={() => submit(r)}>{r}</button>
@@ -24,8 +24,8 @@ export default function Welcome({ onSearch, recent }) {
         <div className="logo" style={{ fontSize: 22 }}><Logo size={34} /> Trade101</div>
         <div className="big">Which stock shall we study, <span>Pranav?</span></div>
         <div className="sub">
-          Type any ticker — US, China, Japan, Korea, Hong Kong, Singapore or India.
-          I'll pull the live data and teach the metrics as we go. (Non-US needs a suffix, e.g. <span className="mono">RELIANCE.NS</span>, <span className="mono">005930.KS</span>.)
+          Just type a <b>company name</b> (or ticker) — any market: US, China, Japan, Korea, Hong Kong, Singapore, India, Europe.
+          If several match, you pick. I'll pull the live data and teach the metrics as we go.
         </div>
 
         <div className="askbox">

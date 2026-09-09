@@ -6,6 +6,7 @@ import AiRead from './AiRead.jsx'
 import NewsPanel from './NewsPanel.jsx'
 import Ecosystem from './Ecosystem.jsx'
 import { analyze, research, patterns as fetchPatterns } from '../api.js'
+import { addHistory } from '../lib/history.js'
 
 const REFRESH_MS = 7 * 60 * 1000
 
@@ -26,7 +27,7 @@ function changeChip(pct) {
   return <span className={'chip ' + cls}>{arrow} {pct > 0 ? '+' : ''}{pct}%</span>
 }
 
-export default function Research({ data, onBack, onSearch }) {
+export default function Research({ data, onBack, onSearch, onNavigate }) {
   const [live, setLive] = useState(data)
   const [ai, setAi] = useState(null)
   const [aiLoading, setAiLoading] = useState(true)
@@ -59,6 +60,13 @@ export default function Research({ data, onBack, onSearch }) {
   }, [data.ticker])
 
   useEffect(() => { setPatSel(0) }, [timeframe])
+
+  // Save each analysed stock to history (with its 2-line AI takeaway).
+  useEffect(() => {
+    if (ai?.available && ai.momentum?.summary) {
+      addHistory({ ticker: live.ticker, name: live.quote?.name, lean: ai.momentum.lean, summary: ai.momentum.summary })
+    }
+  }, [ai])
 
   useEffect(() => {
     if (timeframe === '1Y' || tfData[timeframe]) return
@@ -190,7 +198,7 @@ export default function Research({ data, onBack, onSearch }) {
       <div className="top">
         <div style={{ display: 'flex', alignItems: 'center' }}>
           <div className="logo"><Logo /> Trade101</div>
-          <div className="tabs"><a className="on">Research</a><a>Comparison</a><a>History</a></div>
+          <div className="tabs"><a className="on">Research</a><a>Comparison</a><a onClick={() => onNavigate('history')} style={{ cursor: 'pointer' }}>History</a></div>
         </div>
         <button className="backbtn" onClick={onBack}>← New search</button>
       </div>

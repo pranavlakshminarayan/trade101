@@ -52,8 +52,8 @@ def research(ticker: str, period: str = "1y", interval: str = "1d"):
     if data is None:
         raise HTTPException(
             status_code=404,
-            detail=f"No market data found for '{ticker}'. Check the symbol "
-                   f"(non-US markets need an exchange suffix, e.g. 005930.KS, RELIANCE.NS).",
+            detail=f"No market data found for '{ticker}'. Try the company name instead — "
+                   f"search resolves any market and lets you pick from the matches.",
         )
     hist, quote = data
     ind = indicators.compute_indicators(hist)

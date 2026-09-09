@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react'
 import Welcome from './components/Welcome.jsx'
 import Research from './components/Research.jsx'
+import History from './components/History.jsx'
 import { research as fetchResearch, search as searchSymbols } from './api.js'
 
 export default function App() {
@@ -9,6 +10,7 @@ export default function App() {
   const [error, setError] = useState(null)
   const [recent, setRecent] = useState([])
   const [candidates, setCandidates] = useState(null) // disambiguation list
+  const [view, setView] = useState('home') // 'home' | 'history'
 
   async function doResearch(symbol, push = true) {
     setLoading(true); setError(null); setCandidates(null)
@@ -73,19 +75,23 @@ export default function App() {
     </div>
   )
 
+  if (view === 'history') {
+    return <History onNavigate={setView} onOpen={(t) => { setView('home'); doResearch(t) }} />
+  }
+
   if (loading) {
     return <div className="loading"><div className="spinner" />Working…</div>
   }
 
   if (data) {
     return (<>
-      <Research data={data} onBack={goHome} onSearch={submitQuery} />
+      <Research data={data} onBack={goHome} onSearch={submitQuery} onNavigate={setView} />
       {picker}
     </>)
   }
 
   return (<>
-    <Welcome onSearch={submitQuery} recent={recent} />
+    <Welcome onSearch={submitQuery} recent={recent} onNavigate={setView} />
     {picker}
     {error && (
       <div style={{ position: 'fixed', left: 0, right: 0, bottom: 20, display: 'flex', justifyContent: 'center' }}>
