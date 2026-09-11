@@ -30,34 +30,40 @@ feature work below; the phases after it are renumbered accordingly.
       with Guided Study Mode below.
 - [ ] **Saved learning note** — ditto.
 
-## Phase 2 — Learning engine
-- **Guided Study Mode** — observe → predict → reveal → challenge → revisit.
-- **Learning journal** — save the learner's hypothesis + evidence (never a virtual trade).
-- **Retrospective replay** — hide the historical outcome until the learner commits a read.
-- **Company fundamentals** — earnings date, results vs estimates, revenue, margins, cash
-  flow, valuation context, primary filing links.
-- Short contextual prompts over tooltip overload.
+## Phase 2 — Learning engine ✅
+- [x] **Guided Study Mode** — observe → predict → reveal → challenge → revisit.
+- [x] **Learning journal** — hypothesis + evidence, never a virtual trade.
+- [x] **Retrospective replay** — separate setup/reveal endpoints so the future never reaches the browser.
+- [x] **Company fundamentals** — earnings, results vs estimates, revenue, margins, cash flow, valuation, filing links.
+- [x] Short contextual prompts over tooltip overload.
 
-## Phase 2.5 — Style lenses (not "styles to copy")
+## Phase 2.5 — Style lenses ✅ (not "styles to copy")
 Trend · Swing · Mean-reversion · Long-term · Event-driven. Each must show what it
 considers, what it ignores, conflicting evidence, and its failure modes.
 **No day-trading lens** until a licensed real-time feed exists — delayed data would
 create false precision.
 
-## Phase 3 — Research workspace
-- **Comparison** — two or more companies, normalized charts; never reduced to "which is better".
-- **Watchlist** — alerts phrased as information events (earnings filed, level crossed), not trade prompts.
-- **Optional simulated portfolio** — a separate practice lab, explicitly hypothetical; never the primary action.
-- Light mode, contrast checks, keyboard navigation, responsive layout.
+## Phase 3 — Research workspace ✅
+- [x] **Comparison** — two or more companies, normalized charts; never reduced to "which is better".
+- [x] **Watchlist** — alerts phrased as information events, never trade prompts.
+- [x] **Practice lab** — separate tab, explicitly hypothetical, reasoning required; never the primary action.
+- [x] Light mode (3-state switch), focus rings, skip link, responsive to 400px.
 
-## Phase 4 — Supply-chain & ecosystem intelligence
-- Replace the peer list with a **sourced relationship graph**: each edge carries type
-  (supplier/customer/partner/competitor/investor/index constituent), source, date,
-  confidence and materiality.
-- Distinguish public from private companies.
-- State plainly that a business relationship is a research hypothesis, not proof of a
-  price effect.
-- ETF view shows verified holdings and weights.
+## Phase 4 — Supply-chain & ecosystem intelligence ✅ (within what is sourceable)
+- [x] **Sourced relationship graph** — every edge carries type, source, date, confidence, materiality.
+- [x] Public/private distinguished by an explicit flag.
+- [x] "A relationship is a research hypothesis, not proof of a price effect" carried everywhere.
+- [x] ETF view shows verified holdings and real published weights.
+- [ ] **Supplier/customer/partner/investor edges still have no source.** They are shown as
+      explicitly unsourced rather than guessed. Needs a licensed dataset behind
+      `TRADE101_RELATIONSHIP_PROVIDER` — the adapter slot exists.
+
+## Still open
+- **Ask-Claude chat** over the research bundle — the one Phase-2 item from the original
+  plan that was never built (no endpoint, no UI seam). Starts from zero.
+- Remove the old `Ecosystem` peer panel once the new `Graph` has been compared against it.
+- Frontend tests (Vitest) — the backend has 128, the React side has none.
+- Live-data verification of fundamentals/ETF holdings across non-US markets.
 
 ## Deferred — depth (was Phase 2)
 - **Deeper search / scrape for non-US markets.** US data is easy/free (Wall Street sources, etc.); other countries (China, Japan, Korea, HK, Singapore, India) are harder → **Firecrawl or an alternative** to scrape/extract where clean APIs don't exist. Pluggable provider slot already designed for this.

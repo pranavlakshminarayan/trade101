@@ -4,7 +4,8 @@ A faithful, detailed record of the entire conversation and build that produced T
 
 - **Repo:** https://github.com/pranavlakshminarayan/trade101 (public)
 - **Local:** `C:\Users\prana\Documents\Claude Code\Trading idea`
-- **Status (2026-09-12):** MVP complete (Milestones 0–5) and pushed to GitHub.
+- **Status (2026-09-11):** MVP (M0–M5) + Phases 1.5, 2, 2.5, 3 and 4 complete. 128 backend tests.
+**→ For the current state, read `docs/EXECUTION-REPORT.md` first** — what shipped, what still needs live testing, known gaps.
 - **User:** Pranav (student, beginning trader; trades on Moomoo; workspace.sonic@gmail.com). GitHub: pranavlakshminarayan.
 
 ---
@@ -112,3 +113,44 @@ See `README.md`. Two terminals: backend `uvicorn app:app --reload --port 8000` (
 - Deeper non-US sourcing (**Firecrawl** or alternative) — the news provider is already pluggable (`TRADE101_NEWS_PROVIDER`).
 - Richer pattern library + step-by-step teaching replay; the real data-cube **logo**; desktop packaging; broader premium sourcing (Exa, etc.).
 - North-star reminder: **extract and make sense of data; teach understanding; never advise.**
+
+
+---
+
+## 6. Phase 1.5 → 4 (session of 2026-09-11)
+
+Pranav brought an external review (ChatGPT + Gemini) of the MVP, saved at
+`docs/trade101-phase-2-recommendations.txt`. It reordered the roadmap: **trust and
+coherence before features**, and cautioned against adding agents or API keys to improve
+sourcing. That ordering was adopted and everything below follows it.
+
+**Full detail: `docs/EXECUTION-REPORT.md`.** In brief:
+
+- **Phase 1.5 — trust.** The evidence pipeline (`services/evidence.py`): two
+  deterministic gates around the single analysis call — a relevance filter before,
+  a citation verifier after. Claim-level citations, coverage grading, a shared as-of
+  timestamp across every panel, stale-vs-closed-market distinction, a TTL cache behind
+  every provider call, and provider outages as explained 503s rather than 500s.
+- **Phase 2 — learning.** Guided Study (your read saved *before* the AI's is shown),
+  retrospective replay (setup and reveal as separate endpoints so the future never
+  reaches the browser), a learning journal of hypotheses rather than trades, and
+  company fundamentals.
+- **Phase 2.5 — lenses.** Five deterministic readings of the same data, each declaring
+  its blind spot and failure modes. No day-trading lens, on delayed data.
+- **Phase 3 — workspace.** Comparison (rebased, no ranking), watchlist (information
+  events, never prompts), practice lab (hypothetical, behind its own tab), light mode
+  and accessibility.
+- **Phase 4 — ecosystem.** Typed sourced edges. Fund holdings at high confidence with
+  real weights; peers at low confidence, labelled a grouping. Supplier/customer edges
+  left empty *and said to be empty*, since no licensed source exists.
+
+**On the API keys.** Pranav's reason for wanting separate keys was per-use spend
+tracking; the review advised against key proliferation. Both are now satisfied: the
+named keys still work and all fall back to `TRADE101_ANALYSIS_KEY`, and `GET /usage`
+attributes every Claude call to the *feature* that made it regardless of how many keys
+are configured.
+
+**Not verified:** this session ran in a container whose egress proxy blocks Yahoo,
+Finnhub and SEC. All 128 tests use stubs. The live provider integrations — especially
+`services/fundamentals.py` row-label matching and ETF holdings — are the first thing to
+check when running locally.

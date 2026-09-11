@@ -4,6 +4,44 @@ A personal stock-research **and learning** app. Type a **company name** (any mar
 
 > **It never tells you to buy or sell.** Numbers are exact (deterministic code); every AI opinion is source-backed. It's a data-analytics + learning tool, not a signal generator. Data is delayed ~15 min.
 
+
+## What it does now
+
+A research page for any company in any major market, plus a learning layer around it.
+
+**Research** — live chart, exact indicators, chart patterns, a sourced AI momentum read
+where every claim links to the evidence it rests on, filtered company news, fundamentals,
+five style lenses, and a typed ecosystem graph.
+
+**Learning** — Guided Study (commit your own read before the AI's is revealed),
+retrospective replay (read a hidden window of the stock's own history), and a journal of
+your hypotheses — not your trades.
+
+**Workspace** — side-by-side comparison, a watchlist that reports information events
+rather than prompting you to act, and an optional practice lab for hypothetical positions.
+
+Trade101 describes and teaches. It never says buy, sell or hold, never gives a price
+target, and never states a claim it cannot source.
+
+📄 **[docs/EXECUTION-REPORT.md](docs/EXECUTION-REPORT.md)** — what is built, what needs
+testing, and known gaps.
+
+### API endpoints
+
+| | |
+|---|---|
+| `/research/{ticker}` | quote, indicators, OHLCV, as-of + staleness |
+| `/analyze/{ticker}` | sourced AI read (degrades without a key) |
+| `/lenses/{ticker}` | five deterministic style lenses |
+| `/fundamentals/{ticker}` | earnings, revenue, margins, cash flow, valuation |
+| `/graph/{ticker}` | typed, sourced ecosystem relationships |
+| `/replay/{ticker}` · `/replay/{ticker}/reveal` | hidden-window exercise |
+| `/compare?tickers=A,B` | rebased side-by-side, no ranking |
+| `/journal` · `/watchlist` · `/practice` | the learning layer |
+| `/usage` | AI spend by feature, key, model and ticker |
+| `/patterns` · `/ecosystem` · `/search` · `/history` · `/cache` · `/health` | |
+
+
 ## Features
 - **Search by name, any market** — "samsung", "toyota", "allianz" → pick from the matches (US, China, Japan, Korea, HK, Singapore, India, Europe).
 - **Live chart** — candlesticks or line, timeframes 1Y · 1M · 10D · 5D · 1D (intraday), auto-refreshes every 7 min. Line color follows direction.
