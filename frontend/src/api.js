@@ -143,3 +143,46 @@ export async function journalDelete(id) {
 // Style lenses — deterministic, so this costs nothing to call.
 export const lenses = (ticker, period) =>
   getJSON(`/lenses/${encodeURIComponent(ticker.trim())}${period ? `?period=${period}` : ''}`)
+
+// ---- Phase 3: the research workspace -------------------------------------
+
+export const compare = (tickers, period = '1y') =>
+  getJSON(`/compare?tickers=${encodeURIComponent(tickers.join(','))}&period=${period}`)
+
+export const watchlist = (refresh = true) =>
+  getJSON(`/watchlist?refresh=${refresh}`, { items: [], errors: [] })
+
+export async function watchAdd(entry) {
+  const res = await fetch(`${BASE}/watchlist`, {
+    method: 'POST', headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(entry),
+  })
+  if (!res.ok) throw new Error((await res.json().catch(() => ({}))).detail || 'Could not add')
+  return res.json()
+}
+
+export const watchRemove = (ticker) =>
+  fetch(`${BASE}/watchlist/${encodeURIComponent(ticker)}`, { method: 'DELETE' }).then((r) => r.ok)
+
+export const practiceList = () =>
+  getJSON('/practice', { entries: [], disclaimer: '', purpose: '' })
+
+export async function practiceOpen(entry) {
+  const res = await fetch(`${BASE}/practice`, {
+    method: 'POST', headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(entry),
+  })
+  if (!res.ok) throw new Error((await res.json().catch(() => ({}))).detail || 'Could not open')
+  return res.json()
+}
+
+export async function practiceClose(id, price, reflection) {
+  const res = await fetch(`${BASE}/practice/${id}`, {
+    method: 'PATCH', headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ price, reflection }),
+  })
+  return res.ok
+}
+
+export const practiceDelete = (id) =>
+  fetch(`${BASE}/practice/${id}`, { method: 'DELETE' }).then((r) => r.ok)

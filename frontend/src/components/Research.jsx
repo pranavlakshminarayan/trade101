@@ -10,6 +10,7 @@ import Fundamentals from './Fundamentals.jsx'
 import StudyMode from './StudyMode.jsx'
 import Replay from './Replay.jsx'
 import Lenses from './Lenses.jsx'
+import { applyTheme, cycleTheme, getTheme, THEME_LABEL } from '../lib/theme.js'
 import { analyze, research, patterns as fetchPatterns } from '../api.js'
 import { addHistory } from '../lib/history.js'
 
@@ -51,6 +52,7 @@ export default function Research({ data, onBack, onSearch, onNavigate }) {
   const [tick, setTick] = useState(0)
   const [study, setStudy] = useState(false)
   const [replay, setReplay] = useState(false)
+  const [theme, setTheme] = useState(getTheme())
 
   const ticker = live.ticker
   const refs = useRef({})
@@ -231,6 +233,7 @@ export default function Research({ data, onBack, onSearch, onNavigate }) {
             <a className="on">Research</a>
             <a onClick={() => onNavigate('compare')} style={{ cursor: 'pointer' }}>Comparison</a>
             <a onClick={() => onNavigate('history')} style={{ cursor: 'pointer' }}>History</a>
+            <a onClick={() => onNavigate('watchlist')} style={{ cursor: 'pointer' }}>Watchlist</a>
             <a onClick={() => onNavigate('journal')} style={{ cursor: 'pointer' }}>Journal</a>
           </div>
         </div>
@@ -239,6 +242,8 @@ export default function Research({ data, onBack, onSearch, onNavigate }) {
                   title="Form your own read before seeing the app's">◎ Study this chart</button>
           <button className="studybtn" onClick={() => setReplay(true)}
                   title="Read a hidden window of this stock's own history">⟲ Replay</button>
+          <button className="themebtn" onClick={() => { const t = cycleTheme(theme); setTheme(t); applyTheme(t) }}
+                  title="Switch theme">{THEME_LABEL[theme]}</button>
           <button className="backbtn" onClick={onBack}>← New search</button>
         </div>
       </div>

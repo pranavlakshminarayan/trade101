@@ -252,3 +252,154 @@ def delete_journal_entry(entry_id: int) -> bool:
         _ensure_journal(conn)
         cur = conn.execute("DELETE FROM journal WHERE id = ?", (entry_id,))
         return (cur.rowcount or 0) > 0
+
+
+# ---- watchlist -------------------------------------------------------------
+#
+# Companies the learner is following, with their own note. The `level` field is
+# a price the learner asked to be TOLD about — deliberately not a "target" and
+# never a trigger to act. Everything this table produces is phrased as an
+# information event ("price crossed the level you marked"), because a watchlist
+# that nudges is a watchlist that trades for you.
+
+WATCHLIST_SCHEMA = """
+CREATE TABLE IF NOT EXISTS watchlist (
+    ticker     TEXT PRIMARY KEY,
+    name       TEXT,
+    note       TEXT,
+    level      REAL,          -- a price to be informed about, NOT a target
+    added_at   TEXT NOT NULL,
+    last_seen  REAL,          -- last PRICE we recorded, to detect a crossing
+    last_check TEXT
+);
+"""
+
+
+def _ensure_watchlist(conn) -> None:
+    conn.executescript(WATCHLIST_SCHEMA)
+
+
+def watch_add(ticker: str, name: str | None = None, note: str | None = None,
+              level: float | None = None) -> dict | None:
+    from datetime import datetime, timezone
+    now = datetime.now(timezone.utc).isoformat(timespec="seconds")
+    with connect() as conn:
+        if conn is None:
+            return None
+        _ensure_watchlist(conn)
+        conn.execute(
+            """INSERT INTO watchlist (ticker, name, note, level, added_at)
+               VALUES (?, ?, ?, ?, ?)
+               ON CONFLICT(ticker) DO UPDATE SET
+                 name=COALESCE(excluded.name, watchlist.name),
+                 note=excluded.note, level=excluded.level""",
+            (ticker.upper(), name, note, level, now),
+        )
+        row = conn.execute("SELECT * FROM watchlist WHERE ticker = ?", (ticker.upper(),)).fetchone()
+        return dict(row) if row else None
+
+
+def watch_list() -> list[dict]:
+    with connect() as conn:
+        if conn is None:
+            return []
+        _ensure_watchlist(conn)
+        return [dict(r) for r in conn.execute(
+            "SELECT * FROM watchlist ORDER BY added_at DESC").fetchall()]
+
+
+def watch_remove(ticker: str) -> bool:
+    with connect() as conn:
+        if conn is None:
+            return False
+        _ensure_watchlist(conn)
+        return (conn.execute("DELETE FROM watchlist WHERE ticker = ?",
+                             (ticker.upper(),)).rowcount or 0) > 0
+
+
+def watch_record_price(ticker: str, price: float) -> None:
+    """Remember the last price seen, so a crossing can be detected next time."""
+    from datetime import datetime, timezone
+    with connect() as conn:
+        if conn is None:
+            return
+        _ensure_watchlist(conn)
+        conn.execute("UPDATE watchlist SET last_seen = ?, last_check = ? WHERE ticker = ?",
+                     (price, datetime.now(timezone.utc).isoformat(timespec="seconds"),
+                      ticker.upper()))
+
+
+# ---- practice lab ----------------------------------------------------------
+#
+# A deliberately separate space for hypothetical positions. The review's
+# condition for this existing at all: it must not be the primary action of a
+# beginner-facing educational app, and its performance must be explicitly
+# hypothetical and delayed. So it lives behind its own tab, every figure is
+# labelled hypothetical, and each entry requires a REASON and prompts for a
+# reflection — the point being to test reasoning, not to accumulate a score.
+
+PRACTICE_SCHEMA = """
+CREATE TABLE IF NOT EXISTS practice (
+    id          INTEGER PRIMARY KEY AUTOINCREMENT,
+    ticker      TEXT NOT NULL,
+    opened_at   TEXT NOT NULL,
+    open_price  REAL NOT NULL,
+    quantity    REAL NOT NULL DEFAULT 1,
+    direction   TEXT NOT NULL DEFAULT 'long',
+    reason      TEXT NOT NULL,      -- required: a position with no reasoning teaches nothing
+    closed_at   TEXT,
+    close_price REAL,
+    reflection  TEXT
+);
+CREATE INDEX IF NOT EXISTS idx_practice_ticker ON practice (ticker);
+"""
+
+
+def _ensure_practice(conn) -> None:
+    conn.executescript(PRACTICE_SCHEMA)
+
+
+def practice_open(ticker: str, price: float, quantity: float, direction: str,
+                  reason: str) -> dict | None:
+    from datetime import datetime, timezone
+    with connect() as conn:
+        if conn is None:
+            return None
+        _ensure_practice(conn)
+        cur = conn.execute(
+            """INSERT INTO practice (ticker, opened_at, open_price, quantity, direction, reason)
+               VALUES (?, ?, ?, ?, ?, ?)""",
+            (ticker.upper(), datetime.now(timezone.utc).isoformat(timespec="seconds"),
+             float(price), float(quantity), direction, reason),
+        )
+        row = conn.execute("SELECT * FROM practice WHERE id = ?", (cur.lastrowid,)).fetchone()
+        return dict(row) if row else None
+
+
+def practice_close(entry_id: int, price: float, reflection: str | None = None) -> bool:
+    from datetime import datetime, timezone
+    with connect() as conn:
+        if conn is None:
+            return False
+        _ensure_practice(conn)
+        return (conn.execute(
+            "UPDATE practice SET closed_at = ?, close_price = ?, reflection = ? WHERE id = ? AND closed_at IS NULL",
+            (datetime.now(timezone.utc).isoformat(timespec="seconds"), float(price),
+             reflection, entry_id)).rowcount or 0) > 0
+
+
+def practice_list() -> list[dict]:
+    with connect() as conn:
+        if conn is None:
+            return []
+        _ensure_practice(conn)
+        return [dict(r) for r in conn.execute(
+            "SELECT * FROM practice ORDER BY opened_at DESC").fetchall()]
+
+
+def practice_delete(entry_id: int) -> bool:
+    with connect() as conn:
+        if conn is None:
+            return False
+        _ensure_practice(conn)
+        return (conn.execute("DELETE FROM practice WHERE id = ?", (entry_id,)).rowcount or 0) > 0

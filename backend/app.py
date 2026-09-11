@@ -20,9 +20,9 @@ from fastapi.responses import JSONResponse
 load_dotenv(Path(__file__).resolve().parent.parent / ".env")
 
 from agents import llm, orchestrator
-from services import (cache, company, evidence, fundamentals, indicators, lenses,
-                      marketdata, news as news_svc, patterns, replay, search,
-                      storage, usage)
+from services import (cache, company, compare as compare_svc, evidence, fundamentals,
+                      indicators, lenses, marketdata, news as news_svc, patterns,
+                      replay, search, storage, usage, watchlist)
 
 app = FastAPI(title="Trade101 API", version="0.1.0")
 
@@ -290,3 +290,129 @@ def style_lenses(ticker: str, period: str = "1y"):
         **marketdata.freshness(hist, "1d"),
         **lenses.build(ind, fund, kept, filings),
     }
+
+
+# ---- Phase 3: the research workspace --------------------------------------
+
+@app.get("/compare")
+def compare_tickers(tickers: str, period: str = "1y", interval: str = "1d"):
+    """
+    Two to four companies on the same axes, each rebased to 100 at the start of
+    the window. Produces no ranking and no score: it shows how the companies
+    differ, and names where a side-by-side reading is weak.
+    """
+    symbols = [t for t in (tickers or "").split(",") if t.strip()]
+    if len(symbols) < 2:
+        raise HTTPException(status_code=400,
+                            detail="Give at least two comma-separated tickers to compare.")
+    return compare_svc.compare(symbols, period=period, interval=interval)
+
+
+@app.get("/watchlist")
+def watchlist_status(refresh: bool = True):
+    """Watched companies + what changed since you last looked, as information
+    events — never prompts to act."""
+    return watchlist.status(refresh=refresh)
+
+
+@app.post("/watchlist")
+def watchlist_add(body: dict):
+    ticker = (body or {}).get("ticker", "").strip()
+    if not ticker:
+        raise HTTPException(status_code=400, detail="A watchlist entry needs a ticker.")
+    level = body.get("level")
+    saved = storage.watch_add(ticker, body.get("name"), body.get("note"),
+                              float(level) if level not in (None, "") else None)
+    if saved is None:
+        raise HTTPException(status_code=503, detail="Watchlist database unavailable.")
+    return saved
+
+
+@app.delete("/watchlist/{ticker}")
+def watchlist_remove(ticker: str):
+    if not storage.watch_remove(ticker):
+        raise HTTPException(status_code=404, detail=f"{ticker.upper()} is not on the watchlist.")
+    return {"removed": ticker.upper()}
+
+
+@app.get("/practice")
+def practice_list():
+    """The practice lab: hypothetical positions, marked to delayed prices.
+
+    Explicitly separate from research. Every figure returned is hypothetical and
+    is labelled as such by the caller.
+    """
+    entries = storage.practice_list()
+    out = []
+    for e in entries:
+        mark, note = None, None
+        if e.get("closed_at"):
+            mark = e["close_price"]
+        else:
+            try:
+                data = marketdata.get(e["ticker"], period="5d")
+                mark = data[1].get("price") if data else None
+            except marketdata.ProviderError as ex:
+                note = str(ex)
+        pnl = None
+        if mark is not None:
+            diff = (mark - e["open_price"]) * (1 if e["direction"] == "long" else -1)
+            pnl = {
+                "hypotheticalChangePercent": round(diff / e["open_price"] * 100, 2),
+                "hypotheticalAmount": round(diff * e["quantity"], 2),
+            }
+        out.append({**e, "mark": mark, "hypothetical": pnl, "note": note})
+    return {
+        "entries": out,
+        "disclaimer": "Every figure here is HYPOTHETICAL and marked to data delayed by "
+                      "roughly 15 minutes. No order was placed, no costs, spread, slippage "
+                      "or tax are modelled, and a hypothetical result that assumes you could "
+                      "transact at a delayed price is optimistic by construction.",
+        "purpose": "This lab exists to test reasoning, not to keep score. The reflection on "
+                   "each closed entry is the part worth reading.",
+    }
+
+
+@app.post("/practice")
+def practice_open(body: dict):
+    b = body or {}
+    if not (b.get("ticker") or "").strip():
+        raise HTTPException(status_code=400, detail="A practice entry needs a ticker.")
+    if not (b.get("reason") or "").strip():
+        raise HTTPException(status_code=400,
+                            detail="Write why you are opening this hypothetical position. "
+                                   "A position with no reasoning behind it teaches nothing "
+                                   "when you close it.")
+    try:
+        price = float(b.get("price"))
+        quantity = float(b.get("quantity", 1))
+    except (TypeError, ValueError):
+        raise HTTPException(status_code=400, detail="Price and quantity must be numbers.")
+    direction = b.get("direction", "long")
+    if direction not in ("long", "short"):
+        raise HTTPException(status_code=400, detail="Direction must be 'long' or 'short'.")
+
+    saved = storage.practice_open(b["ticker"], price, quantity, direction, b["reason"].strip())
+    if saved is None:
+        raise HTTPException(status_code=503, detail="Practice database unavailable.")
+    return saved
+
+
+@app.patch("/practice/{entry_id}")
+def practice_close(entry_id: int, body: dict):
+    b = body or {}
+    try:
+        price = float(b.get("price"))
+    except (TypeError, ValueError):
+        raise HTTPException(status_code=400, detail="A closing price is required.")
+    if not storage.practice_close(entry_id, price, b.get("reflection")):
+        raise HTTPException(status_code=404,
+                            detail=f"No open practice entry {entry_id}.")
+    return {"closed": entry_id}
+
+
+@app.delete("/practice/{entry_id}")
+def practice_delete(entry_id: int):
+    if not storage.practice_delete(entry_id):
+        raise HTTPException(status_code=404, detail=f"No practice entry {entry_id}.")
+    return {"deleted": entry_id}

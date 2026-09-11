@@ -1,27 +1,35 @@
 import { useState } from 'react'
 import Logo from './Logo.jsx'
+import { applyTheme, cycleTheme, getTheme, THEME_LABEL } from '../lib/theme.js'
 
 const SUGGEST = ['NVDA', 'Apple', 'Samsung', 'Toyota', 'Tencent', 'Reliance']
 
 export default function Welcome({ onSearch, recent, onNavigate }) {
   const [value, setValue] = useState('')
+  const [theme, setTheme] = useState(getTheme())
+  const switchTheme = () => { const t = cycleTheme(theme); setTheme(t); applyTheme(t) }
   const submit = (t) => { const q = (t ?? value).trim(); if (q) onSearch(q) }
 
   return (
-    <div className="welcome">
+    <div className="welcome" style={{ position: 'relative' }}>
+      <a className="skip-link" href="#main">Skip to main content</a>
       <aside className="rail">
         <div className="logo"><Logo /> Trade101</div>
         <button className="railitem on" style={{ marginTop: 12 }}>✚ New research</button>
-        <button className="railitem">⚖️ Comparison <span className="faint" style={{ marginLeft: 'auto', fontSize: 11 }}>soon</span></button>
+        <button className="railitem" onClick={() => onNavigate('compare')}>⚖️ Comparison</button>
+        <button className="railitem" onClick={() => onNavigate('watchlist')}>👁 Watchlist</button>
         <button className="railitem" onClick={() => onNavigate('history')}>🕘 History</button>
         <button className="railitem" onClick={() => onNavigate('journal')}>📓 Journal</button>
+        <button className="railitem" onClick={() => onNavigate('practice')}>🧪 Practice lab</button>
         {recent?.length > 0 && <div className="railsec">Recent research</div>}
         {recent?.map((r) => (
           <button key={r} className="railitem" onClick={() => submit(r)}>{r}</button>
         ))}
       </aside>
 
-      <main className="welc-main">
+      <main className="welc-main" id="main">
+        <button className="themebtn" style={{ position: 'absolute', top: 18, right: 20 }}
+                onClick={switchTheme} title="Switch theme">{THEME_LABEL[theme]}</button>
         <div className="logo" style={{ fontSize: 22 }}><Logo size={34} /> Trade101</div>
         <div className="big">Which stock shall we study, <span>Pranav?</span></div>
         <div className="sub">

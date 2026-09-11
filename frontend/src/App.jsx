@@ -3,6 +3,10 @@ import Welcome from './components/Welcome.jsx'
 import Research from './components/Research.jsx'
 import History from './components/History.jsx'
 import Journal from './components/Journal.jsx'
+import Compare from './components/Compare.jsx'
+import Watchlist from './components/Watchlist.jsx'
+import Practice from './components/Practice.jsx'
+import { applyTheme, getTheme } from './lib/theme.js'
 import { research as fetchResearch, search as searchSymbols } from './api.js'
 
 export default function App() {
@@ -11,7 +15,10 @@ export default function App() {
   const [error, setError] = useState(null)
   const [recent, setRecent] = useState([])
   const [candidates, setCandidates] = useState(null) // disambiguation list
-  const [view, setView] = useState('home') // 'home' | 'history'
+  const [view, setView] = useState('home') // home | history | journal | compare | watchlist | practice
+
+  // Apply the saved theme before first paint of any view.
+  useEffect(() => { applyTheme(getTheme()) }, [])
 
   async function doResearch(symbol, push = true) {
     setLoading(true); setError(null); setCandidates(null)
@@ -86,6 +93,19 @@ export default function App() {
 
   if (view === 'journal') {
     return <Journal onNavigate={setView} onOpen={openTicker} />
+  }
+
+  if (view === 'compare') {
+    return <Compare onNavigate={setView} onOpen={openTicker}
+                    initial={data ? [data.ticker] : recent.slice(0, 2)} />
+  }
+
+  if (view === 'watchlist') {
+    return <Watchlist onNavigate={setView} onOpen={openTicker} />
+  }
+
+  if (view === 'practice') {
+    return <Practice onNavigate={setView} onOpen={openTicker} />
   }
 
   if (loading) {

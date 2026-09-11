@@ -434,3 +434,134 @@ a.cite:hover { background: rgba(52,169,190,.26); color: #A9E6F2; }
 }
 
 @media (max-width: 680px) { .lens-grid { grid-template-columns: 1fr; } }
+
+/* ---- Phase 3: workspace + light mode + accessibility -------------------- */
+
+/* Light mode. The palette is redefined by token so every component follows
+   without a single component-level override. Dark stays the default; this is
+   opt-in via data-theme, and honours the OS preference when unset. */
+:root[data-theme="light"] {
+  --bg:#F6F9FB; --bg2:#FFFFFF; --surface:#FFFFFF; --surface2:#EEF4F8; --hair:#D3E0E9;
+  --ink:#10212E; --muted:#41596B; --faint:#5C7182;
+  --teal:#0E7C93; --teal-soft:#DCF0F5; --navy:#1E3A5F;
+  --up:#00794F; --up-soft:#DDF3EA; --down:#C0303C; --down-soft:#FBE3E5; --amber:#9A6608;
+  --shadow:0 1px 2px rgba(16,33,46,.06),0 8px 24px rgba(16,33,46,.08);
+}
+@media (prefers-color-scheme: light) {
+  :root:not([data-theme="dark"]) {
+    --bg:#F6F9FB; --bg2:#FFFFFF; --surface:#FFFFFF; --surface2:#EEF4F8; --hair:#D3E0E9;
+    --ink:#10212E; --muted:#41596B; --faint:#5C7182;
+    --teal:#0E7C93; --teal-soft:#DCF0F5;
+    --up:#00794F; --up-soft:#DDF3EA; --down:#C0303C; --down-soft:#FBE3E5; --amber:#9A6608;
+    --shadow:0 1px 2px rgba(16,33,46,.06),0 8px 24px rgba(16,33,46,.08);
+  }
+}
+:root[data-theme="light"] .welcome,
+:root:not([data-theme="dark"]) .welcome {
+  background: radial-gradient(1200px 500px at 60% 28%, rgba(52,169,190,.10), transparent 60%), var(--bg);
+}
+
+.themebtn {
+  background: none; border: 1px solid var(--hair); border-radius: 8px;
+  color: var(--muted); padding: 6px 10px; font-size: 13px;
+}
+.themebtn:hover { color: var(--ink); border-color: var(--teal); }
+
+/* Accessibility: a visible focus ring everywhere, and never only on hover. */
+a:focus-visible, button:focus-visible, input:focus-visible,
+textarea:focus-visible, select:focus-visible, summary:focus-visible {
+  outline: 2px solid var(--teal);
+  outline-offset: 2px;
+  border-radius: 4px;
+}
+.skip-link {
+  position: absolute; left: -9999px; top: 0; z-index: 100;
+  background: var(--surface); color: var(--ink); padding: 10px 16px;
+  border: 1px solid var(--teal); border-radius: 0 0 8px 0;
+}
+.skip-link:focus { left: 0; }
+.sr-only {
+  position: absolute; width: 1px; height: 1px; padding: 0; margin: -1px;
+  overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; border: 0;
+}
+.tabs a { cursor: pointer; }
+
+/* Comparison */
+.cmp-controls {
+  display: flex; justify-content: space-between; align-items: center;
+  gap: 14px; flex-wrap: wrap; margin-bottom: 16px;
+}
+.cmp-chips { display: flex; gap: 8px; align-items: center; flex-wrap: wrap; }
+.cmp-chip {
+  display: inline-flex; align-items: center; gap: 7px;
+  border: 1px solid var(--hair); border-left-width: 3px;
+  border-radius: 8px; padding: 5px 9px; font-size: 13px;
+}
+.cmp-chip i { width: 8px; height: 8px; border-radius: 50%; display: inline-block; }
+.cmp-open { background: none; border: none; color: var(--ink); font-weight: 600; padding: 0; }
+.cmp-open:hover { text-decoration: underline; }
+.cmp-x { background: none; border: none; color: var(--faint); padding: 0 2px; }
+.cmp-x:hover { color: var(--down); }
+
+.cmp-tablewrap { overflow-x: auto; }
+.cmp-table { width: 100%; border-collapse: collapse; font-size: 13px; min-width: 420px; }
+.cmp-table th, .cmp-table td {
+  padding: 9px 12px; text-align: left; border-bottom: 1px solid var(--hair);
+  vertical-align: middle;
+}
+.cmp-table thead th { font-weight: 600; font-size: 13.5px; }
+.cmp-table thead th i {
+  width: 8px; height: 8px; border-radius: 50%; display: inline-block; margin-right: 7px;
+}
+.cmp-table thead th span { display: block; font-size: 11px; font-weight: 400; }
+.cmp-table tbody th {
+  font-weight: 400; color: var(--faint); font-size: 12.5px; white-space: nowrap;
+}
+
+/* Watchlist */
+.wl-fields { display: flex; gap: 12px; flex-wrap: wrap; align-items: flex-end; }
+.wl-fields label { display: flex; flex-direction: column; gap: 4px; font-size: 12px; flex: 1; min-width: 150px; }
+.wl-note { flex: 2 1 260px; }
+.wl-fields input, .wl-fields select {
+  background: var(--bg); border: 1px solid var(--hair); border-radius: 8px;
+  padding: 9px 11px; color: var(--ink); font: inherit; font-size: 13.5px;
+}
+.wl-fields input:focus, .wl-fields select:focus { outline: none; border-color: var(--teal); }
+.wl-list { display: flex; flex-direction: column; gap: 12px; }
+.wl-item { padding-bottom: 12px; border-bottom: 1px solid var(--hair); }
+.wl-item:last-child { border-bottom: none; padding-bottom: 0; }
+.wl-main { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; }
+.wl-main .jdel { margin-left: auto; }
+.wl-level { font-size: 12px; margin-top: 4px; }
+.wl-yournote { font-size: 12.5px; color: var(--muted); margin-top: 4px; font-style: italic; }
+.wl-eventgroup { padding: 10px 0; border-bottom: 1px solid var(--hair); }
+.wl-eventgroup:last-child { border-bottom: none; }
+.wl-event {
+  margin-top: 6px; padding: 9px 11px; border-radius: 5px; font-size: 12.5px;
+  line-height: 1.6; background: var(--surface2); border-left: 2px solid var(--teal);
+}
+.wl-event .faint { font-size: 11.5px; margin-top: 3px; }
+
+/* Practice lab */
+.pl-entry { padding-bottom: 14px; border-bottom: 1px solid var(--hair); }
+.pl-entry:last-child { border-bottom: none; padding-bottom: 0; }
+.pl-entry.closed { opacity: .8; }
+.pl-head { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; margin-bottom: 6px; }
+.pl-head .jdel { margin-left: auto; }
+.pl-close { margin-top: 10px; }
+.pl-close label { display: flex; flex-direction: column; gap: 4px; font-size: 12px; max-width: 180px; }
+.pl-close input {
+  background: var(--bg); border: 1px solid var(--hair); border-radius: 8px;
+  padding: 8px 10px; color: var(--ink); font: inherit;
+}
+
+@media (max-width: 900px) {
+  .welcome { grid-template-columns: 1fr; }
+  .rail { border-right: none; border-bottom: 1px solid var(--hair); }
+  .cols { grid-template-columns: 1fr !important; }
+}
+@media (max-width: 560px) {
+  .welc-main .big { font-size: 26px; }
+  .top { flex-wrap: wrap; gap: 10px; }
+  .tabs { flex-wrap: wrap; }
+}
