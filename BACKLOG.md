@@ -14,7 +14,52 @@ A running list so we don't lose ideas. Add freely; we pull from here after the M
 
 ---
 
-## Phase 2 — depth
+## Phase 1.5 — Trust & coherence  ← **current**
+External review (ChatGPT + Gemini, Sept 2026) recommended this land BEFORE the
+feature work below; the phases after it are renumbered accordingly.
+- [x] Evidence relevance filter — only articles actually about the company reach the model.
+- [x] Claim-level citations — every claim resolves to a real catalog entry, or is withheld.
+- [x] Evidence tests — the sourcing contract is now enforced by tests, not by prompt wording.
+- [x] Shared timeframe / as-of labels across chart, metrics, patterns and AI read.
+- [x] Provider coverage badges + stale-data states (closed market vs. feed behind).
+- [x] Cache abstraction + response caching (Redis seam via `TRADE101_CACHE_URL`).
+- [x] Visible not-advice notice beside the momentum narrative, not only in the footer.
+- [x] API keys confirmed backend-only (no `VITE_` vars, no secrets in the bundle).
+- [x] Graceful degradation hardened — provider outage is a 503 with a retry, never a 500.
+- [ ] **Form your own read before the AI's** — the last Definition-of-Done item; belongs
+      with Guided Study Mode below.
+- [ ] **Saved learning note** — ditto.
+
+## Phase 2 — Learning engine
+- **Guided Study Mode** — observe → predict → reveal → challenge → revisit.
+- **Learning journal** — save the learner's hypothesis + evidence (never a virtual trade).
+- **Retrospective replay** — hide the historical outcome until the learner commits a read.
+- **Company fundamentals** — earnings date, results vs estimates, revenue, margins, cash
+  flow, valuation context, primary filing links.
+- Short contextual prompts over tooltip overload.
+
+## Phase 2.5 — Style lenses (not "styles to copy")
+Trend · Swing · Mean-reversion · Long-term · Event-driven. Each must show what it
+considers, what it ignores, conflicting evidence, and its failure modes.
+**No day-trading lens** until a licensed real-time feed exists — delayed data would
+create false precision.
+
+## Phase 3 — Research workspace
+- **Comparison** — two or more companies, normalized charts; never reduced to "which is better".
+- **Watchlist** — alerts phrased as information events (earnings filed, level crossed), not trade prompts.
+- **Optional simulated portfolio** — a separate practice lab, explicitly hypothetical; never the primary action.
+- Light mode, contrast checks, keyboard navigation, responsive layout.
+
+## Phase 4 — Supply-chain & ecosystem intelligence
+- Replace the peer list with a **sourced relationship graph**: each edge carries type
+  (supplier/customer/partner/competitor/investor/index constituent), source, date,
+  confidence and materiality.
+- Distinguish public from private companies.
+- State plainly that a business relationship is a research hypothesis, not proof of a
+  price effect.
+- ETF view shows verified holdings and weights.
+
+## Deferred — depth (was Phase 2)
 - **Deeper search / scrape for non-US markets.** US data is easy/free (Wall Street sources, etc.); other countries (China, Japan, Korea, HK, Singapore, India) are harder → **Firecrawl or an alternative** to scrape/extract where clean APIs don't exist. Pluggable provider slot already designed for this.
 - **Broader web sourcing** — add **Exa** (wide semantic search) and premium sources where accessible/legal (the WSJ / Bloomberg / JP Morgan / investment-bank-report depth). Always sourced.
 - **"Ask Claude" chat** — conversational Q&A and discussion over the current research bundle (button already reserved in the UI).
@@ -39,6 +84,17 @@ A running list so we don't lose ideas. Add freely; we pull from here after the M
 - "Explain like I'm new" vs "pro" depth toggle on lessons.
 - Backtesting a pattern's historical hit-rate (as a *learning* stat, with heavy caveats — never a signal).
 - Multi-language / currency niceties for non-US markets.
+
+## Architecture rules (from the review)
+- **Provider abstraction for market data** — add adapters behind the interface; never a
+  one-shot rewrite onto an institutional feed. Choose on exchange coverage, redistribution
+  rights, history, real-time entitlement and cost.
+- **No WebSockets** until a licensed real-time feed justifies them — a socket cannot make
+  delayed data live. Polling + cached refreshes are right for a learning tool.
+- **Graceful degradation everywhere** — each unavailable panel says what failed, what is
+  still usable, and whether retrying helps.
+- **One bounded analysis call** — do not add agents or keys to improve sourcing; fix the
+  evidence pipeline first. Per-purpose spend is tracked in-app via `GET /usage`.
 
 ## Guardrails (never drop)
 - Numbers are exact (deterministic code); every AI claim is sourced.

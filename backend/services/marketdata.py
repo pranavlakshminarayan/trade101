@@ -19,11 +19,31 @@ import yfinance as yf
 from services import cache
 
 
+class ProviderError(RuntimeError):
+    """The data provider could not be reached.
+
+    Deliberately distinct from "this symbol has no data": an unknown ticker is
+    the user's question answered, while an unreachable provider is our problem
+    and is worth retrying. Telling them apart is what lets each failure state
+    say something true and useful instead of a generic error.
+    """
+
+    def __init__(self, ticker: str, cause: Exception):
+        self.ticker, self.cause = ticker, cause
+        super().__init__(
+            f"Could not reach {PROVIDER.title()} for '{ticker}': {type(cause).__name__}. "
+            f"This is a source outage or a blocked network, not a problem with the symbol — "
+            f"retrying in a moment usually works."
+        )
+
+
 def get(ticker: str, period: str = "1y", interval: str = "1d") -> Optional[Tuple[pd.DataFrame, dict]]:
     """
     Fetch (OHLCV DataFrame, quote dict) for `ticker`, or None if the symbol
     has no data (unknown/delisted). Prices are split/dividend-adjusted.
     Served from the TTL cache when fresh — see get_with_meta for the fetch time.
+
+    Raises ProviderError if the provider itself is unreachable.
     """
     result, _ = get_with_meta(ticker, period, interval)
     return result
@@ -32,10 +52,13 @@ def get(ticker: str, period: str = "1y", interval: str = "1d") -> Optional[Tuple
 def get_with_meta(ticker: str, period: str = "1y", interval: str = "1d"):
     """As get(), plus cache metadata saying when this data was actually fetched."""
     def fetch():
-        t = yf.Ticker(ticker)
-        hist = t.history(period=period, interval=interval, auto_adjust=True)
+        try:
+            t = yf.Ticker(ticker)
+            hist = t.history(period=period, interval=interval, auto_adjust=True)
+        except Exception as e:  # network, proxy, provider 4xx/5xx, parse failure
+            raise ProviderError(ticker, e) from e
         if hist is None or hist.empty:
-            return None
+            return None  # a real answer: this symbol has no data
         return hist, _quote(t, hist, ticker)
 
     return cache.get_or_fetch("history", f"{ticker.upper()}:{period}:{interval}", fetch)

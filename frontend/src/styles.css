@@ -162,3 +162,94 @@ button{font:inherit;cursor:pointer}
 .spinner{width:26px;height:26px;border:3px solid var(--hair);border-top-color:var(--teal);border-radius:50%;animation:spin .8s linear infinite;margin:0 auto 14px}
 @keyframes spin{to{transform:rotate(360deg)}}
 @media (prefers-reduced-motion:reduce){.spinner{animation:none}}
+
+/* ---- Phase 1.5: trust & coherence surfaces ------------------------------ */
+
+/* The shared as-of line. Every panel that asserts something renders this. */
+.asof {
+  display: flex; align-items: center; gap: 7px;
+  font-size: 11.5px; color: var(--faint, #7d93a5);
+  letter-spacing: .01em; margin: 4px 0 6px;
+}
+.asof-dot {
+  width: 6px; height: 6px; border-radius: 50%;
+  background: #00D68F; flex: none;
+}
+.asof-stale { color: #E8B14A; }
+.asof-stale .asof-dot { background: #E8B14A; }
+.asof-flag {
+  font-size: 10px; text-transform: uppercase; letter-spacing: .08em;
+  background: rgba(232,177,74,.16); color: #E8B14A;
+  padding: 1px 6px; border-radius: 4px;
+}
+.stalewarn {
+  margin-top: 6px; padding: 8px 10px; font-size: 12px; line-height: 1.5;
+  background: rgba(232,177,74,.10); border-left: 2px solid #E8B14A;
+  border-radius: 4px; color: #E8C88A;
+}
+.chartfoot { margin-top: 8px; }
+.provbadge {
+  display: inline-block; font-size: 11px; color: var(--faint, #7d93a5);
+  border: 1px solid #26394b; border-radius: 4px; padding: 1px 6px;
+}
+
+/* Not-advice boundary — deliberately beside the narrative, not in a footer. */
+.notadvice {
+  font-size: 12px; line-height: 1.55; margin: 2px 0 10px;
+  padding: 9px 11px; border-radius: 5px;
+  background: rgba(52,169,190,.09); border-left: 2px solid #34A9BE;
+  color: #BFD6E2;
+}
+.notadvice b { color: #DCEAF2; }
+
+/* Evidence coverage */
+.coverage {
+  margin: 8px 0 10px; padding: 9px 11px; border-radius: 5px;
+  background: rgba(255,255,255,.025); border-left: 2px solid #4a5f72;
+  font-size: 12px;
+}
+.cov-head { display: flex; align-items: center; gap: 7px; }
+.cov-icon { font-size: 13px; }
+.cov-note { margin: 5px 0 0; line-height: 1.55; color: #AFC4D2; }
+.cov-ok   { border-left-color: #00D68F; }
+.cov-ok   .cov-icon { color: #00D68F; }
+.cov-thin { border-left-color: #E8B14A; }
+.cov-thin .cov-icon { color: #E8B14A; }
+.cov-none { border-left-color: #F0616D; }
+.cov-none .cov-icon { color: #F0616D; }
+.cov-filter { margin-top: 8px; }
+.cov-filter summary {
+  cursor: pointer; font-size: 11.5px; color: #7FA8BC; user-select: none;
+}
+.cov-filter summary:hover { color: #9FC6D8; }
+.cov-filter ul { margin: 6px 0 0; padding-left: 18px; line-height: 1.6; }
+.cov-filter li { margin-bottom: 3px; font-size: 11.5px; }
+
+/* Claim-level citations */
+.cite {
+  display: inline-block; font-size: 10.5px; margin-left: 5px;
+  padding: 1px 6px; border-radius: 4px; white-space: nowrap;
+  background: rgba(52,169,190,.14); color: #7FD3E4;
+  text-decoration: none; border: 1px solid rgba(52,169,190,.28);
+}
+a.cite:hover { background: rgba(52,169,190,.26); color: #A9E6F2; }
+.cite-num { font-family: ui-monospace, Menlo, Consolas, monospace; cursor: help; }
+
+/* Claims that could not be traced — shown, never silently dropped. */
+.unsupported { margin-top: 10px; }
+.unsupported summary {
+  cursor: pointer; font-size: 11.5px; color: #E8B14A; user-select: none;
+}
+.unsupported ul { margin: 6px 0 0; padding-left: 18px; font-size: 11.5px; line-height: 1.6; }
+
+.relwhy { font-size: 10.5px; margin-top: 3px; font-style: italic; }
+.peer-caveat {
+  font-size: 11px; line-height: 1.55; margin: 0 0 8px;
+  padding: 7px 9px; border-radius: 4px; background: rgba(255,255,255,.03);
+}
+.retry {
+  margin-top: 10px; background: rgba(52,169,190,.16); color: #7FD3E4;
+  border: 1px solid rgba(52,169,190,.4); border-radius: 6px;
+  padding: 6px 14px; font-size: 13px; cursor: pointer;
+}
+.retry:hover { background: rgba(52,169,190,.28); }

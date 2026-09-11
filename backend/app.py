@@ -11,8 +11,9 @@ from __future__ import annotations
 from pathlib import Path
 
 from dotenv import load_dotenv
-from fastapi import FastAPI, HTTPException
+from fastapi import FastAPI, HTTPException, Request
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.responses import JSONResponse
 
 # Load .env from the project root (one level up from backend/) so the named
 # API keys are available as environment variables.
@@ -30,6 +31,24 @@ app.add_middleware(
     allow_methods=["*"],
     allow_headers=["*"],
 )
+
+
+@app.exception_handler(marketdata.ProviderError)
+def provider_unreachable(request: Request, exc: marketdata.ProviderError):
+    """A source outage is a 503 with an explanation, never a 500 stack trace.
+
+    The frontend shows `detail` verbatim, so it has to say what failed, what
+    still works, and whether retrying is worth it.
+    """
+    return JSONResponse(
+        status_code=503,
+        content={
+            "detail": str(exc),
+            "failure": "provider_unreachable",
+            "provider": marketdata.PROVIDER,
+            "retryable": True,
+        },
+    )
 
 
 @app.get("/health")

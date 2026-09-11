@@ -5,6 +5,7 @@ import Metrics from './Metrics.jsx'
 import AiRead from './AiRead.jsx'
 import NewsPanel from './NewsPanel.jsx'
 import Ecosystem from './Ecosystem.jsx'
+import AsOf, { ProviderBadge } from './AsOf.jsx'
 import { analyze, research, patterns as fetchPatterns } from '../api.js'
 import { addHistory } from '../lib/history.js'
 
@@ -34,6 +35,8 @@ export default function Research({ data, onBack, onSearch, onNavigate }) {
   const [chartType, setChartType] = useState('candles')
   const [timeframe, setTimeframe] = useState('1Y')
   const [tfData, setTfData] = useState({})
+  const [tfMetaMap, setTfMetaMap] = useState({})
+  const [patMeta, setPatMeta] = useState({})
   const [tfLoading, setTfLoading] = useState(false)
   const [showPatterns, setShowPatterns] = useState(false)
   const [patData, setPatData] = useState({})
@@ -48,7 +51,7 @@ export default function Research({ data, onBack, onSearch, onNavigate }) {
   const setRef = (id) => (el) => { refs.current[id] = el }
 
   useEffect(() => {
-    setLive(data); setTfData({}); setPatData({}); setShowPatterns(false); setPatSel(0)
+    setLive(data); setTfData({}); setTfMetaMap({}); setPatData({}); setPatMeta({}); setShowPatterns(false); setPatSel(0)
     setChartType('candles'); setTimeframe('1Y'); setUpdatedAt(new Date())
   }, [data])
 
@@ -73,7 +76,11 @@ export default function Research({ data, onBack, onSearch, onNavigate }) {
     let alive = true
     setTfLoading(true)
     research(ticker, TF[timeframe])
-      .then((r) => { if (alive) setTfData((c) => ({ ...c, [timeframe]: r.ohlcv })) })
+      .then((r) => {
+        if (!alive) return
+        setTfData((c) => ({ ...c, [timeframe]: r.ohlcv }))
+        setTfMetaMap((c) => ({ ...c, [timeframe]: r.meta }))
+      })
       .catch(() => {}).finally(() => { if (alive) setTfLoading(false) })
     return () => { alive = false }
   }, [timeframe, ticker, tfData])
@@ -82,7 +89,9 @@ export default function Research({ data, onBack, onSearch, onNavigate }) {
     if (!showPatterns || patData[timeframe]) return
     let alive = true
     fetchPatterns(ticker, TF[timeframe]).then((r) => {
-      if (alive) setPatData((c) => ({ ...c, [timeframe]: r.patterns || [] }))
+      if (!alive) return
+      setPatData((c) => ({ ...c, [timeframe]: r.patterns || [] }))
+      setPatMeta((c) => ({ ...c, [timeframe]: r.meta }))
     })
     return () => { alive = false }
   }, [showPatterns, timeframe, ticker, patData])
@@ -94,7 +103,11 @@ export default function Research({ data, onBack, onSearch, onNavigate }) {
         const fresh = await research(data.ticker)
         setLive(fresh); setUpdatedAt(new Date())
         const tf = tfRef.current
-        if (tf !== '1Y') { const r = await research(data.ticker, TF[tf]); setTfData((c) => ({ ...c, [tf]: r.ohlcv })) }
+        if (tf !== '1Y') {
+          const r = await research(data.ticker, TF[tf])
+          setTfData((c) => ({ ...c, [tf]: r.ohlcv }))
+          setTfMetaMap((c) => ({ ...c, [tf]: r.meta }))
+        }
       } catch { /* keep last good */ }
     }, REFRESH_MS)
     return () => clearInterval(id)
@@ -121,6 +134,7 @@ export default function Research({ data, onBack, onSearch, onNavigate }) {
   const sources = ai?.available ? (ai.sources || []) : []
   const lean = ai?.available ? ai.momentum?.lean : null
 
+  const tfMeta = timeframe === '1Y' ? meta : (tfMetaMap[timeframe] || meta)
   const rawTf = timeframe === '1Y' ? ohlcv : (tfData[timeframe] || [])
   const sl = TF[timeframe].slice
   const chartOhlcv = sl ? rawTf.slice(-sl) : rawTf
@@ -133,7 +147,7 @@ export default function Research({ data, onBack, onSearch, onNavigate }) {
 
   // block elements the masonry places
   const blocks = {
-    metrics: <Metrics indicators={indicators} ticker={ticker} />,
+    metrics: <Metrics indicators={indicators} ticker={ticker} meta={meta} />,
     news: <NewsPanel ai={ai} loading={aiLoading} ticker={ticker} />,
     ecosystem: <Ecosystem ticker={ticker} onSearch={onSearch} />,
     references: (
@@ -163,7 +177,13 @@ export default function Research({ data, onBack, onSearch, onNavigate }) {
       {chartLoading || !chartOhlcv.length
         ? <div className="chartwrap placeholder" style={{ display: 'grid', placeItems: 'center' }}>Loading {timeframe}…</div>
         : <PriceChart ohlcv={chartOhlcv} type={chartType} patterns={showPatterns && selPat ? [selPat] : []} showPatterns={showPatterns} />}
-      <div className="note">{timeframe} · {TF[timeframe].interval} bars · updated {updatedAt.toLocaleTimeString()} · auto-refreshes every 7 min · {meta.note}</div>
+      <div className="chartfoot">
+        <AsOf meta={tfMeta} timeframe={timeframe} />
+        <div className="note">
+          <ProviderBadge meta={tfMeta} /> · {TF[timeframe].interval} bars · page refreshed {updatedAt.toLocaleTimeString()} (every 7 min) · {meta.delayed ? 'delayed ~15m, not real-time trading data' : ''}
+        </div>
+        {tfMeta?.stale && <div className="stalewarn">⚠ {tfMeta.note}</div>}
+      </div>
       {showPatterns && (
         <div className="patterns-panel">
           {pats.length ? (
@@ -177,6 +197,7 @@ export default function Research({ data, onBack, onSearch, onNavigate }) {
               </div>
               {selPat && (
                 <div className="pat">
+                  <AsOf meta={patMeta[timeframe] || tfMeta} timeframe={timeframe} label="Detected on" />
                   <div>
                     <span className={'chip ' + (selPat.direction === 'bullish' ? 'up' : 'down')}>{selPat.name}</span>
                     <span className="faint" style={{ marginLeft: 8, fontSize: 12 }}>{selPat.direction} · confidence {selPat.confidence}</span>
@@ -212,7 +233,7 @@ export default function Research({ data, onBack, onSearch, onNavigate }) {
         <span className="strip-tk"><b>{ticker}</b> — {quote.name}</span>
         {lean && <span className={'chip ' + (lean === 'bullish' ? 'up' : lean === 'bearish' ? 'down' : 'flat')}>{lean === 'bullish' ? '▲' : lean === 'bearish' ? '▼' : '■'} {lean}</span>}
         <span className="strip-meta">{quote.exchange}</span>
-        <span className="strip-meta faint">delayed ~15m</span>
+        <span className="strip-meta faint">{meta.stale ? '⚠ stale data' : 'delayed ~15m'}</span>
       </div>
 
       <div className="headline">
@@ -228,7 +249,7 @@ export default function Research({ data, onBack, onSearch, onNavigate }) {
           {FLOW.filter((id) => assign[id] === 'L').map((id) => <div key={id} ref={setRef(id)}>{blocks[id]}</div>)}
         </div>
         <div className="col">
-          <div ref={setRef('ai')}><AiRead ai={ai} loading={aiLoading} /></div>
+          <div ref={setRef('ai')}><AiRead ai={ai} loading={aiLoading} meta={meta} /></div>
           {FLOW.filter((id) => assign[id] === 'R').map((id) => <div key={id} ref={setRef(id)}>{blocks[id]}</div>)}
         </div>
       </div>

@@ -1,9 +1,10 @@
 import { useEffect, useState } from 'react'
 import { METRICS, metricLabel, metricValue, factFor, lessonFor } from '../lessons.js'
+import AsOf from './AsOf.jsx'
 
 // Metric analyzer + learning in ONE block: click a metric → the fact for this
 // stock first, then the deeper lesson. Esc closes.
-export default function Metrics({ indicators, ticker }) {
+export default function Metrics({ indicators, ticker, meta }) {
   const [selected, setSelected] = useState(null)
 
   useEffect(() => {
@@ -15,6 +16,7 @@ export default function Metrics({ indicators, ticker }) {
   return (
     <div className="card">
       <div className="lbl">Metrics &amp; learning — tap a metric to learn it on {ticker}</div>
+      <AsOf meta={meta} timeframe={meta?.period === '1y' ? '1Y' : meta?.period} label="Computed from" />
       <div className="metrics">
         {METRICS.map((m) => (
           <button

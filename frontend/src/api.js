@@ -5,10 +5,25 @@ export async function research(ticker, { period, interval } = {}) {
   if (period) qs.set('period', period)
   if (interval) qs.set('interval', interval)
   const q = qs.toString()
-  const res = await fetch(`${BASE}/research/${encodeURIComponent(ticker.trim())}${q ? '?' + q : ''}`)
+  let res
+  try {
+    res = await fetch(`${BASE}/research/${encodeURIComponent(ticker.trim())}${q ? '?' + q : ''}`)
+  } catch {
+    // The backend itself is unreachable — distinct from a bad ticker.
+    const e = new Error(
+      'Cannot reach the Trade101 backend at ' + BASE + '. Start it with ' +
+      '`uvicorn app:app --reload --port 8000` from backend/, then try again.')
+    e.retryable = true
+    e.failure = 'backend_unreachable'
+    throw e
+  }
   if (!res.ok) {
     const err = await res.json().catch(() => ({ detail: `Request failed (HTTP ${res.status})` }))
-    throw new Error(err.detail || `HTTP ${res.status}`)
+    const e = new Error(err.detail || `HTTP ${res.status}`)
+    // A source outage is worth retrying; an unknown ticker is not.
+    e.retryable = err.retryable ?? res.status >= 500
+    e.failure = err.failure || (res.status === 404 ? 'not_found' : 'error')
+    throw e
   }
   return res.json()
 }

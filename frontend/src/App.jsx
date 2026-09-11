@@ -20,7 +20,9 @@ export default function App() {
       setRecent((r) => [bundle.ticker, ...r.filter((x) => x !== bundle.ticker)].slice(0, 6))
       if (push) window.history.pushState({ ticker: bundle.ticker }, '', '#' + bundle.ticker)
     } catch (e) {
-      setError(e.message || 'Something went wrong')
+      // Keep the failure kind, so the UI can offer a retry only when retrying
+      // could actually help.
+      setError({ message: e.message || 'Something went wrong', retryable: !!e.retryable, symbol })
     } finally {
       setLoading(false)
     }
@@ -95,7 +97,14 @@ export default function App() {
     {picker}
     {error && (
       <div style={{ position: 'fixed', left: 0, right: 0, bottom: 20, display: 'flex', justifyContent: 'center' }}>
-        <div className="err" style={{ maxWidth: 560 }}>⚠️ {error}</div>
+        <div className="err" style={{ maxWidth: 620 }}>
+          <div>⚠️ {error.message}</div>
+          {error.retryable && (
+            <button className="retry" onClick={() => doResearch(error.symbol, false)}>
+              Try again
+            </button>
+          )}
+        </div>
       </div>
     )}
   </>)

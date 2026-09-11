@@ -50,7 +50,14 @@ export default function Ecosystem({ ticker, onSearch }) {
 
           {eco.peers?.length > 0 && (
             <div style={{ marginTop: 14 }}>
-              <div className="faint" style={{ fontSize: 12, marginBottom: 6 }}>Peers / ecosystem — tap to research</div>
+              <div className="faint" style={{ fontSize: 12, marginBottom: 6 }}>
+                Peers / ecosystem — tap to research
+              </div>
+              <div className="peer-caveat faint">
+                These are companies the data provider groups with {ticker} — usually same
+                sector or industry. It is <b>not</b> a verified supply-chain or business
+                relationship, and being a peer says nothing about how the two prices move.
+              </div>
               <div className="eco-peers">
                 {eco.peers.map((p) => (
                   <button key={p} className="chipx" onClick={() => onSearch(p)}>{p}</button>
@@ -63,7 +70,14 @@ export default function Ecosystem({ ticker, onSearch }) {
         </>
       )}
 
-      {!loading && !eco && <div className="placeholder">Company profile unavailable for {ticker}.</div>}
+      {!loading && eco?.meta?.note && <div className="note faint" style={{ marginTop: 10 }}>{eco.meta.note}</div>}
+
+      {!loading && !eco && (
+        <div className="placeholder">
+          Company profile unavailable for {ticker} — the profile source did not respond.
+          The chart, metrics and patterns are unaffected; retrying later may work.
+        </div>
+      )}
     </div>
   )
 }
