@@ -121,10 +121,19 @@ def build_catalog(indicators: dict, news_items: list[dict], filings: list[dict])
     claim into a clickable, checkable source.
     """
     catalog = []
+
+    def add_indicator(key: str, value) -> None:
+        # Nested groups (macd, bollinger) are flattened to dotted ids, otherwise
+        # the model has no way to cite MACD or a Bollinger band at all.
+        if isinstance(value, dict):
+            for sub, sub_v in value.items():
+                add_indicator(f"{key}.{sub}", sub_v)
+        elif value is not None and not isinstance(value, list):
+            catalog.append({"id": f"ind:{key}", "kind": "indicator", "label": key,
+                            "detail": f"{key} = {value}", "url": None})
+
     for k, v in (indicators or {}).items():
-        if v is not None and not isinstance(v, (dict, list)):
-            catalog.append({"id": f"ind:{k}", "kind": "indicator", "label": k,
-                            "detail": f"{k} = {v}", "url": None})
+        add_indicator(k, v)
     for i, n in enumerate(news_items or []):
         catalog.append({"id": f"news:{i}", "kind": "news",
                         "label": n.get("headline") or n.get("source") or f"news {i}",

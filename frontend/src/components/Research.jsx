@@ -9,6 +9,7 @@ import AsOf, { ProviderBadge } from './AsOf.jsx'
 import Fundamentals from './Fundamentals.jsx'
 import StudyMode from './StudyMode.jsx'
 import Replay from './Replay.jsx'
+import Lenses from './Lenses.jsx'
 import { analyze, research, patterns as fetchPatterns } from '../api.js'
 import { addHistory } from '../lib/history.js'
 
@@ -22,7 +23,7 @@ const TF = {
   '1D':  { period: '1d',  interval: '5m' },
 }
 const TF_ORDER = ['1Y', '1M', '10D', '5D', '1D']
-const FLOW = ['metrics', 'fundamentals', 'news', 'ecosystem', 'references'] // blocks the masonry distributes
+const FLOW = ['metrics', 'lenses', 'fundamentals', 'news', 'ecosystem', 'references'] // blocks the masonry distributes
 
 function changeChip(pct) {
   if (pct == null) return <span className="chip flat">—</span>
@@ -46,7 +47,7 @@ export default function Research({ data, onBack, onSearch, onNavigate }) {
   const [patSel, setPatSel] = useState(0)
   const [updatedAt, setUpdatedAt] = useState(new Date())
   const [q, setQ] = useState('')
-  const [assign, setAssign] = useState({ metrics: 'L', fundamentals: 'R', news: 'L', ecosystem: 'R', references: 'R' })
+  const [assign, setAssign] = useState({ metrics: 'L', lenses: 'R', fundamentals: 'R', news: 'L', ecosystem: 'R', references: 'R' })
   const [tick, setTick] = useState(0)
   const [study, setStudy] = useState(false)
   const [replay, setReplay] = useState(false)
@@ -153,6 +154,7 @@ export default function Research({ data, onBack, onSearch, onNavigate }) {
   // block elements the masonry places
   const blocks = {
     metrics: <Metrics indicators={indicators} ticker={ticker} meta={meta} />,
+    lenses: <Lenses ticker={ticker} />,
     fundamentals: <Fundamentals ticker={ticker} filings={ai?.filings} />,
     news: <NewsPanel ai={ai} loading={aiLoading} ticker={ticker} />,
     ecosystem: <Ecosystem ticker={ticker} onSearch={onSearch} />,

@@ -391,3 +391,46 @@ a.cite:hover { background: rgba(52,169,190,.26); color: #A9E6F2; }
   .compare { grid-template-columns: 1fr; }
   .study-foot { flex-direction: column; align-items: stretch; }
 }
+
+/* ---- Phase 2.5: style lenses -------------------------------------------- */
+
+.disagree { padding: 10px 12px; border-radius: 6px; font-size: 12.5px; margin-bottom: 12px; }
+.disagree p { margin: 5px 0 0; line-height: 1.6; }
+.disagree.high { background: rgba(232,177,74,.10); border-left: 2px solid #E8B14A; }
+.disagree.low, .disagree.none { background: rgba(52,169,190,.09); border-left: 2px solid #34A9BE; }
+
+.lenslist { display: flex; flex-direction: column; gap: 8px; }
+.lens { border: 1px solid var(--hair, #1c2f3f); border-radius: 9px; overflow: hidden; }
+.lens.open { border-color: rgba(52,169,190,.4); }
+.lens-head {
+  display: flex; align-items: center; gap: 10px; width: 100%; text-align: left;
+  background: rgba(255,255,255,.02); border: none; cursor: pointer;
+  padding: 10px 12px; color: var(--ink, #DCEAF2); font: inherit; flex-wrap: wrap;
+}
+.lens-head:hover { background: rgba(255,255,255,.05); }
+.lens-name { font-weight: 600; font-size: 13.5px; min-width: 104px; }
+.lens-q { font-size: 11.5px; flex: 1; min-width: 160px; }
+.lens-caret { color: var(--faint, #7d93a5); }
+.lens-body { padding: 4px 13px 14px; font-size: 12.5px; line-height: 1.6; }
+.lens-reading { margin: 6px 0 10px; color: var(--ink, #DCEAF2); }
+
+.lens-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; margin: 10px 0; }
+.lens-grid ul, .lens-conflict ul, .lens-fail ul { margin: 5px 0 0; padding-left: 17px; }
+.lens-grid li, .lens-conflict li, .lens-fail li { margin-bottom: 4px; }
+.lens-ignores { opacity: .95; }
+.lens-ignores .lbl { color: #E8B14A; }
+
+.lens-conflict {
+  margin: 10px 0; padding: 9px 11px; border-radius: 5px;
+  background: rgba(232,177,74,.08); border-left: 2px solid #E8B14A;
+}
+.lens-fail {
+  margin-top: 10px; padding: 9px 11px; border-radius: 5px;
+  background: rgba(240,97,109,.07); border-left: 2px solid rgba(240,97,109,.55);
+}
+.lens-excluded {
+  margin-top: 12px; padding: 9px 11px; border-radius: 5px; font-size: 12px;
+  line-height: 1.6; background: rgba(255,255,255,.03); color: #AFC4D2;
+}
+
+@media (max-width: 680px) { .lens-grid { grid-template-columns: 1fr; } }

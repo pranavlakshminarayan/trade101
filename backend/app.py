@@ -20,8 +20,9 @@ from fastapi.responses import JSONResponse
 load_dotenv(Path(__file__).resolve().parent.parent / ".env")
 
 from agents import llm, orchestrator
-from services import (cache, company, fundamentals, indicators, marketdata, patterns,
-                      replay, search, storage, usage)
+from services import (cache, company, evidence, fundamentals, indicators, lenses,
+                      marketdata, news as news_svc, patterns, replay, search,
+                      storage, usage)
 
 app = FastAPI(title="Trade101 API", version="0.1.0")
 
@@ -257,3 +258,35 @@ def journal_delete(entry_id: int):
     if not ok:
         raise HTTPException(status_code=404, detail=f"No journal entry {entry_id}.")
     return {"deleted": entry_id}
+
+
+# ---- Phase 2.5: style lenses ---------------------------------------------
+
+@app.get("/lenses/{ticker}")
+def style_lenses(ticker: str, period: str = "1y"):
+    """
+    The same data read five ways: trend, swing, mean-reversion, long-term and
+    event-driven. Each declares what it considers, what it IGNORES, evidence in
+    this data that argues against it, and how it fails.
+
+    Entirely deterministic — computed from the exact numbers, so it costs
+    nothing to run and has nothing to hallucinate. There is no day-trading lens:
+    on ~15-minute delayed data it would look precise and be wrong.
+    """
+    data = marketdata.get(ticker, period=period)
+    if data is None:
+        raise HTTPException(status_code=404, detail=f"No market data found for '{ticker}'.")
+    hist, quote = data
+    ind = indicators.compute_indicators(hist)
+
+    fund = fundamentals.get_fundamentals(ticker)
+    raw_news, _ = news_svc.get_news(ticker)
+    kept, _report = evidence.select(raw_news, quote["symbol"], quote.get("name"))
+    filings, _ = news_svc.get_recent_filings(ticker)
+
+    return {
+        "ticker": quote["symbol"],
+        "period": period,
+        **marketdata.freshness(hist, "1d"),
+        **lenses.build(ind, fund, kept, filings),
+    }

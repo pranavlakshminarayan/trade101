@@ -27,7 +27,9 @@ const CONFIDENCE = ['low', 'moderate', 'high']
 // learner is pointed at evidence rather than asked to guess in the abstract.
 function observations(indicators, quote) {
   const out = []
-  const { rsi14, sma50, sma200, macd, macdSignal } = indicators || {}
+  const { rsi14, sma50, sma200, macd } = indicators || {}
+  const macdLine = macd?.macd
+  const macdSignal = macd?.signal
   const px = quote?.price
 
   if (px != null && sma50 != null) {
@@ -39,8 +41,8 @@ function observations(indicators, quote) {
   if (rsi14 != null) {
     out.push(`RSI(14) is ${rsi14}. Is momentum stretched, or is there room left in this move?`)
   }
-  if (macd != null && macdSignal != null) {
-    out.push(`MACD (${macd}) is ${macd >= macdSignal ? 'above' : 'below'} its signal line (${macdSignal}). Is momentum building or fading?`)
+  if (macdLine != null && macdSignal != null) {
+    out.push(`MACD (${macdLine}) is ${macdLine >= macdSignal ? 'above' : 'below'} its signal line (${macdSignal}). Is momentum building or fading?`)
   }
   out.push('Do these signals agree with each other, or is one contradicting the rest?')
   return out

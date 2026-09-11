@@ -139,3 +139,7 @@ export async function journalDelete(id) {
   const res = await fetch(`${BASE}/journal/${id}`, { method: 'DELETE' })
   return res.ok
 }
+
+// Style lenses — deterministic, so this costs nothing to call.
+export const lenses = (ticker, period) =>
+  getJSON(`/lenses/${encodeURIComponent(ticker.trim())}${period ? `?period=${period}` : ''}`)
