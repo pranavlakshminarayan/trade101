@@ -138,3 +138,117 @@ def clear_history() -> int:
             return 0
         cur = conn.execute("DELETE FROM history")
         return cur.rowcount or 0
+
+
+# ---- learning journal ------------------------------------------------------
+#
+# The learner's own reasoning, saved. Deliberately NOT a virtual trade: the
+# record is "here is what I thought and why", so revisiting it teaches whether
+# the REASONING held up — which is the transferable skill — rather than whether
+# a hypothetical position made money.
+
+JOURNAL_SCHEMA = """
+CREATE TABLE IF NOT EXISTS journal (
+    id          INTEGER PRIMARY KEY AUTOINCREMENT,
+    ticker      TEXT NOT NULL,
+    created_at  TEXT NOT NULL,     -- UTC ISO-8601
+    as_of       TEXT,              -- the data timestamp the note describes
+    timeframe   TEXT,
+    kind        TEXT NOT NULL,     -- 'study' | 'replay' | 'note'
+    lean        TEXT,              -- the learner's own read
+    confidence  TEXT,
+    hypothesis  TEXT NOT NULL,     -- what they think is happening, and why
+    evidence    TEXT,              -- JSON list of the evidence they leaned on
+    ai_lean     TEXT,              -- what the AI said, recorded AFTER they committed
+    outcome     TEXT,              -- JSON, for replay entries: what actually followed
+    reflection  TEXT               -- written on revisit
+);
+CREATE INDEX IF NOT EXISTS idx_journal_ticker  ON journal (ticker);
+CREATE INDEX IF NOT EXISTS idx_journal_created ON journal (created_at DESC);
+"""
+
+
+def _ensure_journal(conn) -> None:
+    conn.executescript(JOURNAL_SCHEMA)
+
+
+def add_journal_entry(entry: dict) -> dict | None:
+    """Save one learning-journal entry. Returns the stored row, or None if the
+    database is unavailable."""
+    import json
+    from datetime import datetime, timezone
+
+    row = {
+        "ticker": (entry.get("ticker") or "").upper(),
+        "created_at": datetime.now(timezone.utc).isoformat(timespec="seconds"),
+        "as_of": entry.get("asOf"),
+        "timeframe": entry.get("timeframe"),
+        "kind": entry.get("kind") or "note",
+        "lean": entry.get("lean"),
+        "confidence": entry.get("confidence"),
+        "hypothesis": entry.get("hypothesis") or "",
+        "evidence": json.dumps(entry.get("evidence") or []),
+        "ai_lean": entry.get("aiLean"),
+        "outcome": json.dumps(entry["outcome"]) if entry.get("outcome") is not None else None,
+        "reflection": entry.get("reflection"),
+    }
+    with connect() as conn:
+        if conn is None:
+            return None
+        _ensure_journal(conn)
+        cur = conn.execute(
+            """INSERT INTO journal (ticker, created_at, as_of, timeframe, kind, lean,
+                   confidence, hypothesis, evidence, ai_lean, outcome, reflection)
+               VALUES (:ticker, :created_at, :as_of, :timeframe, :kind, :lean,
+                   :confidence, :hypothesis, :evidence, :ai_lean, :outcome, :reflection)""",
+            row,
+        )
+        return {"id": cur.lastrowid, **row}
+
+
+def get_journal(ticker: str | None = None, limit: int = 100) -> list[dict]:
+    """Journal entries, newest first; optionally for one ticker."""
+    import json
+    with connect() as conn:
+        if conn is None:
+            return []
+        _ensure_journal(conn)
+        if ticker:
+            rows = conn.execute(
+                "SELECT * FROM journal WHERE ticker = ? ORDER BY created_at DESC LIMIT ?",
+                (ticker.upper(), limit)).fetchall()
+        else:
+            rows = conn.execute(
+                "SELECT * FROM journal ORDER BY created_at DESC LIMIT ?", (limit,)).fetchall()
+
+        out = []
+        for r in rows:
+            d = dict(r)
+            for field in ("evidence", "outcome"):
+                if d.get(field):
+                    try:
+                        d[field] = json.loads(d[field])
+                    except (ValueError, TypeError):
+                        pass
+            out.append(d)
+        return out
+
+
+def update_journal_reflection(entry_id: int, reflection: str) -> bool:
+    """Attach a revisit reflection to an existing entry."""
+    with connect() as conn:
+        if conn is None:
+            return False
+        _ensure_journal(conn)
+        cur = conn.execute("UPDATE journal SET reflection = ? WHERE id = ?",
+                           (reflection, entry_id))
+        return (cur.rowcount or 0) > 0
+
+
+def delete_journal_entry(entry_id: int) -> bool:
+    with connect() as conn:
+        if conn is None:
+            return False
+        _ensure_journal(conn)
+        cur = conn.execute("DELETE FROM journal WHERE id = ?", (entry_id,))
+        return (cur.rowcount or 0) > 0

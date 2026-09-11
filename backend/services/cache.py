@@ -26,6 +26,8 @@ TTL = {
     "filings": 3600,      # 1 h    — EDGAR changes slowly
     "profile": 86400,     # 24 h   — sector/industry/beta are near-static
     "search": 3600,       # 1 h
+    "fundamentals": 21600,  # 6 h  — these move on a reporting cadence
+    "replay": 86400,      # 24 h   — a historical window never changes
 }
 DEFAULT_TTL = 300
 

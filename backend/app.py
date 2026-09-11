@@ -20,7 +20,8 @@ from fastapi.responses import JSONResponse
 load_dotenv(Path(__file__).resolve().parent.parent / ".env")
 
 from agents import llm, orchestrator
-from services import cache, company, indicators, marketdata, patterns, search, storage, usage
+from services import (cache, company, fundamentals, indicators, marketdata, patterns,
+                      replay, search, storage, usage)
 
 app = FastAPI(title="Trade101 API", version="0.1.0")
 
@@ -186,3 +187,73 @@ def history_clear():
 def cache_stats():
     """What the response cache is holding — useful when a number looks stale."""
     return cache.stats()
+
+
+# ---- Phase 2: the learning engine ----------------------------------------
+
+@app.get("/fundamentals/{ticker}")
+def company_fundamentals(ticker: str):
+    """Earnings, revenue, margins, cash flow and valuation context — the business
+    behind the ticker, reported as filed and never inferred."""
+    return fundamentals.get_fundamentals(ticker)
+
+
+@app.get("/replay/{ticker}")
+def replay_setup(ticker: str, horizon: int = 30, variant: int = 0):
+    """The VISIBLE half of a retrospective replay: history up to a hidden cut
+    point. Contains no information about what followed — that is /replay/reveal,
+    which the learner should only call after committing a read."""
+    result = replay.setup(ticker, horizon=horizon, variant=variant)
+    if result is None:
+        raise HTTPException(status_code=404, detail=f"No market data found for '{ticker}'.")
+    return result
+
+
+@app.get("/replay/{ticker}/reveal")
+def replay_reveal(ticker: str, horizon: int = 30, variant: int = 0):
+    """What actually followed. One sample — never evidence that a setup predicts."""
+    result = replay.reveal(ticker, horizon=horizon, variant=variant)
+    if result is None:
+        raise HTTPException(status_code=404, detail=f"No market data found for '{ticker}'.")
+    return result
+
+
+@app.get("/journal")
+def journal_list(ticker: str | None = None, limit: int = 100):
+    """The learner's own saved reads — hypotheses and evidence, not trades."""
+    return {"entries": storage.get_journal(ticker, limit)}
+
+
+@app.post("/journal")
+def journal_add(entry: dict):
+    """Save one read. `hypothesis` is required — a lean with no reasoning behind
+    it is exactly the habit this app exists to discourage."""
+    if not (entry.get("hypothesis") or "").strip():
+        raise HTTPException(status_code=400,
+                            detail="Write what you think is happening and why — a saved "
+                                   "lean with no reasoning teaches nothing on revisit.")
+    if not (entry.get("ticker") or "").strip():
+        raise HTTPException(status_code=400, detail="A journal entry needs a ticker.")
+    saved = storage.add_journal_entry(entry)
+    if saved is None:
+        raise HTTPException(status_code=503,
+                            detail="Could not save — the local journal database is "
+                                   "unavailable. Your research is unaffected.")
+    return saved
+
+
+@app.patch("/journal/{entry_id}")
+def journal_reflect(entry_id: int, body: dict):
+    """Attach a revisit reflection — the 'revisit' step of Guided Study."""
+    ok = storage.update_journal_reflection(entry_id, (body or {}).get("reflection", ""))
+    if not ok:
+        raise HTTPException(status_code=404, detail=f"No journal entry {entry_id}.")
+    return {"updated": entry_id}
+
+
+@app.delete("/journal/{entry_id}")
+def journal_delete(entry_id: int):
+    ok = storage.delete_journal_entry(entry_id)
+    if not ok:
+        raise HTTPException(status_code=404, detail=f"No journal entry {entry_id}.")
+    return {"deleted": entry_id}

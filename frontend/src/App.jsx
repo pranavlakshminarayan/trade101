@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react'
 import Welcome from './components/Welcome.jsx'
 import Research from './components/Research.jsx'
 import History from './components/History.jsx'
+import Journal from './components/Journal.jsx'
 import { research as fetchResearch, search as searchSymbols } from './api.js'
 
 export default function App() {
@@ -77,8 +78,14 @@ export default function App() {
     </div>
   )
 
+  const openTicker = (t) => { setView('home'); doResearch(t) }
+
   if (view === 'history') {
-    return <History onNavigate={setView} onOpen={(t) => { setView('home'); doResearch(t) }} />
+    return <History onNavigate={setView} onOpen={openTicker} />
+  }
+
+  if (view === 'journal') {
+    return <Journal onNavigate={setView} onOpen={openTicker} />
   }
 
   if (loading) {

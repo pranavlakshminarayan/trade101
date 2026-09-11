@@ -6,6 +6,9 @@ import AiRead from './AiRead.jsx'
 import NewsPanel from './NewsPanel.jsx'
 import Ecosystem from './Ecosystem.jsx'
 import AsOf, { ProviderBadge } from './AsOf.jsx'
+import Fundamentals from './Fundamentals.jsx'
+import StudyMode from './StudyMode.jsx'
+import Replay from './Replay.jsx'
 import { analyze, research, patterns as fetchPatterns } from '../api.js'
 import { addHistory } from '../lib/history.js'
 
@@ -19,7 +22,7 @@ const TF = {
   '1D':  { period: '1d',  interval: '5m' },
 }
 const TF_ORDER = ['1Y', '1M', '10D', '5D', '1D']
-const FLOW = ['metrics', 'news', 'ecosystem', 'references'] // blocks the masonry distributes
+const FLOW = ['metrics', 'fundamentals', 'news', 'ecosystem', 'references'] // blocks the masonry distributes
 
 function changeChip(pct) {
   if (pct == null) return <span className="chip flat">—</span>
@@ -43,8 +46,10 @@ export default function Research({ data, onBack, onSearch, onNavigate }) {
   const [patSel, setPatSel] = useState(0)
   const [updatedAt, setUpdatedAt] = useState(new Date())
   const [q, setQ] = useState('')
-  const [assign, setAssign] = useState({ metrics: 'L', news: 'L', ecosystem: 'R', references: 'R' })
+  const [assign, setAssign] = useState({ metrics: 'L', fundamentals: 'R', news: 'L', ecosystem: 'R', references: 'R' })
   const [tick, setTick] = useState(0)
+  const [study, setStudy] = useState(false)
+  const [replay, setReplay] = useState(false)
 
   const ticker = live.ticker
   const refs = useRef({})
@@ -148,6 +153,7 @@ export default function Research({ data, onBack, onSearch, onNavigate }) {
   // block elements the masonry places
   const blocks = {
     metrics: <Metrics indicators={indicators} ticker={ticker} meta={meta} />,
+    fundamentals: <Fundamentals ticker={ticker} filings={ai?.filings} />,
     news: <NewsPanel ai={ai} loading={aiLoading} ticker={ticker} />,
     ecosystem: <Ecosystem ticker={ticker} onSearch={onSearch} />,
     references: (
@@ -219,9 +225,20 @@ export default function Research({ data, onBack, onSearch, onNavigate }) {
       <div className="top">
         <div style={{ display: 'flex', alignItems: 'center' }}>
           <div className="logo"><Logo /> Trade101</div>
-          <div className="tabs"><a className="on">Research</a><a>Comparison</a><a onClick={() => onNavigate('history')} style={{ cursor: 'pointer' }}>History</a></div>
+          <div className="tabs">
+            <a className="on">Research</a>
+            <a onClick={() => onNavigate('compare')} style={{ cursor: 'pointer' }}>Comparison</a>
+            <a onClick={() => onNavigate('history')} style={{ cursor: 'pointer' }}>History</a>
+            <a onClick={() => onNavigate('journal')} style={{ cursor: 'pointer' }}>Journal</a>
+          </div>
         </div>
-        <button className="backbtn" onClick={onBack}>← New search</button>
+        <div style={{ display: 'flex', gap: 8 }}>
+          <button className="studybtn" onClick={() => setStudy(true)}
+                  title="Form your own read before seeing the app's">◎ Study this chart</button>
+          <button className="studybtn" onClick={() => setReplay(true)}
+                  title="Read a hidden window of this stock's own history">⟲ Replay</button>
+          <button className="backbtn" onClick={onBack}>← New search</button>
+        </div>
       </div>
 
       <div className="strip">
@@ -253,6 +270,12 @@ export default function Research({ data, onBack, onSearch, onNavigate }) {
           {FLOW.filter((id) => assign[id] === 'R').map((id) => <div key={id} ref={setRef(id)}>{blocks[id]}</div>)}
         </div>
       </div>
+
+      {study && (
+        <StudyMode ticker={ticker} indicators={indicators} quote={quote} meta={meta}
+                   ai={ai} onClose={() => setStudy(false)} />
+      )}
+      {replay && <Replay ticker={ticker} onClose={() => setReplay(false)} />}
     </div>
   )
 }

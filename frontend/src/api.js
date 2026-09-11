@@ -84,3 +84,58 @@ export async function analyze(ticker) {
     delete _inflight[key]
   }
 }
+
+// ---- Phase 2: the learning engine ----------------------------------------
+
+async function getJSON(path, fallback = null) {
+  try {
+    const res = await fetch(`${BASE}${path}`)
+    if (!res.ok) return fallback
+    return await res.json()
+  } catch {
+    return fallback
+  }
+}
+
+// Earnings, revenue, margins, cash flow, valuation.
+export const fundamentals = (ticker) =>
+  getJSON(`/fundamentals/${encodeURIComponent(ticker.trim())}`)
+
+// The VISIBLE half of a replay. Deliberately a separate call from the reveal:
+// the outcome must not be in the browser before the learner commits a read.
+export const replaySetup = (ticker, { horizon = 30, variant = 0 } = {}) =>
+  getJSON(`/replay/${encodeURIComponent(ticker.trim())}?horizon=${horizon}&variant=${variant}`)
+
+export const replayReveal = (ticker, { horizon = 30, variant = 0 } = {}) =>
+  getJSON(`/replay/${encodeURIComponent(ticker.trim())}/reveal?horizon=${horizon}&variant=${variant}`)
+
+// ---- learning journal ----
+export const journalList = (ticker) =>
+  getJSON(`/journal${ticker ? `?ticker=${encodeURIComponent(ticker)}` : ''}`, { entries: [] })
+
+export async function journalAdd(entry) {
+  const res = await fetch(`${BASE}/journal`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(entry),
+  })
+  if (!res.ok) {
+    const err = await res.json().catch(() => ({}))
+    throw new Error(err.detail || `Could not save (HTTP ${res.status})`)
+  }
+  return res.json()
+}
+
+export async function journalReflect(id, reflection) {
+  const res = await fetch(`${BASE}/journal/${id}`, {
+    method: 'PATCH',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ reflection }),
+  })
+  return res.ok
+}
+
+export async function journalDelete(id) {
+  const res = await fetch(`${BASE}/journal/${id}`, { method: 'DELETE' })
+  return res.ok
+}
