@@ -19,7 +19,7 @@ from fastapi.middleware.cors import CORSMiddleware
 load_dotenv(Path(__file__).resolve().parent.parent / ".env")
 
 from agents import llm, orchestrator
-from services import company, indicators, marketdata, patterns, search, storage, usage
+from services import cache, company, indicators, marketdata, patterns, search, storage, usage
 
 app = FastAPI(title="Trade101 API", version="0.1.0")
 
@@ -49,7 +49,7 @@ def research(ticker: str, period: str = "1y", interval: str = "1d"):
     Live research bundle for ANY ticker: quote + indicators + OHLCV (for the
     chart). Ticker-agnostic — nothing is hardcoded to a specific symbol.
     """
-    data = marketdata.get(ticker, period=period, interval=interval)
+    data, cache_meta = marketdata.get_with_meta(ticker, period=period, interval=interval)
     if data is None:
         raise HTTPException(
             status_code=404,
@@ -78,12 +78,16 @@ def research(ticker: str, period: str = "1y", interval: str = "1d"):
         "indicators": ind,
         "ohlcv": ohlcv,
         "meta": {
+            "provider": marketdata.PROVIDER,
             "source": "Yahoo Finance",
             "delayed": True,
             "note": "Data delayed ~15m; not real-time trading data.",
-            "asOf": hist.index[-1].date().isoformat() if len(hist) else None,
-            "bars": len(ohlcv),
+            "period": period,
             "interval": interval,
+            "bars": len(ohlcv),
+            # The as-of every panel on the page must agree with.
+            **marketdata.freshness(hist, interval),
+            "cache": cache_meta,
         },
     }
 
@@ -94,7 +98,10 @@ def ecosystem(ticker: str):
     data = marketdata.get(ticker, period="5d")  # confirm the symbol exists
     if data is None:
         raise HTTPException(status_code=404, detail=f"No data for '{ticker}'.")
-    return {"ticker": ticker.upper(), **company.get_profile(ticker)}
+    return {"ticker": ticker.upper(), **company.get_profile(ticker),
+            "meta": {"provider": "Yahoo Finance + Finnhub peers",
+                     "note": "Company profile is cached for up to 24h; sector, industry and "
+                             "beta change rarely."}}
 
 
 @app.get("/patterns/{ticker}")
@@ -108,7 +115,8 @@ def detect_patterns(ticker: str, period: str = "1y", interval: str = "1d"):
     closes = hist["Close"].tolist()
     times = [int(idx.timestamp()) for idx in hist.index]
     return {"ticker": ticker.upper(), "period": period, "interval": interval,
-            "patterns": patterns.detect(closes, times)}
+            "patterns": patterns.detect(closes, times),
+            "meta": {**marketdata.freshness(hist, interval), "bars": len(closes)}}
 
 
 @app.get("/analyze/{ticker}")
@@ -153,3 +161,9 @@ def history(limit: int = 50):
 def history_clear():
     """Clear the saved research history."""
     return {"cleared": storage.clear_history()}
+
+
+@app.get("/cache")
+def cache_stats():
+    """What the response cache is holding — useful when a number looks stale."""
+    return cache.stats()

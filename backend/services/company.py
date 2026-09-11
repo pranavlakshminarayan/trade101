@@ -12,6 +12,8 @@ import os
 import httpx
 import yfinance as yf
 
+from services import cache
+
 FINNHUB = "https://finnhub.io/api/v1"
 
 
@@ -28,6 +30,12 @@ def _peers(ticker: str) -> list[str]:
 
 
 def get_profile(ticker: str) -> dict:
+    """Company profile, cached for a day — sector/industry/beta barely move."""
+    result, _ = cache.get_or_fetch("profile", ticker.upper(), lambda: _fetch_profile(ticker))
+    return result
+
+
+def _fetch_profile(ticker: str) -> dict:
     t = yf.Ticker(ticker)
     info = {}
     try:

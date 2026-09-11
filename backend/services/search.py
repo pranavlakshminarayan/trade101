@@ -8,12 +8,20 @@ import time
 
 import httpx
 
+from services import cache
+
 YAHOO_SEARCH = "https://query2.finance.yahoo.com/v1/finance/search"
 UA = {"User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) Trade101/0.1"}
 
 
 def resolve(query: str, limit: int = 6) -> list[dict]:
     """Return candidate symbols for a name/ticker query, best match first."""
+    result, _ = cache.get_or_fetch("search", f"{query.strip().lower()}:{limit}",
+                                   lambda: _fetch(query, limit))
+    return result
+
+
+def _fetch(query: str, limit: int) -> list[dict]:
     quotes = []
     for attempt in range(2):  # one retry — Yahoo throttles bursts
         try:

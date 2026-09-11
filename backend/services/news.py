@@ -15,6 +15,8 @@ from datetime import datetime, timedelta, timezone
 
 import httpx
 
+from services import cache
+
 FINNHUB = "https://finnhub.io/api/v1"
 SEC_TICKERS = "https://www.sec.gov/files/company_tickers.json"
 SEC_SUBMISSIONS = "https://data.sec.gov/submissions/CIK{cik}.json"
@@ -39,6 +41,12 @@ def get_company_news(ticker: str, days: int = 30) -> tuple[list[dict], str | Non
     key = os.environ.get("TRADE101_NEWS_KEY")
     if not key:
         return [], "No Finnhub key set (TRADE101_NEWS_KEY) — news feed unavailable."
+    result, _ = cache.get_or_fetch("news", f"{ticker.upper()}:{days}",
+                                   lambda: _fetch_company_news(ticker, days, key))
+    return result
+
+
+def _fetch_company_news(ticker: str, days: int, key: str) -> tuple[list[dict], str | None]:
     to = datetime.now(timezone.utc).date()
     frm = to - timedelta(days=days)
     try:
@@ -80,6 +88,12 @@ def _cik_for(ticker: str) -> str | None:
 
 def get_recent_filings(ticker: str, limit: int = 5) -> tuple[list[dict], str | None]:
     """Recent SEC filings (10-K/10-Q/8-K) via EDGAR. US symbols only. (items, note)."""
+    result, _ = cache.get_or_fetch("filings", f"{ticker.upper()}:{limit}",
+                                   lambda: _fetch_filings(ticker, limit))
+    return result
+
+
+def _fetch_filings(ticker: str, limit: int) -> tuple[list[dict], str | None]:
     cik = _cik_for(ticker)
     if not cik:
         return [], "No SEC filings (EDGAR covers US-listed companies only)."
