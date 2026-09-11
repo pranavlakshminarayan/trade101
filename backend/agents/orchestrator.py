@@ -8,7 +8,7 @@ only judgment is inside the agent.
 from __future__ import annotations
 
 from agents import analysis, llm
-from services import indicators, marketdata, news
+from services import indicators, marketdata, news, storage
 
 
 def analyze(ticker: str) -> dict | None:
@@ -35,8 +35,16 @@ def analyze(ticker: str) -> dict | None:
         sources.append({"label": f"SEC {f['form']} filing ({f['date']})",
                         "source": "SEC EDGAR", "url": f["url"]})
 
+    momentum = result.get("momentum") or {}
+    # Persist the takeaway alongside the AS-OF the data it describes, so a saved
+    # read can never be mistaken for a statement about a later price.
+    as_of = hist.index[-1].date().isoformat() if len(hist) else None
+    storage.save_history(quote["symbol"], quote.get("name"), momentum.get("lean"),
+                         momentum.get("summary"), as_of)
+
     return {
         "ticker": quote["symbol"],
+        "asOf": as_of,
         "momentum": result.get("momentum"),
         "learning_note": result.get("learning_note"),
         "news": {"feed": news_items, "note": news_note, "inference": result.get("news_inference")},

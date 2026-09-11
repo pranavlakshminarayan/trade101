@@ -11,7 +11,7 @@ list + a note, never fabricated news.
 from __future__ import annotations
 
 import os
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, timezone
 
 import httpx
 
@@ -39,7 +39,7 @@ def get_company_news(ticker: str, days: int = 30) -> tuple[list[dict], str | Non
     key = os.environ.get("TRADE101_NEWS_KEY")
     if not key:
         return [], "No Finnhub key set (TRADE101_NEWS_KEY) — news feed unavailable."
-    to = datetime.utcnow().date()
+    to = datetime.now(timezone.utc).date()
     frm = to - timedelta(days=days)
     try:
         r = httpx.get(
@@ -59,7 +59,7 @@ def get_company_news(ticker: str, days: int = 30) -> tuple[list[dict], str | Non
             "summary": a.get("summary"),
             "source": a.get("source"),
             "url": a.get("url"),
-            "datetime": datetime.utcfromtimestamp(a["datetime"]).date().isoformat() if a.get("datetime") else None,
+            "datetime": datetime.fromtimestamp(a["datetime"], timezone.utc).date().isoformat() if a.get("datetime") else None,
         })
     note = None if items else "No recent company news returned (Finnhub coverage is strongest for US symbols)."
     return items, note

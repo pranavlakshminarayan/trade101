@@ -1,9 +1,10 @@
 """
 Trade101 backend — FastAPI.
 
-Milestone 1: real-time, ticker-agnostic research endpoint returning exact
-market data + indicators. No AI yet (that arrives in Milestone 3); this is the
-deterministic foundation everything else stands on.
+Deterministic services own the numbers (market data, indicators, patterns,
+company profile); the agents own the judgment (the sourced momentum read and
+news inference). The two are split across endpoints on purpose: /research never
+waits on — or fails because of — the AI.
 """
 from __future__ import annotations
 
@@ -18,7 +19,7 @@ from fastapi.middleware.cors import CORSMiddleware
 load_dotenv(Path(__file__).resolve().parent.parent / ".env")
 
 from agents import llm, orchestrator
-from services import company, indicators, marketdata, patterns, search
+from services import company, indicators, marketdata, patterns, search, storage, usage
 
 app = FastAPI(title="Trade101 API", version="0.1.0")
 
@@ -127,3 +128,28 @@ def analyze(ticker: str):
     if result is None:
         raise HTTPException(status_code=404, detail=f"No market data found for '{ticker}'.")
     return {"available": True, **result}
+
+
+@app.get("/usage")
+def llm_usage(since: str | None = None):
+    """
+    What the AI has cost, broken down by PURPOSE (which feature spent it), by
+    key, and by model. Purpose is recorded independently of the key, so the
+    breakdown is the same whether you run one named key or several.
+
+    `since` is an ISO-8601 UTC timestamp (e.g. 2026-09-01T00:00:00+00:00);
+    omit for all-time.
+    """
+    return usage.summary(since)
+
+
+@app.get("/history")
+def history(limit: int = 50):
+    """Server-side record of researched stocks + their AI takeaway."""
+    return {"history": storage.get_history(limit)}
+
+
+@app.delete("/history")
+def history_clear():
+    """Clear the saved research history."""
+    return {"cleared": storage.clear_history()}

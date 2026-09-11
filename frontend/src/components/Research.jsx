@@ -140,7 +140,7 @@ export default function Research({ data, onBack, onSearch, onNavigate }) {
       <div className="card">
         <div className="lbl">📎 References — every source used</div>
         <div className="reflist">
-          <div><a href="#">Yahoo Finance</a> <span className="faint">— price &amp; indicators</span></div>
+          <div><a href={`https://finance.yahoo.com/quote/${encodeURIComponent(ticker)}`} target="_blank" rel="noreferrer">Yahoo Finance — {ticker}</a> <span className="faint">— price &amp; indicators</span></div>
           {sources.map((s, i) => (
             <div key={i}><a href={s.url} target="_blank" rel="noreferrer" title={s.url}>{s.label}</a>{s.source ? <span className="faint"> — {s.source}</span> : null}</div>
           ))}

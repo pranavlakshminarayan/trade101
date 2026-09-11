@@ -82,7 +82,7 @@ def run(ticker: str, quote: dict, indicators: dict, news_items: list, filings: l
         + json.dumps(payload, indent=2)
         + "\n\nReturn only the JSON object described in your instructions."
     )
-    text = llm.call("TRADE101_ANALYSIS_KEY", SYSTEM, user, effort="high", max_tokens=4000)
+    text = llm.call("analysis", SYSTEM, user, ticker=ticker, effort="high", max_tokens=4000)
     try:
         result = _extract_json(text)
     except (json.JSONDecodeError, ValueError):
