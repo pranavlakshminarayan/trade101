@@ -186,3 +186,6 @@ export async function practiceClose(id, price, reflection) {
 
 export const practiceDelete = (id) =>
   fetch(`${BASE}/practice/${id}`, { method: 'DELETE' }).then((r) => r.ok)
+
+// Phase 4 — typed, sourced ecosystem relationships.
+export const graph = (ticker) => getJSON(`/graph/${encodeURIComponent(ticker.trim())}`)

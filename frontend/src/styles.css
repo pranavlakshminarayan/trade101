@@ -565,3 +565,36 @@ textarea:focus-visible, select:focus-visible, summary:focus-visible {
   .top { flex-wrap: wrap; gap: 10px; }
   .tabs { flex-wrap: wrap; }
 }
+
+/* ---- Phase 4: ecosystem graph ------------------------------------------- */
+
+.edgegroup { margin: 14px 0; }
+.edgegroup-head {
+  font-size: 12px; font-weight: 600; margin-bottom: 8px;
+  display: flex; gap: 10px; align-items: baseline; flex-wrap: wrap;
+}
+.edgegroup-head .faint { font-weight: 400; font-size: 11.5px; }
+.edge { padding: 9px 0; border-bottom: 1px solid var(--hair); }
+.edge:last-child { border-bottom: none; }
+.edge-main { display: flex; align-items: center; gap: 9px; flex-wrap: wrap; }
+.edge-name { font-size: 12px; }
+.edge-private { font-size: 13.5px; font-weight: 600; }
+.edge-conf {
+  font-size: 10.5px; padding: 1px 7px; border-radius: 4px; cursor: help;
+  text-transform: uppercase; letter-spacing: .05em;
+}
+.conf-high { background: rgba(0,214,143,.16); color: var(--up); }
+.conf-mod  { background: rgba(52,169,190,.16); color: var(--teal); }
+.conf-low  { background: rgba(232,177,74,.16); color: var(--amber); }
+.edge-mat {
+  font-size: 11px; font-family: ui-monospace, Menlo, Consolas, monospace;
+  color: var(--muted);
+}
+.edge-src { font-size: 11px; margin-top: 3px; }
+.edge-note { font-size: 11.5px; line-height: 1.55; margin-top: 3px; }
+
+.unsourced-block {
+  margin-top: 14px; padding: 10px 12px; border-radius: 6px;
+  background: rgba(232,177,74,.08); border-left: 2px solid var(--amber);
+}
+.unsourced-block p { margin: 5px 0 0; font-size: 11.5px; line-height: 1.6; }

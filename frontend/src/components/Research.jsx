@@ -5,6 +5,7 @@ import Metrics from './Metrics.jsx'
 import AiRead from './AiRead.jsx'
 import NewsPanel from './NewsPanel.jsx'
 import Ecosystem from './Ecosystem.jsx'
+import Graph from './Graph.jsx'
 import AsOf, { ProviderBadge } from './AsOf.jsx'
 import Fundamentals from './Fundamentals.jsx'
 import StudyMode from './StudyMode.jsx'
@@ -24,7 +25,7 @@ const TF = {
   '1D':  { period: '1d',  interval: '5m' },
 }
 const TF_ORDER = ['1Y', '1M', '10D', '5D', '1D']
-const FLOW = ['metrics', 'lenses', 'fundamentals', 'news', 'ecosystem', 'references'] // blocks the masonry distributes
+const FLOW = ['metrics', 'lenses', 'fundamentals', 'news', 'ecosystem', 'graph', 'references'] // blocks the masonry distributes
 
 function changeChip(pct) {
   if (pct == null) return <span className="chip flat">—</span>
@@ -48,7 +49,7 @@ export default function Research({ data, onBack, onSearch, onNavigate }) {
   const [patSel, setPatSel] = useState(0)
   const [updatedAt, setUpdatedAt] = useState(new Date())
   const [q, setQ] = useState('')
-  const [assign, setAssign] = useState({ metrics: 'L', lenses: 'R', fundamentals: 'R', news: 'L', ecosystem: 'R', references: 'R' })
+  const [assign, setAssign] = useState({ metrics: 'L', lenses: 'R', fundamentals: 'R', news: 'L', ecosystem: 'R', graph: 'L', references: 'R' })
   const [tick, setTick] = useState(0)
   const [study, setStudy] = useState(false)
   const [replay, setReplay] = useState(false)
@@ -160,6 +161,7 @@ export default function Research({ data, onBack, onSearch, onNavigate }) {
     fundamentals: <Fundamentals ticker={ticker} filings={ai?.filings} />,
     news: <NewsPanel ai={ai} loading={aiLoading} ticker={ticker} />,
     ecosystem: <Ecosystem ticker={ticker} onSearch={onSearch} />,
+    graph: <Graph ticker={ticker} onOpen={onSearch} />,
     references: (
       <div className="card">
         <div className="lbl">📎 References — every source used</div>

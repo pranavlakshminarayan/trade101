@@ -28,6 +28,7 @@ TTL = {
     "search": 3600,       # 1 h
     "fundamentals": 21600,  # 6 h  — these move on a reporting cadence
     "replay": 86400,      # 24 h   — a historical window never changes
+    "etf_holdings": 86400,  # 24 h — fund holdings are published periodically
 }
 DEFAULT_TTL = 300
 

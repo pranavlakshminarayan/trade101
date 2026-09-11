@@ -22,7 +22,7 @@ load_dotenv(Path(__file__).resolve().parent.parent / ".env")
 from agents import llm, orchestrator
 from services import (cache, company, compare as compare_svc, evidence, fundamentals,
                       indicators, lenses, marketdata, news as news_svc, patterns,
-                      replay, search, storage, usage, watchlist)
+                      relationships, replay, search, storage, usage, watchlist)
 
 app = FastAPI(title="Trade101 API", version="0.1.0")
 
@@ -416,3 +416,19 @@ def practice_delete(entry_id: int):
     if not storage.practice_delete(entry_id):
         raise HTTPException(status_code=404, detail=f"No practice entry {entry_id}.")
     return {"deleted": entry_id}
+
+
+# ---- Phase 4: ecosystem graph ---------------------------------------------
+
+@app.get("/graph/{ticker}")
+def ecosystem_graph(ticker: str):
+    """
+    Typed, sourced relationships around a company — each edge carrying its
+    relationship type, source, confidence and materiality.
+
+    Relationship types we have no licensed source for (supplier, customer,
+    partner, investor) come back EMPTY and are listed under `unsourced`. An
+    empty supplier list means we have no source, never that the company has no
+    suppliers, and the response says so.
+    """
+    return relationships.graph(ticker)
