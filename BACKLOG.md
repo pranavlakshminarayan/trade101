@@ -26,9 +26,11 @@ feature work below; the phases after it are renumbered accordingly.
 - [x] Visible not-advice notice beside the momentum narrative, not only in the footer.
 - [x] API keys confirmed backend-only (no `VITE_` vars, no secrets in the bundle).
 - [x] Graceful degradation hardened — provider outage is a 503 with a retry, never a 500.
-- [ ] **Form your own read before the AI's** — the last Definition-of-Done item; belongs
-      with Guided Study Mode below.
-- [ ] **Saved learning note** — ditto.
+- [x] **Saved learning note** — the learning journal (Phase 2).
+- [ ] **Form your own read before the AI's** — ⚠️ *partially met*. Guided Study enforces it,
+      but it is opt-in; on a normal research page the AI read still renders immediately.
+      Needs a product decision: leave it, collapse the AI read behind a reveal (suggested),
+      or gate it until the learner has written something. See `docs/EXECUTION-REPORT.md`.
 
 ## Phase 2 — Learning engine ✅
 - [x] **Guided Study Mode** — observe → predict → reveal → challenge → revisit.

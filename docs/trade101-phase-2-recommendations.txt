@@ -1,0 +1,110 @@
+TRADE101 — EXTERNAL REVIEW OF THE PHASE 1 MVP
+Reviewers: ChatGPT + Gemini, reviewed by Pranav, September 2026.
+
+This is the review that reordered the roadmap: trust and coherence BEFORE feature
+work. It is the authority on sequencing and on the guardrails below — Phases 1.5,
+2, 2.5, 3 and 4 as built follow it. See docs/EXECUTION-REPORT.md for what was
+delivered against it.
+
+Note on this file: as received, the text begins at architecture item 3. The two
+preceding items were clipped in transmission and Pranav confirmed the remainder
+is complete as-is. Everything below is verbatim.
+
+---
+
+3. Use a provider abstraction for market data.
+   Do not replace Yahoo data with an institutional provider in one large rewrite.
+   Keep a MarketDataProvider interface, then add an adapter for the chosen
+   professional provider. Select a provider based on target exchanges, allowed
+   redistribution, historical data, real-time entitlement, and cost.
+4. Add WebSockets only when a real-time feed justifies them.
+   A WebSocket connection cannot make delayed source data real-time. For the
+   current education-oriented MVP, polling/cached refreshes are reasonable.
+   Use real-time streaming only after obtaining a licensed real-time feed and
+   designing clear reconnect, stale-data, and market-closed states.
+5. Preserve graceful degradation.
+   Prices and charts should render if AI, news, filing, ecosystem, or search
+   sources fail. Each unavailable panel should say what failed, what remains
+   usable, and whether retrying may help.
+
+PRODUCT FEATURES: RECOMMENDED ORDER
+
+Phase 1.5 — Trust and coherence
+- Evidence relevance filter, claim-level citations, evidence tests.
+- Shared timeframe/as-of labels across chart, metrics, patterns, and AI read.
+- Provider coverage badges and robust error/stale-data states.
+- Cache abstraction and API response caching.
+- Visible educational/not-financial-advice notice near the momentum narrative,
+  not only at the bottom of the app.
+- Confirm API keys remain backend-only; do not expose them in Vite variables,
+  browser bundles, URLs, client logs, or committed files.
+
+Phase 2 — Learning engine
+- Guided Study Mode: observe, predict, reveal, challenge, revisit.
+- More tooltips, but favor short contextual prompts over tooltip overload.
+- Learning journal: save the learner's hypothesis and evidence, not a virtual
+  trade recommendation.
+- Retrospective replay: hide a historical outcome until the learner submits a
+  read, then reveal what followed with no claim of predictability.
+- Company fundamentals: earnings date, results versus estimates, revenue,
+  margins, cash flow, valuation context, and primary filing links.
+
+Phase 2.5 — Style lenses, not "styles to copy"
+- Trend lens: trend structure, relative strength, volume confirmation.
+- Swing lens: momentum, volatility, recent catalyst context.
+- Mean-reversion lens: range and volatility context, strongly caveated.
+- Long-term lens: fundamentals, earnings, valuation, competitive position.
+- Event-driven lens: earnings, filings, guidance, and macro sensitivity.
+For every lens, show what it considers, what it does not consider, conflicting
+evidence, and its failure modes. Do not ship a day-trading lens until a licensed
+real-time data source is available; delayed data creates false precision.
+
+Phase 3 — Research workspace
+- Complete Comparison: choose two or more companies; normalize price charts;
+  compare indicators, earnings/fundamentals, news evidence, peers, and time
+  windows. Never reduce the output to "which is better."
+- Watchlist: track companies, research updates, source coverage, and learner
+  notes. Alerts should be phrased as information events (earnings filed, price
+  crossed a selected level, new filing), not trade prompts.
+- Optional simulated portfolio: make it a separate practice lab with explicit
+  delayed/hypothetical performance and learning reflections. Do not make it the
+  primary action of a beginner-facing educational app.
+- Light mode, contrast checks, keyboard navigation, and responsive layout.
+
+Phase 4 — Supply-chain and market ecosystem intelligence
+- Replace the present peer list with a sourced relationship graph.
+- Each edge needs relationship type (supplier, customer, partner, competitor,
+  investor, index constituent), source, date, confidence, and materiality.
+- Distinguish public companies from private companies.
+- State that a business relationship can be a research hypothesis, not proof of
+  a stock-price effect.
+- ETF view should display verified holdings and weights. An ETF does not
+  automatically rise merely because a company in a possible supply chain grows.
+
+API KEYS AND AGENTS
+The current two-key configuration is appropriate for the current MVP:
+TRADE101_ANALYSIS_KEY=...    # Claude narration
+TRADE101_NEWS_KEY=...        # Finnhub news and peers
+Do not add separate AI agents or separate Claude API keys merely to improve
+sourcing. First implement the evidence pipeline above. One carefully bounded
+analysis call is easier to evaluate, cache, secure, and debug.
+Add a new key only when a real integration has been implemented and tested:
+TRADE101_SEARCH_PROVIDER=none
+TRADE101_SEARCH_KEY=          # optional, future research/search provider
+TRADE101_MARKET_DATA_PROVIDER=yahoo
+TRADE101_MARKET_DATA_KEY=     # optional, future licensed data provider
+TRADE101_CACHE_URL=           # optional, Redis connection when needed
+Never commit the real .env file. Maintain only .env.example in Git with empty
+values and explanations.
+
+DEFINITION OF DONE FOR THE NEXT RELEASE
+A completed "Trust & Learning" release should let a learner open a company and:
+- See exactly what timeframe and data timestamp every conclusion refers to.
+- See only relevant company, sector, supply-chain, or macro evidence.
+- Open a citation and understand why it supports a displayed statement.
+- See uncertainty when source coverage is poor.
+- Form their own interpretation before seeing the AI synthesis.
+- Leave with a saved learning note, not a trading instruction.
+
+This sequence protects Trade101's most valuable promise: it helps people learn
+how to reason about markets rather than outsourcing that reasoning to an AI.

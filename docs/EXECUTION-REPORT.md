@@ -177,6 +177,41 @@ Everything below was written against stubs. **Test these first.**
 
 ---
 
+## Audit against the review's own Definition of Done
+
+The review defined done for a "Trust & Learning" release as six things a learner
+should be able to do. Checked honestly:
+
+| # | Definition of Done | Status | Where |
+|---|---|---|---|
+| 1 | See exactly what timeframe and data timestamp every conclusion refers to | ✅ | `AsOf.jsx` renders from one shared `meta`; an integration test asserts chart, patterns and lenses agree |
+| 2 | See only relevant company, sector, supply-chain or macro evidence | ✅ | `evidence.select()` — and it shows you what it dropped, and why |
+| 3 | Open a citation and understand why it supports a displayed statement | ✅ | Every claim renders resolved citations; indicators show the exact value they rest on |
+| 4 | See uncertainty when source coverage is poor | ✅ | `Coverage.jsx` — ok / thin / none, with the confidence instruction spelled out |
+| 5 | **Form their own interpretation before seeing the AI synthesis** | ⚠️ **partial** | Guided Study does this properly — but it is **opt-in**. On a normal research page the AI read still renders immediately. |
+| 6 | Leave with a saved learning note, not a trading instruction | ✅ | Journal stores hypothesis + evidence; a lean with no reasoning is rejected |
+
+### On item 5 — a decision for you, not a bug
+
+Guided Study genuinely enforces the ordering: your read is saved *before* the AI's
+is rendered. But it is a button you have to press. Open a stock normally and the AI
+momentum read is right there, which is the habit the review wanted to interrupt.
+
+Three options, in increasing strength:
+
+1. **Leave it.** Study Mode is available when you want it. Lowest friction, weakest
+   guarantee.
+2. **Collapse the AI read by default** behind a "Reveal Trade101's read" button, with
+   a line explaining why it starts hidden. One-click escape, and the default nudges
+   the right way. *This is what I'd suggest.*
+3. **Gate it** — the AI read stays hidden until you have written something. Strongest
+   guarantee, most friction, and probably irritating on the tenth stock of an evening.
+
+I did not pick one, because it changes the default feel of the main screen every time
+you open the app, and that is your call rather than mine.
+
+---
+
 ## Known gaps and honest limits
 
 - **Live data untested** (above). This is the big one.
