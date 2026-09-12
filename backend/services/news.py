@@ -11,6 +11,7 @@ list + a note, never fabricated news.
 from __future__ import annotations
 
 import os
+import re
 from datetime import datetime, timedelta
 
 import httpx
@@ -22,6 +23,24 @@ SEC_SUBMISSIONS = "https://data.sec.gov/submissions/CIK{cik}.json"
 SEC_UA = {"User-Agent": "Trade101 research app (workspace.sonic@gmail.com)"}
 
 _cik_cache: dict[str, str] = {}
+
+
+def _safe_err(e: Exception) -> str:
+    """Provider errors are shown to the user, so never let a key travel with them.
+
+    httpx puts the full request URL in its error text, which includes the
+    Finnhub `token=` query param. Redact that (and any configured key value)
+    before the message leaves the backend.
+    """
+    msg = str(e)
+    msg = re.sub(r"(token|apikey|api_key|key)=[^&\s\"']+", r"\g<1>=***", msg, flags=re.I)
+    for env in ("TRADE101_NEWS_KEY", "TRADE101_SCRAPE_KEY"):
+        val = os.environ.get(env)
+        if val and len(val) > 6:
+            msg = msg.replace(val, "***")
+    return msg
+
+
 
 
 def get_news(ticker: str, days: int = 30) -> tuple[list[dict], str | None]:
@@ -50,7 +69,14 @@ def get_company_news(ticker: str, days: int = 30) -> tuple[list[dict], str | Non
         r.raise_for_status()
         raw = r.json()
     except Exception as e:
-        return [], f"News provider error: {e}"
+        note = f"News provider error: {_safe_err(e)}"
+        if "403" in str(e):
+            note = (
+                "Finnhub's free tier doesn't cover company news for this symbol "
+                f"({ticker.upper()}) — non-US listings are mostly excluded. No news "
+                "fetched; nothing was inferred from headlines."
+            )
+        return [], note
 
     items = []
     for a in raw[:15]:
@@ -88,7 +114,7 @@ def get_recent_filings(ticker: str, limit: int = 5) -> tuple[list[dict], str | N
         r.raise_for_status()
         recent = r.json()["filings"]["recent"]
     except Exception as e:
-        return [], f"EDGAR error: {e}"
+        return [], f"EDGAR error: {_safe_err(e)}"
 
     wanted = {"10-K", "10-Q", "8-K"}
     out = []

@@ -6,11 +6,19 @@ A running list so we don't lose ideas. Add freely; we pull from here after the M
 
 ---
 
-## MVP (Phase 1) — in progress
+## MVP (Phase 1) — complete
 - [x] M0 Scaffold · [x] M1 real-time core · [x] M2 frontend (welcome + research view + live chart + click-to-learn)
-- [ ] **M3 AI narration** — momentum read + news Feed + "What it means" inference (sense-making, sourced). News via **Finnhub (free) + SEC EDGAR**.
-- [ ] M4 patterns (magnifier) + ecosystem + index/beta + references + history
-- [ ] M5 resilience + tests + the "surprise-ticker" true test
+- [x] **M3 AI narration** — momentum read + news Feed + "What it means" inference (sense-making, sourced). News via **Finnhub (free) + SEC EDGAR**.
+- [x] M4 patterns (magnifier) + ecosystem + index/beta + references + history
+- [x] M5 resilience + tests + the "surprise-ticker" true test
+
+**Verification run (2026-09-12), surprise ticker `7974.T` (Nintendo, Tokyo):** name search
+resolved 4 listings across markets; `/research` returned 244 live bars + exact indicators;
+`/patterns` correctly returned none (nothing clean); `/ecosystem` returned sector/industry/
+market cap; `/analyze` produced a sourced, mixed-lean momentum read with no buy/sell language
+and honestly reported that no news was available rather than inventing any; unknown ticker →
+404 with a helpful message; with the key removed the app degraded to chart + indicators.
+18 backend tests pass; frontend builds clean.
 
 ---
 
