@@ -23,3 +23,6 @@ data/
 # OS
 .DS_Store
 Thumbs.db
+
+# Screenshot output from frontend/scripts/screenshot.mjs
+frontend/screenshots/

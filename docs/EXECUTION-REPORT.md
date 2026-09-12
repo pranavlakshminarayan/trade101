@@ -124,6 +124,32 @@ cd frontend && npm.cmd test                           # 11 frontend tests
 
 ---
 
+## Seeing it without live data
+
+This container cannot reach Yahoo/Finnhub/SEC, so I stubbed the providers and drove
+the real UI with a headless browser. Both tools are committed, so you can do the same
+— useful for checking a UI change without spending a Claude key or waiting on markets:
+
+```bash
+# terminal 1 — the real backend, providers stubbed with fixture data
+cd backend && .venv/Scripts/python.exe tools/stub_server.py
+
+# terminal 2
+cd frontend && npm.cmd run dev
+
+# terminal 3 — drives the app and writes frontend/screenshots/
+cd frontend && npx playwright install chromium   # first time only
+node scripts/screenshot.mjs
+```
+
+`tools/stub_server.py` stubs **only** the outbound providers — the endpoints, evidence
+gates, lenses and freshness logic are all the real code path. Its fixture deliberately
+includes two irrelevant headlines (a Ford recall, a multi-stock round-up) and one
+un-sourceable claim, so you can watch the relevance filter drop 2 of 4 and the citation
+verifier withhold 1 of 5.
+
+---
+
 ## Testing plan — in priority order
 
 ### 🔴 Priority 1 — the live integrations I could not verify
@@ -268,8 +294,16 @@ Worth knowing these existed, because two were silent:
    raised a `TypeError` at runtime. Now `REAL`, with defensive coercion.
 3. **StudyMode's MACD prompt never appeared** — destructured flat from a nested object.
 4. **A provider outage returned a 500 stack trace.** Now a 503 that explains itself.
-5. Dead `<a href="#">` reference link; `datetime.utcnow()` deprecation; two stale
+5. **Light mode failed contrast in eight places.** Found by rendering the app, not by
+   any test: I had hardcoded dark-theme text colours (`#BFD6E2`, `#AFC4D2`, …) instead
+   of theme tokens, so the not-advice notice and several panels were near-illegible
+   pale-on-pale in light mode. All now use `var(--ink)` / `var(--muted)` / `var(--amber)`
+   and follow the theme. This is exactly what a production build cannot catch.
+6. Dead `<a href="#">` reference link; `datetime.utcnow()` deprecation; two stale
    module docstrings.
+
+**Still open (cosmetic):** there is no `favicon.ico`, so every page load logs one 404 in
+the browser console. It belongs with the "real logo" backlog item.
 
 ---
 
