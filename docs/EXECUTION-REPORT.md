@@ -3,7 +3,8 @@
 **What this is:** everything built in the session of 2026-09-11, what to test, and
 what I could *not* verify here. Written so you can sit down cold and check the work.
 
-**Branch:** `claude/trading-idea-handover-dfe84a` · **Tests:** 128 passing, ~5s, no network required.
+**Branch:** `claude/trading-idea-handover-dfe84a`
+**Tests:** 128 backend (`pytest -q`) + 11 frontend (`npm test`), ~7s total, no network required.
 
 ---
 
@@ -109,10 +110,17 @@ Pricing is from the published Anthropic rates (Sonnet 5 $2/$10 per MTok), captur
 npm.cmd run dev
 ```
 
-Open http://127.0.0.1:5173. Tests: `cd backend && .venv/Scripts/python.exe -m pytest -q`
+Open http://127.0.0.1:5173.
 
-**Note:** `pip install -r requirements.txt` again — no new packages were added, but
-the venv here was rebuilt.
+```bash
+cd backend && .venv/Scripts/python.exe -m pytest -q   # 128 backend tests
+cd frontend && npm.cmd test                           # 11 frontend tests
+```
+
+**Before the first run:**
+- `pip install -r requirements.txt` — no new Python packages, but the venv here was rebuilt.
+- `npm.cmd install` — **new dev dependencies** for the frontend tests (vitest, jsdom,
+  @testing-library/react + user-event + jest-dom). Dev-only; they do not ship in the build.
 
 ---
 
@@ -143,36 +151,40 @@ Everything below was written against stubs. **Test these first.**
 
 ### 🟠 Priority 2 — the learning flows
 
-6. **Guided Study** (◎ button on a research page). Walk all five steps. The
-   critical check: **is the AI's read genuinely hidden until after you commit?**
-   Then open the Journal — your entry should be there with your lean *and* the
-   AI's recorded separately.
-7. **Replay** (⟲ button). Check the chart shows no future bars before you commit.
+6. **The curtain.** Open any stock. The AI read should be collapsed, the header
+   strip should show **no lean chip**, and the News panel should open on **Feed**.
+   Click "Reveal Trade101's read" — everything appears, including the lean chip.
+   Then search a different stock: it must be collapsed again.
+7. **Guided Study** (◎ button, or "Walk me through it first" on the curtain). Walk
+   all five steps. The critical check: **is the AI's read genuinely hidden until
+   after you commit?** Then open the Journal — your entry should be there with your
+   lean *and* the AI's recorded separately.
+8. **Replay** (⟲ button). Check the chart shows no future bars before you commit.
    Open devtools → Network: the `/replay/NVDA` response must contain **no**
    `outcome` key. Commit a read, reveal, confirm the one-sample caveat appears.
    Hit "Different window" — the cut should move.
-8. **Journal** — add a reflection, reload, confirm it persists.
+9. **Journal** — add a reflection, reload, confirm it persists.
 
 ### 🟡 Priority 3 — the workspace
 
-9. **Comparison** — add two companies with very different price levels
+10. **Comparison** — add two companies with very different price levels
    (e.g. NVDA and a ₹ stock). Both lines must start at 100. Check the
    comparability warnings fire for different sectors/currencies.
-10. **Watchlist** — add a level just above the current price, then one just below.
+11. **Watchlist** — add a level just above the current price, then one just below.
     Reload. Does the crossing event appear, and is the wording neutral?
-11. **Practice lab** — open a position, confirm every figure says "hypothetical".
-12. **Light mode** — the switch cycles System → Light → Dark. Check every screen in
+12. **Practice lab** — open a position, confirm every figure says "hypothetical".
+13. **Light mode** — the switch cycles System → Light → Dark. Check every screen in
     light mode; I built the palette but never saw it rendered.
-13. **Keyboard** — Tab through a research page. Every control should show a focus
+14. **Keyboard** — Tab through a research page. Every control should show a focus
     ring. Try the skip link (Tab from page load on the welcome screen).
-14. **Phone width** — resize to ~400px.
+15. **Phone width** — resize to ~400px.
 
 ### 🟢 Priority 4 — the failure states
 
-15. **Kill the backend**, then search. You should get the exact uvicorn command
+16. **Kill the backend**, then search. You should get the exact uvicorn command
     and a "Try again" button.
-16. **Bad ticker** (`ZZZZZZ`) — a 404 with no retry button.
-17. **Unplug the network**, then search — a 503 with a retry button, *not* a
+17. **Bad ticker** (`ZZZZZZ`) — a 404 with no retry button.
+18. **Unplug the network**, then search — a 503 with a retry button, *not* a
     stack trace.
 
 ---
@@ -188,27 +200,36 @@ should be able to do. Checked honestly:
 | 2 | See only relevant company, sector, supply-chain or macro evidence | ✅ | `evidence.select()` — and it shows you what it dropped, and why |
 | 3 | Open a citation and understand why it supports a displayed statement | ✅ | Every claim renders resolved citations; indicators show the exact value they rest on |
 | 4 | See uncertainty when source coverage is poor | ✅ | `Coverage.jsx` — ok / thin / none, with the confidence instruction spelled out |
-| 5 | **Form their own interpretation before seeing the AI synthesis** | ⚠️ **partial** | Guided Study does this properly — but it is **opt-in**. On a normal research page the AI read still renders immediately. |
+| 5 | **Form their own interpretation before seeing the AI synthesis** | ✅ | The AI read is **collapsed behind a reveal on every stock**. Guided Study is the stronger opt-in path. |
 | 6 | Leave with a saved learning note, not a trading instruction | ✅ | Journal stores hypothesis + evidence; a lean with no reasoning is rejected |
 
-### On item 5 — a decision for you, not a bug
+### On item 5 — how the curtain works
 
-Guided Study genuinely enforces the ordering: your read is saved *before* the AI's
-is rendered. But it is a button you have to press. Open a stock normally and the AI
-momentum read is right there, which is the habit the review wanted to interrupt.
+Pranav chose option 2, and it shipped. Every stock now opens with the AI momentum read
+collapsed, offering two ways forward: **"Walk me through it first"** (Guided Study, the
+stronger path) or **"Reveal Trade101's read"** (one click).
 
-Three options, in increasing strength:
+Two things leak the synthesis if you only collapse the obvious panel, and both are closed:
 
-1. **Leave it.** Study Mode is available when you want it. Lowest friction, weakest
-   guarantee.
-2. **Collapse the AI read by default** behind a "Reveal Trade101's read" button, with
-   a line explaining why it starts hidden. One-click escape, and the default nudges
-   the right way. *This is what I'd suggest.*
-3. **Gate it** — the AI read stays hidden until you have written something. Strongest
-   guarantee, most friction, and probably irritating on the tenth stock of an evening.
+- **The header strip** rendered the AI's lean chip — the conclusion, in three words,
+  above the fold. Now hidden until reveal.
+- **The News panel** opened on its "What it means" tab, which is AI inference rather
+  than news. It now opens on the **Feed** — raw sourced headlines. Evidence is free;
+  synthesis costs a deliberate click, and the inference tab says plainly that it is
+  Trade101's reading rather than the news.
 
-I did not pick one, because it changes the default feel of the main screen every time
-you open the app, and that is your call rather than mine.
+What stays visible behind the curtain, deliberately: the **as-of timestamp** and the
+**source coverage**. Neither is a conclusion, and both are what you need to calibrate
+*before* deciding how much to trust anything — hiding them would make the exercise
+harder rather than more honest.
+
+The copy matters here too. The curtain says the read is ready and that *"nothing is
+being withheld from you — this is only about the order you see things in, which is the
+one thing you cannot undo."* A locked-door treatment would read as the app
+withholding, which it isn't.
+
+Reset behaviour: the curtain re-closes on every new stock, and on every re-fetch of the
+analysis. It does not remember that you revealed the last one.
 
 ---
 
@@ -224,8 +245,11 @@ you open the app, and that is your call rather than mine.
 - **Practice lab is deliberately minimal.** The review called it optional and
   warned against making it prominent. It's behind its own tab with the
   disclaimer leading.
-- **No frontend tests.** Backend has 128; the React side is verified only by a
-  clean production build. Worth adding Vitest if we keep growing it.
+- **Frontend tests now exist, but only for the curtain.** Vitest + React Testing
+  Library are set up (`npm test`), with 11 tests covering the reveal invariant and
+  the news-panel default — the one frontend behaviour where a regression would be
+  invisible, since the panel would simply look normal. The other 20-odd components
+  are still verified only by a clean production build.
 - **`/analyze` still uses one bounded call**, per the review. The other named
   keys are wired but unused until more agents exist — deliberately.
 

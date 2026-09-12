@@ -54,6 +54,8 @@ export default function Research({ data, onBack, onSearch, onNavigate }) {
   const [study, setStudy] = useState(false)
   const [replay, setReplay] = useState(false)
   const [theme, setTheme] = useState(getTheme())
+  // The AI read starts hidden on EVERY stock — see AiRead's curtain.
+  const [aiRevealed, setAiRevealed] = useState(false)
 
   const ticker = live.ticker
   const refs = useRef({})
@@ -62,11 +64,12 @@ export default function Research({ data, onBack, onSearch, onNavigate }) {
   useEffect(() => {
     setLive(data); setTfData({}); setTfMetaMap({}); setPatData({}); setPatMeta({}); setShowPatterns(false); setPatSel(0)
     setChartType('candles'); setTimeframe('1Y'); setUpdatedAt(new Date())
+    setAiRevealed(false)
   }, [data])
 
   useEffect(() => {
     let alive = true
-    setAiLoading(true); setAi(null)
+    setAiLoading(true); setAi(null); setAiRevealed(false)
     analyze(data.ticker).then((r) => { if (alive) { setAi(r); setAiLoading(false) } })
     return () => { alive = false }
   }, [data.ticker])
@@ -159,7 +162,7 @@ export default function Research({ data, onBack, onSearch, onNavigate }) {
     metrics: <Metrics indicators={indicators} ticker={ticker} meta={meta} />,
     lenses: <Lenses ticker={ticker} />,
     fundamentals: <Fundamentals ticker={ticker} filings={ai?.filings} />,
-    news: <NewsPanel ai={ai} loading={aiLoading} ticker={ticker} />,
+    news: <NewsPanel ai={ai} loading={aiLoading} ticker={ticker} revealed={aiRevealed} />,
     ecosystem: <Ecosystem ticker={ticker} onSearch={onSearch} />,
     graph: <Graph ticker={ticker} onOpen={onSearch} />,
     references: (
@@ -257,7 +260,7 @@ export default function Research({ data, onBack, onSearch, onNavigate }) {
                  onChange={(e) => setQ(e.target.value)} onKeyDown={(e) => { if (e.key === 'Enter') submit() }} />
         </div>
         <span className="strip-tk"><b>{ticker}</b> — {quote.name}</span>
-        {lean && <span className={'chip ' + (lean === 'bullish' ? 'up' : lean === 'bearish' ? 'down' : 'flat')}>{lean === 'bullish' ? '▲' : lean === 'bearish' ? '▼' : '■'} {lean}</span>}
+        {aiRevealed && lean && <span className={'chip ' + (lean === 'bullish' ? 'up' : lean === 'bearish' ? 'down' : 'flat')}>{lean === 'bullish' ? '▲' : lean === 'bearish' ? '▼' : '■'} {lean}</span>}
         <span className="strip-meta">{quote.exchange}</span>
         <span className="strip-meta faint">{meta.stale ? '⚠ stale data' : 'delayed ~15m'}</span>
       </div>
@@ -275,7 +278,9 @@ export default function Research({ data, onBack, onSearch, onNavigate }) {
           {FLOW.filter((id) => assign[id] === 'L').map((id) => <div key={id} ref={setRef(id)}>{blocks[id]}</div>)}
         </div>
         <div className="col">
-          <div ref={setRef('ai')}><AiRead ai={ai} loading={aiLoading} meta={meta} /></div>
+          <div ref={setRef('ai')}><AiRead ai={ai} loading={aiLoading} meta={meta}
+                                     revealed={aiRevealed} onReveal={() => setAiRevealed(true)}
+                                     onStudy={() => setStudy(true)} /></div>
           {FLOW.filter((id) => assign[id] === 'R').map((id) => <div key={id} ref={setRef(id)}>{blocks[id]}</div>)}
         </div>
       </div>

@@ -43,7 +43,7 @@ function Claims({ items }) {
   )
 }
 
-export default function AiRead({ ai, loading, meta }) {
+export default function AiRead({ ai, loading, meta, revealed, onReveal, onStudy }) {
   const [open, setOpen] = useState(false)
 
   if (loading) {
@@ -80,6 +80,36 @@ export default function AiRead({ ai, loading, meta }) {
 
   const m = ai.momentum || {}
   const unsupported = ai.meta?.unsupportedClaims || []
+
+  // The curtain. Once you have read a confident paragraph you cannot un-read it,
+  // and whatever you "would have thought" afterwards is reconstructed rather than
+  // recalled. So the read starts hidden on every stock, and the evidence you need
+  // to form your own view — the as-of, and how well-sourced this is — stays visible.
+  if (!revealed) {
+    return (
+      <div className="card">
+        <div className="lbl">AI momentum read <span className="faint" style={{ textTransform: 'none', letterSpacing: 0 }}>· hidden for now</span></div>
+
+        <AsOf meta={{ ...(meta || {}), asOf: ai.asOf || meta?.asOf }} timeframe={ai.timeframe} />
+        <Coverage coverage={ai.coverage} filter={ai.evidenceFilter} />
+
+        <div className="curtain">
+          <p>
+            <b>Have a look first.</b> The chart, metrics, patterns and lenses on this page
+            are all here — form your own read from them before this one loads into your head.
+          </p>
+          <p className="faint">
+            It is ready and waiting; nothing is being withheld from you. This is only
+            about the order you see things in, which is the one thing you cannot undo.
+          </p>
+          <div className="curtain-actions">
+            <button className="go" onClick={onStudy}>◎ Walk me through it first</button>
+            <button className="themebtn" onClick={onReveal}>Reveal Trade101's read</button>
+          </div>
+        </div>
+      </div>
+    )
+  }
 
   return (
     <div className="card">

@@ -3,8 +3,10 @@ import Coverage from './Coverage.jsx'
 
 // News block with two tabs: Feed (raw sourced headlines) and
 // "What it means" (Trade101's reasoned inference — the sense-making).
-export default function NewsPanel({ ai, loading, ticker }) {
-  const [tab, setTab] = useState('means')
+export default function NewsPanel({ ai, loading, ticker, revealed }) {
+  // Open on the FEED: raw sourced headlines are evidence, and evidence should be
+  // free. The inference is synthesis, so it costs a deliberate click.
+  const [tab, setTab] = useState('feed')
 
   const news = ai?.news || {}
   const feed = news.feed || []
@@ -15,7 +17,9 @@ export default function NewsPanel({ ai, loading, ticker }) {
       <div className="lbl">News &amp; financial signals</div>
       <div className="newstabs">
         <button className={'ntab' + (tab === 'feed' ? ' on' : '')} onClick={() => setTab('feed')}>Feed</button>
-        <button className={'ntab' + (tab === 'means' ? ' on' : '')} onClick={() => setTab('means')}>What it means ✦</button>
+        <button className={'ntab' + (tab === 'means' ? ' on' : '')} onClick={() => setTab('means')}>
+          What it means ✦{revealed === false ? ' ·' : ''}
+        </button>
       </div>
 
       {loading && (
@@ -57,6 +61,12 @@ export default function NewsPanel({ ai, loading, ticker }) {
 
       {!loading && ai?.available && tab === 'means' && (
         <div className="infer">
+          {revealed === false && (
+            <div className="curtain-inline faint">
+              This is Trade101's inference, not the news itself. The headlines are under
+              <b> Feed</b> if you would rather read them yourself first.
+            </div>
+          )}
           <span className="tagline">Trade101's inference · evidence-based, not advice</span>
           <Coverage coverage={ai.coverage} filter={ai.evidenceFilter} />
           <p style={{ marginTop: 8 }}>{inference.summary || news.note || 'No news to interpret yet.'}</p>

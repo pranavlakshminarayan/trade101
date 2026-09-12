@@ -598,3 +598,18 @@ textarea:focus-visible, select:focus-visible, summary:focus-visible {
   background: rgba(232,177,74,.08); border-left: 2px solid var(--amber);
 }
 .unsourced-block p { margin: 5px 0 0; font-size: 11.5px; line-height: 1.6; }
+
+/* The AI-read curtain. Deliberately calm rather than a locked-door treatment:
+   nothing is being withheld, only re-ordered, and the copy says so. */
+.curtain {
+  margin-top: 12px; padding: 14px 15px; border-radius: 8px;
+  background: var(--surface2); border: 1px dashed var(--hair);
+  font-size: 13px; line-height: 1.65;
+}
+.curtain p { margin: 0 0 8px; }
+.curtain p:last-of-type { margin-bottom: 12px; }
+.curtain-actions { display: flex; gap: 10px; flex-wrap: wrap; }
+.curtain-inline {
+  font-size: 11.5px; line-height: 1.55; margin-bottom: 8px;
+  padding: 7px 9px; border-radius: 4px; background: var(--surface2);
+}

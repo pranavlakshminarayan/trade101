@@ -46,7 +46,7 @@ around it, and do not add agents or keys to improve sourcing — fix the evidenc
 # frontend (from frontend/)
 npm run dev            # PowerShell blocks npm → use npm.cmd run dev, or Set-ExecutionPolicy -Scope CurrentUser RemoteSigned
 ```
-Open http://127.0.0.1:5173. Tests: `cd backend && .venv/Scripts/python.exe -m pytest -q`.
+Open http://127.0.0.1:5173. Tests: `cd backend && .venv/Scripts/python.exe -m pytest -q` (128) · `cd frontend && npm.cmd test` (11, Vitest).
 
 ## Config / conventions
 - `.env` in project root (git-ignored). `TRADE101_ANALYSIS_KEY` (Claude), `TRADE101_NEWS_KEY` (free Finnhub). `TRADE101_MODEL` default **claude-sonnet-5** (cost); use `claude-opus-5` for max depth.
@@ -62,5 +62,6 @@ Open http://127.0.0.1:5173. Tests: `cd backend && .venv/Scripts/python.exe -m py
 - Chart-pattern detection is a heuristic learning aid (returns "none" when nothing clean) — never present it as a signal.
 - **Never fabricate an absence.** Empty ≠ nonexistent: "no relationship source configured" and "this company has no suppliers" look identical in a UI and mean opposite things. Every empty list must say which it is.
 - Replay's `setup` and `reveal` are separate endpoints on purpose — the future must never reach the browser before the learner commits a read.
+- **The AI read is collapsed behind a reveal on every stock** (`aiRevealed` in `Research.jsx`), so the learner forms their own view first. Anything that states the AI's *conclusion* must respect that flag — the header lean chip and the news "What it means" tab both leaked it once. Evidence (as-of, source coverage, raw headlines) stays visible; only synthesis is gated.
 - Tests must stay hermetic: stub `news.get_recent_filings` and `fundamentals.get_fundamentals`, or the suite waits on real SEC/Yahoo timeouts.
 - Layout is a self-balancing JS masonry (measures block heights). Browser back/forward + `#TICKER` shareable links work.

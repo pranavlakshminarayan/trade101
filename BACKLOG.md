@@ -27,10 +27,9 @@ feature work below; the phases after it are renumbered accordingly.
 - [x] API keys confirmed backend-only (no `VITE_` vars, no secrets in the bundle).
 - [x] Graceful degradation hardened — provider outage is a 503 with a retry, never a 500.
 - [x] **Saved learning note** — the learning journal (Phase 2).
-- [ ] **Form your own read before the AI's** — ⚠️ *partially met*. Guided Study enforces it,
-      but it is opt-in; on a normal research page the AI read still renders immediately.
-      Needs a product decision: leave it, collapse the AI read behind a reveal (suggested),
-      or gate it until the learner has written something. See `docs/EXECUTION-REPORT.md`.
+- [x] **Form your own read before the AI's** — the AI read is collapsed behind a reveal on
+      every stock; the header lean chip and the news "What it means" tab were both leaking
+      the synthesis and are now gated too. Guided Study remains the stronger opt-in path.
 
 ## Phase 2 — Learning engine ✅
 - [x] **Guided Study Mode** — observe → predict → reveal → challenge → revisit.
@@ -64,7 +63,8 @@ create false precision.
 - **Ask-Claude chat** over the research bundle — the one Phase-2 item from the original
   plan that was never built (no endpoint, no UI seam). Starts from zero.
 - Remove the old `Ecosystem` peer panel once the new `Graph` has been compared against it.
-- Frontend tests (Vitest) — the backend has 128, the React side has none.
+- Frontend tests beyond the curtain — Vitest is set up with 11 tests; the other ~20
+  components are covered only by a clean build.
 - Live-data verification of fundamentals/ETF holdings across non-US markets.
 
 ## Deferred — depth (was Phase 2)
