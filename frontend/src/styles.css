@@ -47,6 +47,8 @@ button{font:inherit;cursor:pointer}
 .backbtn{background:var(--surface);border:1px solid var(--hair);color:var(--muted);border-radius:980px;padding:7px 14px;font-size:13px}
 .headline{display:flex;align-items:flex-end;gap:14px;margin-bottom:20px;flex-wrap:wrap}
 .headline h1{font-size:34px}
+.headline .ticker-tag{font-size:13px;color:var(--faint);background:var(--surface2);border:1px solid var(--hair);
+  border-radius:6px;padding:2px 8px;align-self:center}
 .headline .px{font-size:22px;font-weight:500}
 .chip{font-size:13px;font-weight:600;padding:4px 12px;border-radius:980px}
 .chip.up{background:var(--up-soft);color:var(--up)} .chip.down{background:var(--down-soft);color:var(--down)} .chip.flat{background:var(--surface2);color:var(--muted)}

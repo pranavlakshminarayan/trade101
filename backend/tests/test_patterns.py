@@ -38,6 +38,32 @@ def test_triple_bottom_detected():
     assert any("Bottom" in p["name"] and p["direction"] == "bullish" for p in pats)
 
 
+def _zig(seq, seg=20):
+    parts = [np.linspace(seq[i], seq[i + 1], seg, endpoint=False) for i in range(len(seq) - 1)]
+    parts.append(np.array([seq[-1]]))
+    return np.concatenate(parts)
+
+
+def test_ascending_triangle_detected():
+    # flat resistance ~110, rising support 100 -> 103 -> 106
+    x = _zig([96, 110, 100, 110, 103, 110, 106, 110, 108])
+    pats = patterns.detect(x.tolist(), list(range(len(x))))
+    tri = next((p for p in pats if p["name"] == "Ascending Triangle"), None)
+    assert tri is not None
+    assert tri["direction"] == "bullish"
+    assert tri["lines"] and len(tri["lines"]) == 2   # support + resistance drawn
+    assert tri["explanation"]
+
+
+def test_descending_channel_detected():
+    # parallel falling rails
+    x = _zig([120, 128, 112, 120, 104, 112, 96, 104, 90])
+    pats = patterns.detect(x.tolist(), list(range(len(x))))
+    ch = next((p for p in pats if p["name"] == "Descending Channel"), None)
+    assert ch is not None
+    assert ch["lines"] and len(ch["lines"]) == 2
+
+
 def test_no_pattern_on_pure_trend():
     x = np.linspace(100, 200, 150)
     assert patterns.detect(x.tolist(), list(range(150))) == []

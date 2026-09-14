@@ -39,15 +39,29 @@ export default function PriceChart({ ohlcv, type = 'candles', patterns = [], sho
     // Pattern overlay
     if (showPatterns && patterns?.length) {
       patterns.forEach((pat) => {
-        const pts = pat.points.map((p) => ({ time: p.time, value: p.price })).sort((a, b) => a.time - b.time)
-        const ls = chart.addLineSeries({ color: PAT, lineWidth: 2, lastValueVisible: false, priceLineVisible: false, crosshairMarkerVisible: false })
-        ls.setData(pts)
-        ls.setMarkers(
-          pat.points.slice().sort((a, b) => a.time - b.time).map((p) => ({
-            time: p.time, position: pat.direction === 'bearish' ? 'aboveBar' : 'belowBar',
-            color: PAT, shape: 'circle', text: p.label,
-          }))
-        )
+        const pts = (pat.points || []).map((p) => ({ time: p.time, value: p.price })).sort((a, b) => a.time - b.time)
+        // Trendline shapes (triangles/wedges/channels) carry `lines`; reversal
+        // shapes connect their swing `points` instead.
+        if (pat.lines?.length) {
+          pat.lines.forEach((ln) => {
+            const s = chart.addLineSeries({ color: PAT, lineWidth: 2, lastValueVisible: false, priceLineVisible: false, crosshairMarkerVisible: false })
+            s.setData(ln.map((p) => ({ time: p.time, value: p.price })).sort((a, b) => a.time - b.time))
+          })
+        } else if (pts.length) {
+          const ls = chart.addLineSeries({ color: PAT, lineWidth: 2, lastValueVisible: false, priceLineVisible: false, crosshairMarkerVisible: false })
+          ls.setData(pts)
+        }
+        const labelled = (pat.points || []).filter((p) => p.label)
+        if (labelled.length) {
+          const marker = chart.addLineSeries({ color: 'rgba(0,0,0,0)', lastValueVisible: false, priceLineVisible: false, crosshairMarkerVisible: false })
+          marker.setData(labelled.map((p) => ({ time: p.time, value: p.price })).sort((a, b) => a.time - b.time))
+          marker.setMarkers(
+            labelled.slice().sort((a, b) => a.time - b.time).map((p) => ({
+              time: p.time, position: pat.direction === 'bearish' ? 'aboveBar' : 'belowBar',
+              color: PAT, shape: 'circle', text: p.label,
+            }))
+          )
+        }
         if (pat.neckline?.length === 2) {
           const nl = chart.addLineSeries({ color: PAT, lineWidth: 1, lineStyle: 2, lastValueVisible: false, priceLineVisible: false, crosshairMarkerVisible: false })
           nl.setData(pat.neckline.map((p) => ({ time: p.time, value: p.price })).sort((a, b) => a.time - b.time))

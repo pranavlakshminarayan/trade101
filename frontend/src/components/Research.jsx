@@ -91,10 +91,10 @@ export default function Research({ data, onBack, onSearch, onNavigate }) {
   useEffect(() => {
     const id = setInterval(async () => {
       try {
-        const fresh = await research(data.ticker)
+        const fresh = await research(data.ticker, { fresh: true })
         setLive(fresh); setUpdatedAt(new Date())
         const tf = tfRef.current
-        if (tf !== '1Y') { const r = await research(data.ticker, TF[tf]); setTfData((c) => ({ ...c, [tf]: r.ohlcv })) }
+        if (tf !== '1Y') { const r = await research(data.ticker, { ...TF[tf], fresh: true }); setTfData((c) => ({ ...c, [tf]: r.ohlcv })) }
       } catch { /* keep last good */ }
     }, REFRESH_MS)
     return () => clearInterval(id)
@@ -216,7 +216,8 @@ export default function Research({ data, onBack, onSearch, onNavigate }) {
       </div>
 
       <div className="headline">
-        <h1>{ticker}</h1>
+        <h1>{quote.name || ticker}</h1>
+        <span className="ticker-tag mono">{ticker}</span>
         <span className="px mono">{sym}{quote.price}</span>
         {changeChip(quote.changePercent)}
       </div>

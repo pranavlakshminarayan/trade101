@@ -14,6 +14,7 @@ import os
 from datetime import datetime, timedelta, timezone
 
 import httpx
+import yfinance as yf
 
 FINNHUB = "https://finnhub.io/api/v1"
 SEC_TICKERS = "https://www.sec.gov/files/company_tickers.json"
@@ -26,12 +27,63 @@ _cik_cache: dict[str, str] = {}
 
 def get_news(ticker: str, days: int = 30) -> tuple[list[dict], str | None]:
     """Provider-agnostic news fetch. Swap providers with TRADE101_NEWS_PROVIDER
-    (default 'finnhub'); add 'firecrawl' etc. here later with zero agent changes."""
+    (default 'finnhub'); add 'firecrawl' etc. here later with zero agent changes.
+
+    Finnhub's free tier only covers US symbols, so for anything it can't serve
+    (non-US listings, or no key) we fall back to Yahoo Finance news, which is
+    keyless and global. That's what gives non-US stocks a working news feed."""
     provider = os.environ.get("TRADE101_NEWS_PROVIDER", "finnhub").lower()
     if provider == "finnhub":
-        return get_company_news(ticker, days)
+        items, note = get_company_news(ticker, days)
+        if items:
+            return items, note
+        # Finnhub had nothing (US-only free tier, or no key) → try Yahoo.
+        yf_items, yf_note = _yahoo_news(ticker, days)
+        if yf_items:
+            return yf_items, None
+        return [], note or yf_note
+    if provider == "yahoo":
+        return _yahoo_news(ticker, days)
     # Future: elif provider == "firecrawl": return _firecrawl_news(ticker, days)
     return [], f"Unknown news provider '{provider}' (set TRADE101_NEWS_PROVIDER)."
+
+
+def _yahoo_news(ticker: str, days: int = 30) -> tuple[list[dict], str | None]:
+    """Keyless, global company news via Yahoo Finance (yfinance). Works for
+    non-US listings where Finnhub's free tier 403s."""
+    try:
+        raw = yf.Ticker(ticker).news or []
+    except Exception:
+        return [], "Couldn't reach the news provider just now — the read continues without news."
+
+    cutoff = datetime.now(timezone.utc) - timedelta(days=days)
+    items = []
+    for a in raw:
+        c = a.get("content") or a  # yfinance nests the article under "content"
+        title = c.get("title")
+        if not title:
+            continue
+        url = ((c.get("clickThroughUrl") or {}).get("url")
+               or (c.get("canonicalUrl") or {}).get("url"))
+        pub = c.get("pubDate") or c.get("displayTime")
+        date_iso = None
+        if pub:
+            try:
+                dt = datetime.fromisoformat(pub.replace("Z", "+00:00"))
+                if dt < cutoff:
+                    continue
+                date_iso = dt.date().isoformat()
+            except ValueError:
+                pass
+        items.append({
+            "headline": title,
+            "summary": c.get("summary") or c.get("description"),
+            "source": (c.get("provider") or {}).get("displayName") or "Yahoo Finance",
+            "url": url,
+            "datetime": date_iso,
+        })
+    note = None if items else "No recent company news returned for this listing."
+    return items[:15], note
 
 
 def get_company_news(ticker: str, days: int = 30) -> tuple[list[dict], str | None]:

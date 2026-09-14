@@ -27,6 +27,19 @@ def get(ticker: str, period: str = "1y", interval: str = "1d") -> Optional[Tuple
     return hist, _quote(t, hist, ticker)
 
 
+def _name_from_search(ticker: str) -> str | None:
+    """Last-resort company name via Yahoo's search endpoint, when yfinance.info
+    has no name (occasionally the case for non-US symbols under rate limiting)."""
+    try:
+        from services import search
+        for c in search.resolve(ticker, limit=5):
+            if c.get("symbol", "").upper() == ticker.upper() and c.get("name"):
+                return c["name"]
+    except Exception:
+        pass
+    return None
+
+
 def _quote(t: "yf.Ticker", hist: pd.DataFrame, ticker: str) -> dict:
     """Build a resilient quote dict; every field degrades gracefully to None."""
     last = float(hist["Close"].iloc[-1])
@@ -48,11 +61,17 @@ def _quote(t: "yf.Ticker", hist: pd.DataFrame, ticker: str) -> dict:
     name, exchange, currency = None, None, None
     try:
         info = t.info
-        name = info.get("shortName") or info.get("longName")
+        # Prefer the properly-cased full name (longName) over the ALL-CAPS
+        # shortName; this is what makes non-US listings show "Nintendo Co., Ltd."
+        # instead of the bare ticker.
+        name = info.get("longName") or info.get("shortName") or info.get("displayName")
         exchange = info.get("fullExchangeName") or info.get("exchange")
         currency = info.get("currency")
     except Exception:
         pass
+
+    if not name:
+        name = _name_from_search(ticker)
 
     price = float(g("last_price", "lastPrice") or last)
     change = (price - prev) if prev is not None else None
