@@ -58,9 +58,10 @@ coverage badges, a not-advice notice by the narrative.
 widget) — `/ask/{ticker}` + `agents/chat.py`, grounded, no advice, prompt-cached; **non-US
 sourcing (free tier)** — computed beta vs the regional index (`company.py`) + Yahoo news
 fallback + name fix; **Comparison tab** — two stocks side by side (normalized chart + metrics
-table), deterministic, no AI call, "describes differences, never which to buy". Deferred to
-post-deploy (user's call): the **paid** Firecrawl/Exa provider for deeper non-US scraping. Next
-Phase 2: richer ecosystem graph, real logo, deploy a shareable URL. Full rationale:
+table), deterministic, no AI call, "describes differences, never which to buy". **real data-cube logo** (`Logo.jsx`, hand-crafted SVG); **ecosystem node graph** (peers as a
+radial graph in `Ecosystem.jsx::EcoGraph`). Deferred to post-deploy (user's call): the **paid**
+Firecrawl/Exa provider for deeper non-US scraping, and **deploying a shareable URL**. That
+leaves Phase 2 essentially complete bar the two deferred items. Full rationale:
 `docs/trade101-phase-2-recommendations.md`.
 
 ## Architecture

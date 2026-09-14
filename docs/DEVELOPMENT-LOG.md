@@ -351,3 +351,23 @@ Feedback: the Comparison pickers took the first search match blindly, so "Samsun
   Microsoft test (both resolve cleanly as the top hit) but broke on the first genuinely ambiguous
   non-US name the user tried. *Lesson: test a new picker with an ambiguous/non-US query, not just
   two clean US tickers — the happy path hid both the UX gap and the NaN crash.*
+
+### 2026-09-14 — Real logo + ecosystem node graph (rest of Phase 2)
+
+- **Real data-cube logo.** Replaced the flat placeholder `Logo.jsx` with a hand-crafted
+  isometric cube: three shaded faces, an ascending teal bar-chart clipped to the right face, and
+  a green up-candlestick on the left — the brand's "data cube" spec, as pure scalable SVG (no
+  OpenRouter/image-gen key or cost). Verified in the header + Welcome.
+- **Ecosystem node graph.** Peers were a flat chip row; now `Ecosystem.jsx` renders `EcoGraph` —
+  a radial SVG graph with the company at the centre and up to 8 peers on a ring, connected by
+  edges, each node clickable to research it. Falls back to the existing coverage explanation when
+  peers are unavailable (non-US). A fuller *sourced* supply-chain graph (typed edges,
+  public/private) remains future work.
+
+With these, Phase 2's build items are essentially done except the two the user deferred to
+**after full deployment**: the paid Firecrawl/Exa non-US provider, and deploying a shareable URL.
+
+**Mistakes / course-corrections in this pass:** none material. (Chose to verify the logo on the
+free Welcome page and *not* open a research view just to see the ecosystem graph, since that
+fires a paid `/analyze` — the graph is deterministic SVG, so it's trusted to the user's next
+research view. Noting it so a reviewer knows the graph wasn't screenshot-verified here.)

@@ -89,8 +89,12 @@ the existing single-stock read is demonstrably trustworthy end to end.
   `components/AskClaude.jsx`; grounded in the same exact data + filtered evidence as `/analyze`,
   never advice, prompt-cached context so multi-turn stays cheap.
 - **Richer pattern library + step-by-step teaching replay** — beyond triple-top/bottom + head-and-shoulders; the magnifier walks through "peak 1 → peak 2 → peak 3 is a lower high → weakening," teaching the read.
-- **Ecosystem depth** — fuller supply-chain graph (node-graph visualization), not just a chain.
-- **Real logo** — generate from the data-cube spec (via OpenRouter image gen) and replace the placeholder mark.
+- [~] **Ecosystem depth** — DONE (v1, 2026-09-14): peers now render as a **radial node graph**
+  (company at centre, peers on a ring, each clickable) instead of flat chips (`Ecosystem.jsx`
+  `EcoGraph`). Fuller sourced supply-chain graph (edge types, private/public) is still future.
+- [x] **Real logo** — DONE 2026-09-14. Hand-crafted isometric data-cube SVG (`Logo.jsx`):
+  ascending teal bar-chart on the right face + green up-candle on the left. No OpenRouter/image-gen
+  needed.
 - **Palette / visual polish** — tune the dark fintech colors (parked for now; "good enough for MVP").
 - **TradingView widget option** — embed the exact TV chart look as an alternative to Lightweight-Charts.
 
