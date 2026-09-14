@@ -162,11 +162,44 @@ Tests after the guardrail slice: **26 passing**.
 
 **Remaining in Phase 1.5:** timeframe integrity (one shared as-of label across chart/metrics/
 patterns/AI read; indicators computed for the *selected* timeframe, not always daily),
-coverage-truthfulness badges, a cache abstraction (in-memory/SQLite), and a visible
-not-financial-advice notice next to the narrative.
+coverage-truthfulness badges, and a visible not-financial-advice notice next to the narrative.
 
-**Mistakes / course-corrections in this phase:** _(none material yet — will be recorded here as
-the remaining items are built.)_
+### 2026-09-14 — UX/data fixes pass (three user-reported issues)
+
+Verified live in the browser (US ticker AAPL + non-US 7974.T).
+
+1. **Bigger pattern library, only relevant shapes shown.** `services/patterns.py` gained a
+   trendline family alongside the existing reversals: Ascending/Descending/Symmetrical
+   Triangle, Rising/Falling Wedge, Ascending/Descending Channel — detected by fitting
+   support/resistance lines to recent extrema and classifying by slope + convergence. Only
+   shapes actually present are returned (AAPL live showed Head & Shoulders + Inverse H&S +
+   Rising Wedge; NVDA/TSLA/Nintendo correctly showed none). New patterns carry `lines` to draw
+   two trendlines; `PriceChart.jsx` renders them. Each has a full magnifier explanation of what
+   it is and why it reads that way. +2 tests.
+2. **Non-US stocks now show the company name and get news.** `marketdata.py` prefers the
+   properly-cased `longName` (so "Nintendo Co., Ltd." not "7974.T"), with a Yahoo-search
+   fallback; the headline now leads with the name and shows the ticker as a small tag.
+   `news.py` falls back to keyless Yahoo Finance news when Finnhub can't serve a symbol (its
+   free tier 403s on non-US) — Nintendo went from 0 to 10 headlines, so non-US analysis now has
+   real evidence to work from.
+3. **State no longer lost on tab-switch (and no wasted API spend).** Added a session result
+   cache in `frontend/src/api.js` for research / analyze / ecosystem / patterns. Revisiting a
+   stock or returning from another tab restores everything from memory and, critically, never
+   re-runs the paid `/analyze` call (verified: 1 call for AAPL, still 1 after History→back).
+   The 7-min auto-refresh bypasses the cache with `{ fresh: true }`. This also delivers the
+   frontend half of the Phase 1.5 "cache abstraction" item.
+
+**Mistakes / course-corrections in this pass:**
+- **Introduced a crash then caught it before it shipped.** While editing `PriceChart.jsx` I left
+  a placeholder call to a non-existent `ls_markers(...)` function that would have thrown on
+  every pattern render. Spotted it on re-reading the diff and removed it before any browser test.
+  *Lesson: re-read the actual diff, not just the intent, after a multi-part edit.*
+- **Edited backend files against a server started without `--reload`.** The first backend run
+  used plain `uvicorn ... --port 8000` (no reload), so early edits to `news.py`/`marketdata.py`
+  silently didn't take effect until I killed and restarted it with `--reload`. *Lesson: always
+  run the dev backend with `--reload`.*
+- **A stray `cd` in an exploration command** moved the shell's working directory and a following
+  command failed; corrected by using absolute paths.
 
 ---
 

@@ -67,6 +67,11 @@ frontend/ src/{App,api}.jsx · components/{Welcome,Research,PriceChart,Metrics,A
   sees it (Phase 1.5 guardrail). `services/safe.py` — `redact_secrets` for anything client-bound.
 - `/analyze` now fetches the company profile too (for relevance filtering) and returns
   `news.sourcing` (kept/dropped counts) + per-evidence Fact/Interpretation/Unknown labels.
+- News is Finnhub → **Yahoo Finance fallback** (keyless, global) so non-US listings get a feed.
+- `patterns.py` detects reversals **and** trendline shapes (triangles/wedges/channels), drawn
+  via a `lines` field in `PriceChart.jsx`. Only shapes actually present are returned.
+- `frontend/src/api.js` holds a **session result cache** (research/analyze/ecosystem/patterns) —
+  tab-switching restores from memory; `/analyze` runs at most once per ticker per session.
 Endpoints: `/health`, `/search?q=`, `/research/{ticker}?period&interval`, `/analyze/{ticker}` (AI, degrades w/o key), `/patterns/{ticker}`, `/ecosystem/{ticker}`.
 
 ## Run (two terminals)
@@ -93,9 +98,18 @@ The app is **local-only during development**; a shareable/deployed URL is a Phas
 - Windows 11, Git Bash available; the `claude` CLI is at `C:\Users\prana\.local\bin\claude.exe`.
 
 ## Known bugs
-- **Non-US listings get no news** — Finnhub free tier 403s on non-US symbols. Now degrades with
-  a plain message ("not available on the current news plan"); the AI still infers nothing rather
-  than fabricating. The real fix is Phase 2 Firecrawl/alternative non-US sourcing.
+- _(none open right now — non-US news was fixed 2026-09-14 via the Yahoo fallback below.)_
+
+### Fixed 2026-09-14 (UX/data fixes — see `docs/DEVELOPMENT-LOG.md` 2026-09-14 entry)
+- ~~Non-US listings get no news~~ — `services/news.py` now falls back to keyless Yahoo Finance
+  news when Finnhub can't serve a symbol; non-US listings get a real feed.
+- ~~Non-US stocks displayed as the ticker ID~~ — `marketdata.py` prefers `longName` (+ a Yahoo
+  search fallback); the frontend headline leads with the company name, ticker shown as a tag.
+- ~~Only a couple of patterns ever appeared~~ — `services/patterns.py` now also detects
+  triangles/wedges/channels (trendline family) and returns only the shapes actually present.
+- ~~Switching tabs reloaded everything and re-spent the Claude key~~ — `frontend/src/api.js`
+  now has a session result cache (research/analyze/ecosystem/patterns); `/analyze` runs once per
+  ticker per session. Auto-refresh bypasses it with `{ fresh: true }`.
 
 ### Fixed 2026-09-14 (Phase 1 flaw pass — see `docs/HANDOVER.md` §4.2)
 - ~~Finnhub key leaked to the browser~~ — `services/news.py` no longer returns raw exceptions;

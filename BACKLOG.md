@@ -57,10 +57,17 @@ the existing single-stock read is demonstrably trustworthy end to end.
 - [ ] **Coverage-truthfulness badges** — per company, show supported/limited/unavailable for
   price, company news, filings, fundamentals, instead of implying every market is covered
   equally. (Backend `company.get_profile` already returns a `coverage` map — extend it.)
-- [ ] **Cache abstraction** (in-memory/SQLite for now) for market bars, company profiles, news
-  results, and completed analysis bundles.
+- [~] **Cache abstraction** — frontend session cache done (`api.js`: research/analyze/ecosystem/
+  patterns; `/analyze` runs once per ticker per session, fixing tab-switch reloads + key waste).
+  Backend-side caching (in-memory/SQLite for shared market bars/profiles/analysis) still to do.
 - [ ] Visible "educational, not financial advice" notice near the momentum narrative itself,
   not only in the footer.
+
+**Also shipped 2026-09-14 (user-reported fixes, see `docs/DEVELOPMENT-LOG.md`):**
+- [x] Expanded pattern library (triangles/wedges/channels + reversals; only relevant shapes shown).
+- [x] Non-US company name display (longName, not the ticker ID).
+- [x] Non-US news via keyless Yahoo Finance fallback (Finnhub free tier is US-only) — this lands
+  early part of the Phase 2 "non-US sourcing" goal without Firecrawl.
 
 ---
 
