@@ -19,6 +19,7 @@ load_dotenv(Path(__file__).resolve().parent.parent / ".env")
 
 from agents import llm, orchestrator
 from services import company, indicators, marketdata, patterns, search
+from services.safe import redact_secrets
 
 app = FastAPI(title="Trade101 API", version="0.1.0")
 
@@ -123,7 +124,8 @@ def analyze(ticker: str):
     except llm.MissingKeyError as e:
         return {"available": False, "reason": str(e)}
     except Exception as e:  # network/API/parse — chart still works without this
-        return {"available": False, "reason": f"AI narration error: {e}"}
+        # redact_secrets: an exception's text can carry a request URL with a key.
+        return {"available": False, "reason": redact_secrets(f"AI narration error: {e}")}
     if result is None:
         raise HTTPException(status_code=404, detail=f"No market data found for '{ticker}'.")
     return {"available": True, **result}

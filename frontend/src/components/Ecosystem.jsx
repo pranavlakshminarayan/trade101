@@ -48,7 +48,7 @@ export default function Ecosystem({ ticker, onSearch }) {
             <p style={{ margin: 0 }}>{betaNote(eco.beta)}</p>
           </div>
 
-          {eco.peers?.length > 0 && (
+          {eco.peers?.length > 0 ? (
             <div style={{ marginTop: 14 }}>
               <div className="faint" style={{ fontSize: 12, marginBottom: 6 }}>Peers / ecosystem — tap to research</div>
               <div className="eco-peers">
@@ -57,6 +57,8 @@ export default function Ecosystem({ ticker, onSearch }) {
                 ))}
               </div>
             </div>
+          ) : eco.coverage?.peers && (
+            <div className="faint" style={{ fontSize: 12, marginTop: 14 }}>{eco.coverage.peers}</div>
           )}
 
           {eco.summary && <p className="placeholder" style={{ marginTop: 12 }}>{eco.summary}…</p>}

@@ -11,7 +11,7 @@ list + a note, never fabricated news.
 from __future__ import annotations
 
 import os
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, timezone
 
 import httpx
 
@@ -39,7 +39,7 @@ def get_company_news(ticker: str, days: int = 30) -> tuple[list[dict], str | Non
     key = os.environ.get("TRADE101_NEWS_KEY")
     if not key:
         return [], "No Finnhub key set (TRADE101_NEWS_KEY) — news feed unavailable."
-    to = datetime.utcnow().date()
+    to = datetime.now(timezone.utc).date()
     frm = to - timedelta(days=days)
     try:
         r = httpx.get(
@@ -47,19 +47,26 @@ def get_company_news(ticker: str, days: int = 30) -> tuple[list[dict], str | Non
             params={"symbol": ticker.upper(), "from": frm.isoformat(), "to": to.isoformat(), "token": key},
             timeout=15,
         )
+        if r.status_code in (401, 403):
+            # Free-tier Finnhub 403s on non-US symbols; don't leak status URLs.
+            return [], ("News for this listing isn't available on the current news plan "
+                        "(Finnhub's free tier covers US symbols). The read continues without it.")
         r.raise_for_status()
         raw = r.json()
-    except Exception as e:
-        return [], f"News provider error: {e}"
+    except Exception:
+        # Never surface the raw exception — its text can contain the request URL
+        # (and thus the API key). Log-safe redaction happens server-side only.
+        return [], "Couldn't reach the news provider just now — the read continues without news."
 
     items = []
     for a in raw[:15]:
+        ts = a.get("datetime")
         items.append({
             "headline": a.get("headline"),
             "summary": a.get("summary"),
             "source": a.get("source"),
             "url": a.get("url"),
-            "datetime": datetime.utcfromtimestamp(a["datetime"]).date().isoformat() if a.get("datetime") else None,
+            "datetime": datetime.fromtimestamp(ts, timezone.utc).date().isoformat() if ts else None,
         })
     note = None if items else "No recent company news returned (Finnhub coverage is strongest for US symbols)."
     return items, note
@@ -87,8 +94,8 @@ def get_recent_filings(ticker: str, limit: int = 5) -> tuple[list[dict], str | N
         r = httpx.get(SEC_SUBMISSIONS.format(cik=cik), headers=SEC_UA, timeout=15)
         r.raise_for_status()
         recent = r.json()["filings"]["recent"]
-    except Exception as e:
-        return [], f"EDGAR error: {e}"
+    except Exception:
+        return [], "Couldn't reach SEC EDGAR just now — filings unavailable for this read."
 
     wanted = {"10-K", "10-Q", "8-K"}
     out = []

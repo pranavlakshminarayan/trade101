@@ -34,13 +34,34 @@ def get_profile(ticker: str) -> dict:
         info = t.info
     except Exception:
         info = {}
+
+    beta = info.get("beta")
+    peers = _peers(ticker)
+    is_us = "." not in ticker  # US symbols have no exchange suffix (e.g. AAPL vs 7974.T)
+
+    # Explain the gaps rather than showing a blank panel. Coverage outside the US
+    # is thinner: yfinance often has no beta, and Finnhub's peers endpoint is US-only.
+    coverage = {}
+    if beta is None:
+        coverage["beta"] = (
+            "Beta isn't published for this listing"
+            + (" (common for non-US symbols)." if not is_us else ".")
+        )
+    if not peers:
+        coverage["peers"] = (
+            "Peer companies aren't available for this listing"
+            + (" — the peers source currently covers US-listed symbols." if not is_us
+               else ".")
+        )
+
     return {
         "sector": info.get("sector"),
         "industry": info.get("industry"),
-        "beta": info.get("beta"),
+        "beta": beta,
         "marketCap": info.get("marketCap"),
         "exchange": info.get("fullExchangeName") or info.get("exchange"),
         "country": info.get("country"),
-        "peers": _peers(ticker),
+        "peers": peers,
         "summary": (info.get("longBusinessSummary") or "")[:360] or None,
+        "coverage": coverage,
     }
