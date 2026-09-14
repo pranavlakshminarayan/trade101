@@ -68,6 +68,9 @@ the existing single-stock read is demonstrably trustworthy end to end.
 - [x] Non-US company name display (longName, not the ticker ID).
 - [x] Non-US news via keyless Yahoo Finance fallback (Finnhub free tier is US-only) — this lands
   early part of the Phase 2 "non-US sourcing" goal without Firecrawl.
+- [x] **Prompt caching on the Claude API** (`agents/llm.py`) — system prompt sent as a
+  `cache_control` block; prefix expanded to ~1306 tok so it clears Sonnet 5's 1024 minimum and
+  actually fires. Cuts repeated input cost across tickers/sessions.
 
 ---
 

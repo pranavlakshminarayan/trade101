@@ -201,6 +201,38 @@ Verified live in the browser (US ticker AAPL + non-US 7974.T).
 - **A stray `cd` in an exploration command** moved the shell's working directory and a following
   command failed; corrected by using absolute paths.
 
+### 2026-09-14 — Prompt caching for the Claude API (cost control)
+
+The user asked to move API usage to prompt caching to avoid burning money. Done in
+`agents/llm.py`: the analysis **system prompt is now sent as a `cache_control: ephemeral`
+block**. It's byte-identical on every call and the only per-ticker-variable content (the
+indicators/news/filings payload) comes *after* it in the user message — a textbook cacheable
+prefix. On any call within the 5-minute window Claude serves those system tokens at ~0.1× input
+cost instead of full price. `llm.py` also now logs `cache_write`/`cache_read`/`in`/`out` token
+counts per call so we can confirm caching from the server log.
+
+**The catch we found and fixed.** Prompt caching only fires above a model-specific minimum
+prefix size (Sonnet 5 = 1024 tokens; Opus 5 = 512). Measured with the free `count_tokens` API,
+the system prompt was **897 tokens — below Sonnet 5's minimum**, so the cache marker would have
+silently done nothing on the default model (no error, just `cache_creation_input_tokens: 0`).
+Fixed by adding a genuinely useful, stable worked example of the Fact/Interpretation/Unknown
+evidence labeling to the system prompt (improves output quality *and* pushes the prefix to
+**1306 tokens**), so caching now actually fires on Sonnet 5. Verified the new count with
+`count_tokens` (free); the per-call log will confirm live cache reads on the next real usage.
+
+**Honest scope of the saving.** Caching cuts the *input* cost of the repeated system prompt
+across tickers/sessions within the window; it does nothing for output tokens or the per-ticker
+payload. The larger money-savers already in place are the frontend session cache (no repeat
+`/analyze` calls — the biggest one) and the evidence filter (fewer news tokens sent). The
+`effort="high"` setting on the analysis call remains the main *output*-cost lever if further
+savings are needed later — left as-is for now to preserve quality.
+
+**Mistakes / course-corrections in this pass:**
+- **Nearly shipped a no-op cache.** My first instinct was just to add the `cache_control` marker
+  and call it done — which would have looked correct but cached nothing on Sonnet 5, the user's
+  default. Measuring the prefix (897 < 1024) before claiming success is what caught it. *Lesson:
+  for caching, verify the prefix clears the model's minimum, don't assume the marker is enough.*
+
 ---
 
 ## Phase 2 — depth _(not started)_

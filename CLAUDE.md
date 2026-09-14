@@ -72,6 +72,10 @@ frontend/ src/{App,api}.jsx · components/{Welcome,Research,PriceChart,Metrics,A
   via a `lines` field in `PriceChart.jsx`. Only shapes actually present are returned.
 - `frontend/src/api.js` holds a **session result cache** (research/analyze/ecosystem/patterns) —
   tab-switching restores from memory; `/analyze` runs at most once per ticker per session.
+- `agents/llm.py` sends the analysis **system prompt as a `cache_control: ephemeral` block**
+  (prompt caching) — served at ~0.1× input cost within the 5-min window. Requires the prefix to
+  clear the model minimum (Sonnet 5 = 1024 tok, Opus 5 = 512); ours is ~1306 tok so it fires.
+  `llm.py` logs `cache_write`/`cache_read`/`in`/`out` per call — check the server log to confirm.
 Endpoints: `/health`, `/search?q=`, `/research/{ticker}?period&interval`, `/analyze/{ticker}` (AI, degrades w/o key), `/patterns/{ticker}`, `/ecosystem/{ticker}`.
 
 ## Run (two terminals)
