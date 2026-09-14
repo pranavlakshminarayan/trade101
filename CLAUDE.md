@@ -85,8 +85,9 @@ frontend/ src/{App,api}.jsx · components/{Welcome,Research,PriceChart,Metrics,A
   multi-turn chat reuses it (chat turn 2+ reads the whole prefix from cache). `agents/chat.py`
   uses `effort="medium"` (cheaper). `orchestrator.gather()` is the shared deterministic bundle,
   memoised by `services/cache.py` (TTL 5 min) so chat turns don't re-fetch and numbers stay
-  stable across a conversation. Frontend: `components/AskClaude.jsx` (per-ticker threads kept in
-  module memory), placed in the masonry `FLOW`.
+  stable across a conversation. Frontend: `components/AskClaude.jsx` is a **floating chatbot
+  widget** (bubble pinned bottom-right → opens an overlay panel over the content), rendered at
+  the `Research` root (not in the masonry); per-ticker threads kept in module memory.
 Endpoints: `/health`, `/search?q=`, `/research/{ticker}?period&interval`, `/analyze/{ticker}` (AI, degrades w/o key), `POST /ask/{ticker}` (Ask-Claude chat), `/patterns/{ticker}`, `/ecosystem/{ticker}`.
 
 ## Run (two terminals)

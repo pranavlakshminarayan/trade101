@@ -19,7 +19,7 @@ const TF = {
   '1D':  { period: '1d',  interval: '5m' },
 }
 const TF_ORDER = ['1Y', '1M', '10D', '5D', '1D']
-const FLOW = ['ask', 'metrics', 'news', 'ecosystem', 'references'] // blocks the masonry distributes
+const FLOW = ['metrics', 'news', 'ecosystem', 'references'] // blocks the masonry distributes
 
 function changeChip(pct) {
   if (pct == null) return <span className="chip flat">—</span>
@@ -41,7 +41,7 @@ export default function Research({ data, onBack, onSearch, onNavigate }) {
   const [patSel, setPatSel] = useState(0)
   const [updatedAt, setUpdatedAt] = useState(new Date())
   const [q, setQ] = useState('')
-  const [assign, setAssign] = useState({ ask: 'R', metrics: 'L', news: 'L', ecosystem: 'R', references: 'R' })
+  const [assign, setAssign] = useState({ metrics: 'L', news: 'L', ecosystem: 'R', references: 'R' })
   const [tick, setTick] = useState(0)
 
   const ticker = live.ticker
@@ -134,7 +134,6 @@ export default function Research({ data, onBack, onSearch, onNavigate }) {
 
   // block elements the masonry places
   const blocks = {
-    ask: <AskClaude ticker={ticker} />,
     metrics: <Metrics indicators={indicators} ticker={ticker} />,
     news: <NewsPanel ai={ai} loading={aiLoading} ticker={ticker} />,
     ecosystem: <Ecosystem ticker={ticker} onSearch={onSearch} />,
@@ -235,6 +234,8 @@ export default function Research({ data, onBack, onSearch, onNavigate }) {
           {FLOW.filter((id) => assign[id] === 'R').map((id) => <div key={id} ref={setRef(id)}>{blocks[id]}</div>)}
         </div>
       </div>
+
+      <AskClaude ticker={ticker} />
     </div>
   )
 }
