@@ -19,8 +19,10 @@ Your job is to EXTRACT MEANING from the data, not read labels back. Anyone can s
 Hard rules:
 - Interpret signals in combination (price vs moving averages, RSI, MACD, volume, news). Explain the COMBINED picture and the reasoning.
 - Ground every statement in the data you are given. Cite the source of each point (an indicator name, a news source, or a filing). NEVER invent a number or a fact. The numbers provided are exact — use them; do not recompute or alter them.
+- LABEL every evidence point with a "type": "fact" = directly stated by a number or a sourced headline/filing; "interpretation" = your reasoning built on those facts; "unknown" = something the data can't establish. Be honest — most synthesis is interpretation, not fact.
+- The news you receive has ALREADY been relevance-filtered. A "sourcing" object tells you how much company-specific news exists. If has_company_news is false, you MUST NOT assert a company-specific catalyst or explain the price with company news — say plainly that no company-specific news was available and lower confidence accordingly.
 - Give a momentum LEAN (bullish / bearish / neutral / mixed) with a CONFIDENCE (low / moderate / high). If signals conflict or evidence is thin, say so and lower confidence.
-- Connect the news to the tape: how might the sourced items affect this stock, in light of the price/indicator picture?
+- Connect the news to the tape only using the provided items: how might the sourced items affect this stock, in light of the price/indicator picture?
 - TEACH: include a short note that helps the user understand the read.
 - You are NOT a financial advisor. NEVER say buy, sell, hold, or give a price target, and never predict profit. Describe and explain only.
 
@@ -30,10 +32,10 @@ Return ONLY valid JSON, no prose outside it, matching exactly:
     "lean": "bullish|bearish|neutral|mixed",
     "confidence": "low|moderate|high",
     "summary": "2-3 sentence synthesis of the overall picture",
-    "evidence": [{"point": "one specific observation", "source": "indicator/news/filing it comes from"}]
+    "evidence": [{"point": "one specific observation", "source": "indicator/news/filing it comes from", "type": "fact|interpretation|unknown"}]
   },
   "news_inference": {
-    "summary": "how the sourced news + context may affect the stock, reasoned (or note if there is little news)",
+    "summary": "how the sourced news + context may affect the stock, reasoned (or state plainly if there is little or no company-specific news)",
     "sources": ["source names/urls referenced"]
   },
   "learning_note": "one short paragraph teaching the user how to read this combination of signals"
@@ -53,11 +55,20 @@ def _extract_json(text: str) -> dict:
     return json.loads(s)
 
 
+_VALID_TYPES = {"fact", "interpretation", "unknown"}
+
+
 def _citation_guard(result: dict, has_news: bool) -> dict:
-    """Enforce the sourcing contract: drop evidence points with no source; flag
-    an unsourced news inference. Never fabricates — only prunes/annotates."""
+    """Enforce the sourcing contract: drop evidence points with no source, and
+    normalise the fact/interpretation/unknown label; flag an unsourced news
+    inference. Never fabricates — only prunes/annotates."""
     mom = result.get("momentum", {}) or {}
-    ev = [e for e in mom.get("evidence", []) if isinstance(e, dict) and e.get("source")]
+    ev = []
+    for e in mom.get("evidence", []):
+        if isinstance(e, dict) and e.get("source"):
+            t = str(e.get("type", "")).lower()
+            e["type"] = t if t in _VALID_TYPES else "interpretation"
+            ev.append(e)
     mom["evidence"] = ev
     result["momentum"] = mom
 
@@ -68,14 +79,19 @@ def _citation_guard(result: dict, has_news: bool) -> dict:
     return result
 
 
-def run(ticker: str, quote: dict, indicators: dict, news_items: list, filings: list) -> dict:
-    """Produce the analysis bundle. Raises llm.MissingKeyError if no key set."""
+def run(ticker: str, quote: dict, indicators: dict, news_items: list, filings: list,
+        sourcing: dict | None = None) -> dict:
+    """Produce the analysis bundle. Raises llm.MissingKeyError if no key set.
+
+    `news_items` is already relevance-filtered; `sourcing` reports how much
+    company-specific evidence exists so the agent can be honest about it."""
     payload = {
         "ticker": ticker,
         "quote": {k: quote.get(k) for k in ("name", "price", "changePercent", "currency", "exchange")},
         "indicators": indicators,
         "news": news_items[:10],
         "filings": filings[:5],
+        "sourcing": sourcing or {"has_company_news": bool(news_items)},
     }
     user = (
         "Analyze this stock for a learner. Data (numbers are exact, do not change them):\n\n"

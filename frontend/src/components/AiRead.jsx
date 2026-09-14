@@ -9,6 +9,18 @@ function leanClass(lean) {
   return 'flat'
 }
 
+// Fact / Interpretation / Unknown badge — teaches the user to separate what the
+// data states from what the read infers.
+function EvidenceType({ type }) {
+  const t = type || 'interpretation'
+  const label = t === 'fact' ? 'Fact' : t === 'unknown' ? 'Unknown' : 'Interpretation'
+  return <span className={'etype etype-' + t} title={
+    t === 'fact' ? 'Directly stated by a number or a sourced item'
+      : t === 'unknown' ? "The data can't establish this"
+        : 'Reasoning built on the facts'
+  }>{label}</span>
+}
+
 export default function AiRead({ ai, loading }) {
   const [open, setOpen] = useState(false)
 
@@ -48,9 +60,16 @@ export default function AiRead({ ai, loading }) {
       {m.evidence?.length > 0 && (
         <ul className="why">
           {m.evidence.slice(0, 6).map((e, i) => (
-            <li key={i}><b>{e.point}</b> <span className="src">[{e.source}]</span></li>
+            <li key={i}>
+              <EvidenceType type={e.type} /> <b>{e.point}</b> <span className="src">[{e.source}]</span>
+            </li>
           ))}
         </ul>
+      )}
+      {ai.news?.sourcing?.dropped > 0 && (
+        <div className="faint" style={{ fontSize: 11, marginTop: 6 }}>
+          {ai.news.sourcing.dropped} unrelated article{ai.news.sourcing.dropped > 1 ? 's' : ''} filtered out before analysis · {ai.news.sourcing.kept} kept
+        </div>
       )}
       {ai.learning_note && (
         <div className="lesson" style={{ marginTop: 10 }}>

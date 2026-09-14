@@ -8,7 +8,7 @@ only judgment is inside the agent.
 from __future__ import annotations
 
 from agents import analysis, llm
-from services import indicators, marketdata, news
+from services import company, evidence, indicators, marketdata, news
 
 
 def analyze(ticker: str) -> dict | None:
@@ -23,23 +23,43 @@ def analyze(ticker: str) -> dict | None:
     news_items, news_note = news.get_news(ticker)
     filings, fil_note = news.get_recent_filings(ticker)
 
-    result = analysis.run(quote["symbol"], quote, ind, news_items, filings)
+    # Deterministic relevance filter BEFORE the model sees anything: drop articles
+    # that don't actually relate to the company, so the AI can't build a
+    # company-specific claim out of unrelated news. (Phase 1.5 guardrail.)
+    profile = company.get_profile(ticker)
+    kept_news, sourcing = evidence.filter_news(
+        news_items,
+        name=quote.get("name"), ticker=quote["symbol"],
+        sector=profile.get("sector"), industry=profile.get("industry"),
+        peers=profile.get("peers"),
+    )
 
+    result = analysis.run(quote["symbol"], quote, ind, kept_news, filings, sourcing)
+
+    # References list = only the evidence actually admitted to the analysis.
     sources = []
-    for it in news_items:
+    for it in kept_news:
         if it.get("url"):
-            # descriptive: the headline is the link text, source shown alongside
             sources.append({"label": it.get("headline") or it.get("source") or "News",
-                            "source": it.get("source"), "url": it["url"]})
+                            "source": it.get("source"), "url": it["url"],
+                            "category": it.get("category")})
     for f in filings:
         sources.append({"label": f"SEC {f['form']} filing ({f['date']})",
-                        "source": "SEC EDGAR", "url": f["url"]})
+                        "source": "SEC EDGAR", "url": f["url"], "category": "filing"})
+
+    if sourcing["dropped"]:
+        note_bits = [news_note] if news_note else []
+        note_bits.append(
+            f"{sourcing['dropped']} unrelated article(s) were filtered out before analysis."
+        )
+        news_note = " ".join(note_bits)
 
     return {
         "ticker": quote["symbol"],
         "momentum": result.get("momentum"),
         "learning_note": result.get("learning_note"),
-        "news": {"feed": news_items, "note": news_note, "inference": result.get("news_inference")},
+        "news": {"feed": kept_news, "note": news_note,
+                 "inference": result.get("news_inference"), "sourcing": sourcing},
         "filings": filings,
         "sources": sources,
         "meta": {
