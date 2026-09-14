@@ -54,11 +54,13 @@ filter + claim-level Fact/Interpretation/Unknown labels + evidence tests + keys-
 prompt caching + a backend TTL cache (`services/cache.py`). Remaining: timeframe integrity,
 coverage badges, a not-advice notice by the narrative.
 
-**Phase 2 — started** (see `BACKLOG.md`). Done: **Ask-Claude chat** — `/ask/{ticker}` +
-`agents/chat.py`, grounded in the same exact data + filtered evidence as `/analyze`, no advice,
-prompt-cached context (verified: 2nd turn reads the full prefix from cache). Next Phase 2:
-Comparison tab, deeper non-US sourcing (Firecrawl/Exa), richer ecosystem graph, real logo,
-deploy a shareable URL. Full rationale: `docs/trade101-phase-2-recommendations.md`.
+**Phase 2 — started** (see `BACKLOG.md`). Done: **Ask-Claude chat** (now a floating chatbot
+widget) — `/ask/{ticker}` + `agents/chat.py`, grounded in the same data as `/analyze`, no
+advice, prompt-cached; **non-US sourcing (free tier)** — computed beta vs the regional index
+for listings with no provider beta (`company.py`), on top of the earlier Yahoo news fallback +
+name fix. Deferred to post-deploy (user's call): the **paid** Firecrawl/Exa provider for deeper
+non-US scraping. Next Phase 2: Comparison tab, richer ecosystem graph, real logo, deploy a
+shareable URL. Full rationale: `docs/trade101-phase-2-recommendations.md`.
 
 ## Architecture
 Hybrid: deterministic **services** for exact data + Claude **agents** for judgment, behind a FastAPI API; **React/Vite** frontend.
@@ -72,6 +74,9 @@ frontend/ src/{App,api}.jsx · components/{Welcome,Research,PriceChart,Metrics,A
 - `/analyze` now fetches the company profile too (for relevance filtering) and returns
   `news.sourcing` (kept/dropped counts) + per-evidence Fact/Interpretation/Unknown labels.
 - News is Finnhub → **Yahoo Finance fallback** (keyless, global) so non-US listings get a feed.
+- `company.py` **computes beta** vs the regional index (suffix→index map: .T→Nikkei, .KS→KOSPI,
+  .NS→Nifty, …) when the provider has none — deterministic; response carries `betaSource`
+  ("provider"|"computed") + `betaIndex`. Non-US peers are still gapped (Firecrawl is post-deploy).
 - `patterns.py` detects reversals **and** trendline shapes (triangles/wedges/channels), drawn
   via a `lines` field in `PriceChart.jsx`. Only shapes actually present are returned.
 - `frontend/src/api.js` holds a **session result cache** (research/analyze/ecosystem/patterns) —
@@ -140,5 +145,11 @@ The app is **local-only during development**; a shareable/deployed URL is a Phas
 
 ## Gotchas
 - Kill stray servers on ports 8000/5173 before restart (WinError 10013 = port in use).
+- **`uvicorn --reload` leaves zombie workers on Windows.** Each restart can orphan a worker that
+  keeps port 8000 bound and serves *stale* code (symptom: a new route 404s / a code change
+  doesn't take, but `import app` shows it fine). Killing a `--reload` worker makes its reloader
+  respawn one. Fix: `Get-CimInstance Win32_Process | ? CommandLine -match 'uvicorn|multiprocessing.spawn'`
+  (exclude the yfinance-mcp / Claude Extensions python), kill those, confirm the port is clear,
+  then start ONE backend. For a throwaway verification instance, run without `--reload`.
 - Chart-pattern detection is a heuristic learning aid (returns "none" when nothing clean) — never present it as a signal.
 - Layout is a self-balancing JS masonry (measures block heights). Browser back/forward + `#TICKER` shareable links work.

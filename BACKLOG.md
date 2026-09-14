@@ -78,7 +78,12 @@ the existing single-stock read is demonstrably trustworthy end to end.
 - **Deploy a shareable/public URL.** Currently local-only (`http://127.0.0.1:5173`); after the
   full execution, host the React frontend + FastAPI backend (e.g. Vercel + Render/Fly) so Pranav
   can check it from any device. Keep API keys backend-only.
-- **Deeper search / scrape for non-US markets.** US data is easy/free (Wall Street sources, etc.); other countries (China, Japan, Korea, HK, Singapore, India) are harder → **Firecrawl or an alternative** to scrape/extract where clean APIs don't exist. Pluggable provider slot already designed for this.
+- **Deeper search / scrape for non-US markets.**
+  - [x] Free tier (2026-09-14): Yahoo news fallback + company-name fix + **computed beta vs the
+    regional index** (`company.py`) so non-US listings get a real beta.
+  - [ ] Paid tier (deferred to **after full deployment**, user's call): **Firecrawl or an
+    alternative** for deeper regional news/scrape + non-US peers, behind the pluggable provider
+    slot (`TRADE101_NEWS_PROVIDER`). Needs an API key + costs per scrape.
 - **Broader web sourcing** — add **Exa** (wide semantic search) and premium sources where accessible/legal (the WSJ / Bloomberg / JP Morgan / investment-bank-report depth). Always sourced.
 - [x] **"Ask Claude" chat** — DONE 2026-09-14. `POST /ask/{ticker}` + `agents/chat.py` +
   `components/AskClaude.jsx`; grounded in the same exact data + filtered evidence as `/analyze`,

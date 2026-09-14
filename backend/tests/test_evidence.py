@@ -1,7 +1,15 @@
 """Evidence relevance filter — the Phase-1.5 guardrail that keeps unrelated news
 out of the AI payload. These are the 'feed irrelevant content, assert it's
 rejected' tests the recommendations review asked for."""
-from services import evidence
+from services import company, evidence
+
+
+def test_regional_index_mapping():
+    assert company._index_for("7974.T")[1] == "Nikkei 225"
+    assert company._index_for("005930.KS")[1] == "KOSPI"
+    assert company._index_for("AAPL")[1] == "S&P 500"       # US default
+    assert company._index_for("RELIANCE.NS")[1] == "Nifty 50"
+    assert company._index_for("SOMETHING.XYZ")[1] == "S&P 500"  # unknown suffix → default
 
 NVDA_NEWS = [
     {"headline": "Nvidia unveils new Blackwell GPU", "summary": "The chipmaker announced..."},

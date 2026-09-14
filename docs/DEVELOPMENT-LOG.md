@@ -277,3 +277,30 @@ A conversational tutor over one stock's research bundle. Verified live end to en
   the port was clear, then start a single clean backend. *Lesson: one dev backend at a time —
   verify the port is actually clear before starting another, and diagnose a "route 404s but
   imports fine" as a stale-process problem, not a code problem.*
+
+### 2026-09-14 — Ask-Claude → floating widget + non-US sourcing (free tier)
+
+Two user requests in one pass.
+
+- **Ask-Claude is now a floating chatbot widget** (per a screenshot of a website "Chat with us"
+  bot): a bubble pinned bottom-right that opens an overlay panel over the page content, instead
+  of a card in the research grid. `AskClaude.jsx` rewritten (launcher + panel with header/close,
+  same threads + prompt-cached backend); removed from the masonry `FLOW`, rendered at the
+  `Research` root.
+- **Non-US sourcing, free/deterministic tier** (user chose free now, paid Firecrawl after
+  deploy). The standout gap was beta: non-US listings came back `null` because neither
+  yfinance nor Finnhub publishes one. Now `company.py` **computes beta itself** from ~1y of
+  daily returns vs the stock's regional index (a suffix→index map: .T→Nikkei 225, .KS→KOSPI,
+  .NS→Nifty 50, .HK→Hang Seng, …; US → S&P 500), used only when the provider has none. Verified
+  live: 7974.T beta 0.079 vs Nikkei 225 (`betaSource:"computed"`), while AAPL keeps its provider
+  beta 1.085. The Ecosystem panel notes when a beta was computed and against which index.
+  Non-US peers remain gapped — that's the Firecrawl/Exa job, deferred to post-deploy.
+
+**Mistakes / course-corrections in this pass:**
+- **The zombie-backend problem recurred** and again produced stale responses (computed beta
+  worked when called directly but the live `/ecosystem` returned `null`). Same root cause as
+  above; the accumulation came from repeatedly restarting `uvicorn --reload`. Corrected by
+  killing all uvicorn/`multiprocessing.spawn` workers (sparing the MCP processes) and switching
+  the throwaway verification backend to run **without** `--reload` (one process, no reloader to
+  spawn extras). Documented the whole trap as a Gotcha in `CLAUDE.md`. *Lesson learned twice now:
+  treat "works on direct import, stale over HTTP" as a process problem immediately.*
