@@ -106,6 +106,112 @@ See `README.md`. Two terminals: backend `uvicorn app:app --reload --port 8000` (
 
 ---
 
+## 4.1 Known problems carried out of Phase 1
+
+Found during a live end-to-end run on **7974.T (Nintendo, Tokyo)** on 2026-09-12 — a
+deliberately non-US ticker, which is where all four of these surface. They are **still
+present in the code**; a fix was written and then discarded, so Phase 2 starts with them open.
+
+**1. The Finnhub API key leaks into the browser. (Security — fix first.)**
+`services/news.py` catches provider exceptions and returns `f"News provider error: {e}"`
+straight to the client. httpx puts the **full request URL** in its exception text, and that
+URL carries `token=<your Finnhub key>`. So on any request that errors, the key is rendered
+into the news panel and sits in the `/analyze` JSON payload in the browser. Non-US symbols
+hit this on *every* search (see #2), so it is not an edge case.
+*Fix:* redact `token=` / `apikey=` / `key=` params and any configured key value from provider
+error text before it leaves the backend; same treatment for the EDGAR error path. Assume the
+current key is compromised if the app was ever opened where someone could see the screen —
+rotate it.
+
+**2. Non-US listings get no news at all.**
+Finnhub's free tier returns **403 Forbidden** for company news on non-US symbols. The app
+degrades honestly (the AI says it had no headlines and infers nothing — the guardrail works),
+but it means the whole news half of the product is US-only right now. This is the free tier's
+limit, not a defect, and it is exactly what the Phase 2 "deeper non-US sourcing (Firecrawl)"
+item is for.
+
+**3. Ecosystem is thin outside the US.**
+For 7974.T, `beta` came back `null` and `peers` came back `[]` — yfinance had no beta for the
+symbol and Finnhub's peers endpoint is US-only. Sector, industry, market cap and summary all
+populated fine. The panel currently just shows the gaps rather than explaining them.
+
+**4. Raw provider errors are shown as user-facing copy.**
+Even setting the key leak aside, what the user sees on a failure is a raw exception string
+with a URL in it. It should be a plain sentence explaining what happened and what it means
+for the read.
+
+**5. Minor:** `services/news.py` uses `datetime.utcnow()`, deprecated in 3.12 (warning in the
+test run). Use a timezone-aware `datetime.now(datetime.UTC)`.
+
+**Not problems, for the record:** pattern detection returning `none` on 7974.T is correct
+behaviour (it declines rather than forcing a shape); the unknown-ticker 404, the no-API-key
+degrade, and the name→ticker search across markets all worked as designed.
+
+---
+
+## 4.2 Phase 1 flaw pass — 2026-09-14
+
+Cleared four of the five §4.1 items. Approach for the security fix was defense-in-depth:
+stop the leak at the source *and* add a scrubber at the API boundary, so a future code path
+that forgets can't re-open the hole.
+
+- **Key leak (§4.1 #1) — fixed.** `services/news.py` no longer does `return [], f"...{e}"`;
+  both the Finnhub and EDGAR error paths now return fixed, credential-free strings, and a
+  Finnhub 401/403 (the non-US case) returns its own plain message without ever formatting the
+  response. New `services/safe.py::redact_secrets()` masks `token=`/`apikey=`/`key=` params and
+  any configured key value; `app.py` runs the `/analyze` generic-exception `reason` through it.
+  New `tests/test_safe.py` (4 tests) asserts a planted key never survives into a note or reason.
+  **Still on the user: rotate the Finnhub key** — the fix stops future leaks but can't un-expose
+  a value already shown on screen.
+- **Raw errors as copy (§4.1 #4) — fixed** by the same friendly-message change.
+- **Ecosystem gaps (§4.1 #3) — fixed (explanation, not new data).** `services/company.py` now
+  returns a `coverage` map keyed `beta`/`peers` with a plain reason when each is missing (non-US
+  vs generic); `frontend/.../Ecosystem.jsx` renders the peers explanation instead of hiding the
+  block. Real non-US beta/peers data is still a data-source problem for later.
+- **`datetime.utcnow()` (§4.1 #5) — fixed**, timezone-aware now; the deprecation warning is gone
+  from the test run.
+- **Non-US news (§4.1 #2) — still open by design.** Message is friendlier; the actual fix is the
+  Phase 2 Firecrawl/alternative sourcing (provider slot already pluggable).
+
+Tests: 20 passing (was 16). Next planned work is **Phase 1.5 — trust and coherence**
+(see `BACKLOG.md` and `docs/trade101-phase-2-recommendations.md`) ahead of Phase 2 features.
+
+---
+
+## 4.3 Phase 1.5 — trust & coherence (in progress, from 2026-09-14)
+
+User chose to do Phase 1.5 before Phase 2 features. Started with the guardrail item, because
+"unrelated articles leaking into the AI narrative" is really a violation of the north star
+("every AI claim is sourced" / "make sense of data, not read labels"), not a cosmetic bug.
+
+**Evidence pipeline — done.** New `services/evidence.py` is a *deterministic* relevance filter
+(the review was explicit that this is a data-validation job, not a reason to add AI calls). It
+tokenises the company name (dropping corporate filler like Inc/Corp/Ltd), the ticker (base,
+suffix-stripped so `7974.T` matches "Nintendo"/"7974"), sector/industry, and peer names, then
+classifies each article as company / related / sector / irrelevant and drops the irrelevant
+ones. `orchestrator.analyze` now also fetches the company profile (for sector/peers), filters
+the news through this before `analysis.run`, and only the admitted items reach the model, the
+feed, and the references list. A `sourcing` report ({kept, dropped, has_company_news, counts})
+rides along in the `/analyze` response.
+
+**Claim-level honesty — done.** `analysis.py` SYSTEM now requires a Fact/Interpretation/Unknown
+`type` on every evidence point and forbids a company-catalyst claim when `has_company_news` is
+false; `_citation_guard` normalises the type and still drops unsourced points. `AiRead.jsx`
+renders a coloured badge per claim plus a "N unrelated articles filtered out" line.
+
+**Also done:** `tests/test_evidence.py` (6 tests, incl. the "feed it junk, assert it's dropped"
+cases the review asked for); confirmed no API key reaches the frontend (no `VITE_`/key refs,
+no frontend `.env`).
+
+Tests now 26 passing.
+
+**Remaining Phase 1.5:** timeframe integrity (shared as-of label; indicators computed for the
+selected timeframe, not always daily), coverage-truthfulness badges (extend the `coverage` map
+`company.get_profile` already returns), a cache abstraction (in-memory/SQLite), and a visible
+not-financial-advice notice next to the narrative.
+
+---
+
 ## 5. What's next — Phase 2 (from `BACKLOG.md`)
 - **Ask Claude** chat over the research bundle (seam reserved).
 - **Comparison tab** (two stocks side by side).
