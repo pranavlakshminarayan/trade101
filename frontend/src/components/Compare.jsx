@@ -19,17 +19,17 @@ function pct(v) {
   return (v > 0 ? '+' : '') + v + '%'
 }
 
-// One stock's loaded data for a comparison slot.
+// One stock's loaded data for a comparison slot. loadSymbol takes an ALREADY
+// resolved ticker — name→symbol disambiguation happens in the component so the
+// user picks from candidates (same as the main search), rather than guessing the
+// first match.
 function useSlot() {
   const [state, setState] = useState({ ticker: null, data: null, eco: null, loading: false, error: null })
-  async function load(query, tf) {
+  async function loadSymbol(sym, tf) {
     setState((s) => ({ ...s, loading: true, error: null }))
     try {
-      const { candidates = [] } = await search(query)
-      const sym = candidates.length ? candidates[0].symbol : query
       const [data, eco] = await Promise.all([research(sym, TF[tf]), ecosystem(sym)])
       setState({ ticker: data.ticker, data, eco, loading: false, error: null })
-      return data.ticker
     } catch (e) {
       setState((s) => ({ ...s, loading: false, error: e.message || 'Could not load' }))
     }
@@ -41,19 +41,45 @@ function useSlot() {
       return s
     })
   }
-  return [state, load, reloadTf]
+  return [state, loadSymbol, reloadTf]
 }
 
 export default function Compare({ onNavigate, onOpen, initial }) {
   const [timeframe, setTimeframe] = useState('1Y')
   const [qa, setQa] = useState('')
   const [qb, setQb] = useState('')
-  const [A, loadA, reloadTfA] = useSlot()
-  const [B, loadB, reloadTfB] = useSlot()
+  const [candsA, setCandsA] = useState(null)  // disambiguation lists (null = none shown)
+  const [candsB, setCandsB] = useState(null)
+  const [busyA, setBusyA] = useState(false)
+  const [busyB, setBusyB] = useState(false)
+  const [A, loadSymbolA, reloadTfA] = useSlot()
+  const [B, loadSymbolB, reloadTfB] = useSlot()
 
-  // Seed slot A with the stock the user came from.
+  // Resolve a typed name/ticker to a symbol, showing a picker when it's ambiguous
+  // — the same behaviour as the main search bar.
+  async function resolve(query, { setCands, setBusy, loadSymbol }) {
+    const q = query.trim()
+    if (!q) return
+    setCands(null); setBusy(true)
+    try {
+      const { candidates = [] } = await search(q)
+      if (candidates.length === 0) { await loadSymbol(q, timeframe); return }  // maybe an exact ticker
+      if (candidates.length === 1 || candidates[0].symbol.toUpperCase() === q.toUpperCase()) {
+        await loadSymbol(candidates[0].symbol, timeframe); return
+      }
+      setCands(candidates)  // let the user choose
+    } finally {
+      setBusy(false)
+    }
+  }
+  const resolveA = () => resolve(qa, { setCands: setCandsA, setBusy: setBusyA, loadSymbol: loadSymbolA })
+  const resolveB = () => resolve(qb, { setCands: setCandsB, setBusy: setBusyB, loadSymbol: loadSymbolB })
+  const pickA = (c) => { setQa(c.name || c.symbol); setCandsA(null); loadSymbolA(c.symbol, timeframe) }
+  const pickB = (c) => { setQb(c.name || c.symbol); setCandsB(null); loadSymbolB(c.symbol, timeframe) }
+
+  // Seed slot A with the stock the user came from (already a resolved ticker).
   useEffect(() => {
-    if (initial && !A.ticker) { setQa(initial); loadA(initial, timeframe) }
+    if (initial && !A.ticker) { setQa(initial); loadSymbolA(initial, timeframe) }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [])
 
@@ -107,19 +133,49 @@ export default function Compare({ onNavigate, onOpen, initial }) {
       </div>
 
       <div className="cmp-pickers">
-        <div className="cmp-pick">
-          <span className="cmp-dot" style={{ background: '#34A9BE' }} />
-          <input placeholder="First company or ticker…" value={qa}
-                 onChange={(e) => setQa(e.target.value)}
-                 onKeyDown={(e) => { if (e.key === 'Enter' && qa.trim()) loadA(qa.trim(), timeframe) }} />
-          <button className="go" onClick={() => qa.trim() && loadA(qa.trim(), timeframe)}>Load</button>
+        <div className="cmp-slot">
+          <div className="cmp-pick">
+            <span className="cmp-dot" style={{ background: '#34A9BE' }} />
+            <input placeholder="First company or ticker…" value={qa}
+                   onChange={(e) => setQa(e.target.value)}
+                   onKeyDown={(e) => { if (e.key === 'Enter') resolveA() }} />
+            <button className="go" onClick={resolveA} disabled={busyA}>{busyA ? '…' : 'Load'}</button>
+          </div>
+          {candsA && (
+            <div className="cmp-cands">
+              <div className="cmp-cands-hd">Did you mean… — pick one</div>
+              {candsA.map((c) => (
+                <button key={c.symbol} className="cmp-cand" onClick={() => pickA(c)}>
+                  <span className="cmp-cand-sym mono">{c.symbol}</span>
+                  <span className="cmp-cand-name">{c.name}</span>
+                  <span className="faint" style={{ fontSize: 11 }}>{c.exchange}{c.type === 'ETF' ? ' · ETF' : ''}</span>
+                </button>
+              ))}
+              <button className="cmp-cand-cancel" onClick={() => setCandsA(null)}>Cancel</button>
+            </div>
+          )}
         </div>
-        <div className="cmp-pick">
-          <span className="cmp-dot" style={{ background: '#F2A93B' }} />
-          <input placeholder="Second company or ticker…" value={qb}
-                 onChange={(e) => setQb(e.target.value)}
-                 onKeyDown={(e) => { if (e.key === 'Enter' && qb.trim()) loadB(qb.trim(), timeframe) }} />
-          <button className="go" onClick={() => qb.trim() && loadB(qb.trim(), timeframe)}>Load</button>
+        <div className="cmp-slot">
+          <div className="cmp-pick">
+            <span className="cmp-dot" style={{ background: '#F2A93B' }} />
+            <input placeholder="Second company or ticker…" value={qb}
+                   onChange={(e) => setQb(e.target.value)}
+                   onKeyDown={(e) => { if (e.key === 'Enter') resolveB() }} />
+            <button className="go" onClick={resolveB} disabled={busyB}>{busyB ? '…' : 'Load'}</button>
+          </div>
+          {candsB && (
+            <div className="cmp-cands">
+              <div className="cmp-cands-hd">Did you mean… — pick one</div>
+              {candsB.map((c) => (
+                <button key={c.symbol} className="cmp-cand" onClick={() => pickB(c)}>
+                  <span className="cmp-cand-sym mono">{c.symbol}</span>
+                  <span className="cmp-cand-name">{c.name}</span>
+                  <span className="faint" style={{ fontSize: 11 }}>{c.exchange}{c.type === 'ETF' ? ' · ETF' : ''}</span>
+                </button>
+              ))}
+              <button className="cmp-cand-cancel" onClick={() => setCandsB(null)}>Cancel</button>
+            </div>
+          )}
         </div>
       </div>
 

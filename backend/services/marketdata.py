@@ -24,6 +24,12 @@ def get(ticker: str, period: str = "1y", interval: str = "1d") -> Optional[Tuple
     hist = t.history(period=period, interval=interval, auto_adjust=True)
     if hist is None or hist.empty:
         return None
+    # Drop rows with a NaN OHLC value (some markets return holiday/partial bars,
+    # e.g. 005930.KS) — a raw NaN can't be JSON-serialized and breaks /research.
+    hist = hist.dropna(subset=["Open", "High", "Low", "Close"])
+    if hist.empty:
+        return None
+    hist["Volume"] = hist["Volume"].fillna(0)
     return hist, _quote(t, hist, ticker)
 
 

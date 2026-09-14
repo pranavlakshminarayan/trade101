@@ -327,3 +327,27 @@ spend** — the whole tab is deterministic (`/research` + `/ecosystem` only).
 **Mistakes / course-corrections in this pass:** none material. (Minor: the `#TICKER` hash router
 treats any hash as a ticker, so `#compare` isn't a deep link to the tab — expected; navigation is
 via the tab/rail. Not worth a router rework now.)
+
+### 2026-09-14 — Comparison search parity + a latent NaN crash
+
+Feedback: the Comparison pickers took the first search match blindly, so "Samsung"
+→ "Failed to fetch". Fixed two things:
+
+- **Full search/disambiguation in the Comparison tab.** `Compare.jsx` now runs the same resolve
+  flow as the main search bar: type a name → if ambiguous, a "Did you mean…" candidate list
+  drops under that slot's input (symbol · name · exchange), and you pick — instead of guessing
+  the first hit. `useSlot` now takes an already-resolved symbol; the search/pick lives in the
+  component (per-slot `cands`/`busy` state). Verified live: "samsung" lists 005930.KS (Korea),
+  SSNLF (OTC), SMSN.IL (London), Frankfurt, etc.
+- **Latent `/research` crash on some non-US symbols (found via Samsung).** `/research/005930.KS`
+  returned **500**: `ValueError: Out of range float values are not JSON compliant: nan` — a bad
+  holiday/partial OHLC bar produced a NaN that FastAPI can't serialize (indicators were already
+  NaN-safe; the raw `ohlcv` list was not). Fixed at the source in `marketdata.get`:
+  `dropna(subset=OHLC)` + `Volume.fillna(0)`, so every consumer (research/patterns/analyze)
+  is protected. 005930.KS now 200; AAPL/7974.T unaffected. 29 tests still pass.
+
+**Mistakes / course-corrections in this pass:**
+- **Shipped the Comparison tab with a blind first-match picker** — it looked fine in my Apple-vs-
+  Microsoft test (both resolve cleanly as the top hit) but broke on the first genuinely ambiguous
+  non-US name the user tried. *Lesson: test a new picker with an ambiguous/non-US query, not just
+  two clean US tickers — the happy path hid both the UX gap and the NaN crash.*

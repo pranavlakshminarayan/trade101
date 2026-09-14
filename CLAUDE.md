@@ -85,7 +85,11 @@ frontend/ src/{App,api}.jsx · components/{Welcome,Research,PriceChart,Metrics,A
 - **Comparison tab**: `components/Compare.jsx` (App `view === 'compare'`, tabs in Research/Welcome)
   loads two stocks via `/research` + `/ecosystem` (no `/analyze` → no Claude spend);
   `ComparisonChart.jsx` plots both rebased to 100 (% moves). Metrics table reuses `lessons.js`
-  (`METRICS`, `metricValue`). Guardrail: describes differences, never "which is better".
+  (`METRICS`, `metricValue`). Each slot has the **same name→symbol disambiguation picker as the
+  main search** (type a name → pick from candidates). Guardrail: describes differences, never
+  "which is better".
+- `marketdata.get` drops NaN OHLC rows + zero-fills NaN volume — a bad partial bar (seen on
+  005930.KS) otherwise produces a NaN that FastAPI can't JSON-serialize (500 on `/research`).
 - `agents/llm.py` sends the analysis **system prompt as a `cache_control: ephemeral` block**
   (prompt caching) — served at ~0.1× input cost within the 5-min window. Requires the prefix to
   clear the model minimum (Sonnet 5 = 1024 tok, Opus 5 = 512); ours is ~1306 tok so it fires.
