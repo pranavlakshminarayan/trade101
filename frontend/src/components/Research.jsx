@@ -199,7 +199,7 @@ export default function Research({ data, onBack, onSearch, onNavigate }) {
       <div className="top">
         <div style={{ display: 'flex', alignItems: 'center' }}>
           <div className="logo"><Logo /> Trade101</div>
-          <div className="tabs"><a className="on">Research</a><a>Comparison</a><a onClick={() => onNavigate('history')} style={{ cursor: 'pointer' }}>History</a></div>
+          <div className="tabs"><a className="on">Research</a><a onClick={() => onNavigate('compare')} style={{ cursor: 'pointer' }}>Comparison</a><a onClick={() => onNavigate('history')} style={{ cursor: 'pointer' }}>History</a></div>
         </div>
         <button className="backbtn" onClick={onBack}>← New search</button>
       </div>
