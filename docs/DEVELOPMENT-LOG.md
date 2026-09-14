@@ -304,3 +304,26 @@ Two user requests in one pass.
   the throwaway verification backend to run **without** `--reload` (one process, no reloader to
   spawn extras). Documented the whole trap as a Gotcha in `CLAUDE.md`. *Lesson learned twice now:
   treat "works on direct import, stale over HTTP" as a process problem immediately.*
+
+### 2026-09-14 — Comparison tab (Phase 2)
+
+Two stocks side by side, verified live in the browser (Apple vs Microsoft) with **no Claude
+spend** — the whole tab is deterministic (`/research` + `/ecosystem` only).
+
+- `components/Compare.jsx` — two search pickers (reuse `/search` disambiguation, take best
+  match), color-coded headers (teal A / amber B), a shared timeframe (1Y/1M), and a metrics
+  table that reuses `lessons.js` (`METRICS`, `metricValue`, `metricLabel`) so the numbers match
+  the research view exactly. Rows: price, change%, RSI, MACD, SMA50/200, Bollinger, volume, beta,
+  sector, market cap. "Open full research" chips jump to either stock.
+- `components/ComparisonChart.jsx` — both price series rebased to 100 at the window start, so the
+  chart compares **% moves** rather than absolute prices (deliberately teal/amber, not
+  green/red, so no "good/bad" is implied).
+- Wired `view === 'compare'` in `App.jsx`; activated the previously-dead "Comparison" tab in
+  `Research.jsx` and the Welcome rail (removed its "soon" tag). Slot A seeds from the stock you
+  came from.
+- Guardrail held: the header and a footer note both say it **describes differences, never which
+  to buy** — no "winner", no recommendation.
+
+**Mistakes / course-corrections in this pass:** none material. (Minor: the `#TICKER` hash router
+treats any hash as a ticker, so `#compare` isn't a deep link to the tab — expected; navigation is
+via the tab/rail. Not worth a router rework now.)

@@ -54,20 +54,21 @@ filter + claim-level Fact/Interpretation/Unknown labels + evidence tests + keys-
 prompt caching + a backend TTL cache (`services/cache.py`). Remaining: timeframe integrity,
 coverage badges, a not-advice notice by the narrative.
 
-**Phase 2 — started** (see `BACKLOG.md`). Done: **Ask-Claude chat** (now a floating chatbot
-widget) — `/ask/{ticker}` + `agents/chat.py`, grounded in the same data as `/analyze`, no
-advice, prompt-cached; **non-US sourcing (free tier)** — computed beta vs the regional index
-for listings with no provider beta (`company.py`), on top of the earlier Yahoo news fallback +
-name fix. Deferred to post-deploy (user's call): the **paid** Firecrawl/Exa provider for deeper
-non-US scraping. Next Phase 2: Comparison tab, richer ecosystem graph, real logo, deploy a
-shareable URL. Full rationale: `docs/trade101-phase-2-recommendations.md`.
+**Phase 2 — in progress** (see `BACKLOG.md`). Done: **Ask-Claude chat** (floating chatbot
+widget) — `/ask/{ticker}` + `agents/chat.py`, grounded, no advice, prompt-cached; **non-US
+sourcing (free tier)** — computed beta vs the regional index (`company.py`) + Yahoo news
+fallback + name fix; **Comparison tab** — two stocks side by side (normalized chart + metrics
+table), deterministic, no AI call, "describes differences, never which to buy". Deferred to
+post-deploy (user's call): the **paid** Firecrawl/Exa provider for deeper non-US scraping. Next
+Phase 2: richer ecosystem graph, real logo, deploy a shareable URL. Full rationale:
+`docs/trade101-phase-2-recommendations.md`.
 
 ## Architecture
 Hybrid: deterministic **services** for exact data + Claude **agents** for judgment, behind a FastAPI API; **React/Vite** frontend.
 ```
 backend/  app.py (FastAPI) · services/{marketdata,indicators,patterns,news,company,search,evidence,safe,cache}.py
           agents/{orchestrator,analysis,chat,llm}.py · tests/
-frontend/ src/{App,api}.jsx · components/{Welcome,Research,PriceChart,Metrics,AiRead,NewsPanel,Ecosystem,AskClaude,History,Logo}.jsx · lib/history.js
+frontend/ src/{App,api}.jsx · components/{Welcome,Research,PriceChart,Metrics,AiRead,NewsPanel,Ecosystem,AskClaude,Compare,ComparisonChart,History,Logo}.jsx · lib/history.js
 ```
 - `services/evidence.py` — deterministic relevance filter; drops unrelated news before the AI
   sees it (Phase 1.5 guardrail). `services/safe.py` — `redact_secrets` for anything client-bound.
@@ -81,6 +82,10 @@ frontend/ src/{App,api}.jsx · components/{Welcome,Research,PriceChart,Metrics,A
   via a `lines` field in `PriceChart.jsx`. Only shapes actually present are returned.
 - `frontend/src/api.js` holds a **session result cache** (research/analyze/ecosystem/patterns) —
   tab-switching restores from memory; `/analyze` runs at most once per ticker per session.
+- **Comparison tab**: `components/Compare.jsx` (App `view === 'compare'`, tabs in Research/Welcome)
+  loads two stocks via `/research` + `/ecosystem` (no `/analyze` → no Claude spend);
+  `ComparisonChart.jsx` plots both rebased to 100 (% moves). Metrics table reuses `lessons.js`
+  (`METRICS`, `metricValue`). Guardrail: describes differences, never "which is better".
 - `agents/llm.py` sends the analysis **system prompt as a `cache_control: ephemeral` block**
   (prompt caching) — served at ~0.1× input cost within the 5-min window. Requires the prefix to
   clear the model minimum (Sonnet 5 = 1024 tok, Opus 5 = 512); ours is ~1306 tok so it fires.

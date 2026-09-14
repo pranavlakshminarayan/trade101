@@ -95,7 +95,10 @@ the existing single-stock read is demonstrably trustworthy end to end.
 - **TradingView widget option** — embed the exact TV chart look as an alternative to Lightweight-Charts.
 
 ## Phase 3 — surface & scale
-- **Comparison tab** — two stocks side-by-side on the same metrics.
+- [x] **Comparison tab** — DONE 2026-09-14. Two stocks side by side: normalized price chart
+  (rebased to 100) + metrics table (RSI/MACD/SMA/Bollinger/volume/beta/sector/mktcap).
+  Deterministic (no AI call); "describes differences, never which to buy". `Compare.jsx` +
+  `ComparisonChart.jsx`.
 - **Full History tab** — saved searches with 2-line summaries, revisit past research.
 - **Desktop packaging** — Tauri/Electron so it feels like a native app (Moomoo-style).
 - **More markets fully supported** — all seven target markets with tuned data + news adapters.
