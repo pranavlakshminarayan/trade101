@@ -128,6 +128,22 @@ button{font:inherit;cursor:pointer}
 .newsbox-sum{font-size:12px;color:var(--muted);margin-top:5px;line-height:1.45;
   display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden}
 
+/* Ask-Claude chat */
+.askmsgs{display:flex;flex-direction:column;gap:12px;max-height:340px;overflow-y:auto;padding-right:4px;margin-bottom:10px}
+.askmsg{display:flex;flex-direction:column;gap:3px}
+.askmsg.user{align-items:flex-end}
+.askwho{font-size:10.5px;text-transform:uppercase;letter-spacing:.06em;color:var(--faint)}
+.askbubble{font-size:13.5px;line-height:1.5;padding:9px 12px;border-radius:12px;max-width:88%;white-space:pre-wrap}
+.askmsg.user .askbubble{background:var(--teal-soft);color:var(--ink);border:1px solid #1d4551;border-bottom-right-radius:4px}
+.askmsg.assistant .askbubble{background:var(--surface2);border:1px solid var(--hair);border-bottom-left-radius:4px}
+.askstarters{display:flex;flex-wrap:wrap;gap:6px;margin-bottom:10px}
+.askinput{display:flex;gap:8px}
+.askinput input{flex:1;background:var(--surface2);border:1px solid var(--hair);border-radius:10px;padding:9px 12px;color:var(--ink);font-size:13.5px}
+.askinput input:focus{outline:none;border-color:var(--teal)}
+.askinput .go{background:var(--teal);color:#06222a;border:none;border-radius:10px;padding:9px 16px;font-weight:700;cursor:pointer}
+.askinput .go:disabled{opacity:.5;cursor:default}
+.spinner-inline{display:inline-block;width:11px;height:11px;border:2px solid var(--hair);border-top-color:var(--teal);border-radius:50%;animation:spin .8s linear infinite;vertical-align:-1px;margin-right:6px}
+
 /* evidence fact/interpretation/unknown badges */
 .etype{display:inline-block;font-size:9.5px;font-weight:700;text-transform:uppercase;letter-spacing:.05em;
   padding:1px 6px;border-radius:980px;vertical-align:middle;margin-right:5px;border:1px solid transparent}

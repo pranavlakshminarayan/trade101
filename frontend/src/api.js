@@ -73,6 +73,22 @@ export async function patterns(ticker, { period, interval } = {}) {
   }
 }
 
+// Ask-Claude chat over a stock's research bundle. Not cached — each question is
+// a fresh, paid call; history is sent so the backend can keep the thread.
+export async function ask(ticker, question, history = []) {
+  try {
+    const res = await fetch(`${BASE}/ask/${encodeURIComponent(ticker.trim())}`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ question, history }),
+    })
+    if (!res.ok) return { available: false, reason: `Ask request failed (HTTP ${res.status})` }
+    return res.json()
+  } catch {
+    return { available: false, reason: 'Could not reach the backend for Ask-Claude.' }
+  }
+}
+
 // AI narration — fetched separately so the chart never waits on it. This is the
 // expensive, paid call, so its result is cached for the whole session: revisiting
 // a stock (or returning from another tab) restores the read without spending the

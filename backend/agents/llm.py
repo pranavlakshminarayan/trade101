@@ -55,11 +55,44 @@ def call(key_env: str, system: str, user: str, effort: str = "high", max_tokens:
     )
     if resp.stop_reason == "refusal":
         raise RuntimeError("The model declined this request.")
-    # Surface cache activity to the server log so we can confirm it's working
-    # (cache_read_input_tokens > 0 on the 2nd+ call within the window).
-    u = resp.usage
+    _log_usage(resp.usage)
+    return "".join(b.text for b in resp.content if b.type == "text").strip()
+
+
+def call_chat(key_env: str, system: str, messages: list[dict],
+              effort: str = "medium", max_tokens: int = 1200) -> str:
+    """Multi-turn variant: cached `system` prefix + a full `messages` history.
+    Used by the Ask-Claude chat; the cached system (guardrails + the ticker's
+    stable data context) is reused across conversation turns."""
+    key = os.environ.get(key_env)
+    if not key:
+        raise MissingKeyError(
+            f"Ask-Claude is unavailable — set {key_env} in your .env (a named Claude API key)."
+        )
+    client = anthropic.Anthropic(api_key=key)
+
+    kwargs = {}
+    if "haiku" not in MODEL:
+        kwargs["thinking"] = {"type": "adaptive"}
+        kwargs["output_config"] = {"effort": effort}
+
+    resp = client.messages.create(
+        model=MODEL,
+        max_tokens=max_tokens,
+        system=[{"type": "text", "text": system, "cache_control": {"type": "ephemeral"}}],
+        messages=messages,
+        **kwargs,
+    )
+    if resp.stop_reason == "refusal":
+        raise RuntimeError("The model declined this request.")
+    _log_usage(resp.usage)
+    return "".join(b.text for b in resp.content if b.type == "text").strip()
+
+
+def _log_usage(u) -> None:
+    """Log cache activity so we can confirm prompt caching is working
+    (cache_read_input_tokens > 0 on the 2nd+ call within the window)."""
     print(f"[llm] {MODEL} in={u.input_tokens} "
           f"cache_write={getattr(u, 'cache_creation_input_tokens', 0)} "
           f"cache_read={getattr(u, 'cache_read_input_tokens', 0)} "
           f"out={u.output_tokens}")
-    return "".join(b.text for b in resp.content if b.type == "text").strip()

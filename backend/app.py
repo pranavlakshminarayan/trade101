@@ -12,6 +12,7 @@ from pathlib import Path
 from dotenv import load_dotenv
 from fastapi import FastAPI, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
+from pydantic import BaseModel
 
 # Load .env from the project root (one level up from backend/) so the named
 # API keys are available as environment variables.
@@ -109,6 +110,30 @@ def detect_patterns(ticker: str, period: str = "1y", interval: str = "1d"):
     times = [int(idx.timestamp()) for idx in hist.index]
     return {"ticker": ticker.upper(), "period": period, "interval": interval,
             "patterns": patterns.detect(closes, times)}
+
+
+class AskBody(BaseModel):
+    question: str
+    history: list[dict] = []
+
+
+@app.post("/ask/{ticker}")
+def ask(ticker: str, body: AskBody):
+    """Ask-Claude chat: answer a question about a stock, grounded in the same exact
+    data + filtered evidence as /analyze. Degrades gracefully (no key / error →
+    available:false) so the rest of the app is unaffected. Spends the Claude key."""
+    q = (body.question or "").strip()
+    if not q:
+        raise HTTPException(status_code=400, detail="Ask a question first.")
+    try:
+        result = orchestrator.ask(ticker, q, body.history)
+    except llm.MissingKeyError as e:
+        return {"available": False, "reason": str(e)}
+    except Exception as e:
+        return {"available": False, "reason": redact_secrets(f"Ask-Claude error: {e}")}
+    if result is None:
+        raise HTTPException(status_code=404, detail=f"No market data found for '{ticker}'.")
+    return {"available": True, **result}
 
 
 @app.get("/analyze/{ticker}")

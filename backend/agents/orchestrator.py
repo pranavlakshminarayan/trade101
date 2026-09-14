@@ -7,13 +7,20 @@ only judgment is inside the agent.
 """
 from __future__ import annotations
 
-from agents import analysis, llm
-from services import company, evidence, indicators, marketdata, news
+from agents import analysis, chat, llm
+from services import cache, company, evidence, indicators, marketdata, news
 
 
-def analyze(ticker: str) -> dict | None:
-    """Full AI narration bundle for `ticker`, or None if the symbol has no data.
-    Raises llm.MissingKeyError if no analysis key is configured."""
+def gather(ticker: str) -> dict | None:
+    """Deterministic data bundle for a ticker — exact numbers + relevance-filtered
+    evidence. No LLM. Shared by the analysis run and the Ask-Claude chat so both
+    reason over the SAME sourced data (and we never fetch it twice). None if the
+    symbol has no market data. Cached briefly (TTL) so chat turns reuse one
+    identical bundle — stable numbers + a warm Claude prompt cache."""
+    return cache.get_or_set(f"gather:{ticker.upper()}", lambda: _gather(ticker))
+
+
+def _gather(ticker: str) -> dict | None:
     data = marketdata.get(ticker)
     if data is None:
         return None
@@ -33,6 +40,22 @@ def analyze(ticker: str) -> dict | None:
         sector=profile.get("sector"), industry=profile.get("industry"),
         peers=profile.get("peers"),
     )
+    return {
+        "quote": quote, "indicators": ind, "profile": profile,
+        "news": kept_news, "news_note": news_note, "filings": filings,
+        "fil_note": fil_note, "sourcing": sourcing,
+    }
+
+
+def analyze(ticker: str) -> dict | None:
+    """Full AI narration bundle for `ticker`, or None if the symbol has no data.
+    Raises llm.MissingKeyError if no analysis key is configured."""
+    b = gather(ticker)
+    if b is None:
+        return None
+    quote, ind = b["quote"], b["indicators"]
+    kept_news, filings, sourcing = b["news"], b["filings"], b["sourcing"]
+    news_note, fil_note = b["news_note"], b["fil_note"]
 
     result = analysis.run(quote["symbol"], quote, ind, kept_news, filings, sourcing)
 
@@ -68,3 +91,17 @@ def analyze(ticker: str) -> dict | None:
             "notes": [n for n in (news_note, fil_note) if n],
         },
     }
+
+
+def ask(ticker: str, question: str, history: list[dict] | None = None) -> dict | None:
+    """Answer a user question about `ticker`, grounded in the same exact data +
+    filtered evidence the analysis uses. None if the symbol has no data. Raises
+    llm.MissingKeyError if no key is configured."""
+    b = gather(ticker)
+    if b is None:
+        return None
+    return chat.answer(
+        ticker=b["quote"]["symbol"], quote=b["quote"], indicators=b["indicators"],
+        news=b["news"], filings=b["filings"], sourcing=b["sourcing"],
+        history=history or [], question=question,
+    )
