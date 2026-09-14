@@ -92,10 +92,10 @@ the existing single-stock read is demonstrably trustworthy end to end.
 - [~] **Ecosystem depth** — DONE (v1, 2026-09-14): peers now render as a **radial node graph**
   (company at centre, peers on a ring, each clickable) instead of flat chips (`Ecosystem.jsx`
   `EcoGraph`). Fuller sourced supply-chain graph (edge types, private/public) is still future.
-- [x] **Real logo** — DONE 2026-09-14. Hand-crafted isometric data-cube SVG (`Logo.jsx`):
-  ascending teal bar-chart on the right face + green up-candle on the left. No OpenRouter/image-gen
-  needed.
-- **Palette / visual polish** — tune the dark fintech colors (parked for now; "good enough for MVP").
+- [x] **Real logo** — DONE. Superseded by the 2026-09-15 rebrand: `Logo.jsx` is now the
+  **Trade Craft** growth-spiral mark (green→teal ribbon + arrow + bar chart + $/€/¥ nodes).
+- [x] **Palette / visual polish** — DONE 2026-09-15: deep-navy theme + cream/near-white text
+  (`styles.css` `:root`), part of the Trade Craft rebrand.
 - **TradingView widget option** — embed the exact TV chart look as an alternative to Lightweight-Charts.
 
 ## Phase 3 — surface & scale
@@ -103,15 +103,21 @@ the existing single-stock read is demonstrably trustworthy end to end.
   (rebased to 100) + metrics table (RSI/MACD/SMA/Bollinger/volume/beta/sector/mktcap).
   Deterministic (no AI call); "describes differences, never which to buy". `Compare.jsx` +
   `ComparisonChart.jsx`.
-- **Full History tab** — saved searches with 2-line summaries, revisit past research.
+- [x] **Full History tab** — DONE (MVP): saved searches with 2-line summaries, revisit past research.
+- [x] **Watchlist** — DONE 2026-09-15. Track companies (`lib/watchlist.js` + `Watchlist.jsx`,
+  ☆ Watch toggle on the research header); live quotes via `/research`, framed as tracking /
+  information — no positions, P&L, or signals.
 - **Desktop packaging** — Tauri/Electron so it feels like a native app (Moomoo-style).
 - **More markets fully supported** — all seven target markets with tuned data + news adapters.
+- **Optional simulated practice lab** — kept SEPARATE from the main learning flow (delayed/
+  hypothetical, reflection-focused), per `docs/trade101-phase-2-recommendations.md` Phase 3.
+- **Accessibility / keyboard nav / responsive polish.**
 
 ---
 
 ## Ideas parked / to revisit
 - Real-time (vs ~15-min delayed) data — would need a paid feed / broker API. Fine as delayed for learning.
-- Alerts / watchlist.
+- Alerts (info-event style: earnings filed, price crossed a chosen level) — watchlist itself is DONE.
 - Export a research bundle (PDF/notes) for study.
 - "Explain like I'm new" vs "pro" depth toggle on lessons.
 - Backtesting a pattern's historical hit-rate (as a *learning* stat, with heavy caveats — never a signal).

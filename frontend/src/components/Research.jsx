@@ -8,6 +8,7 @@ import Ecosystem from './Ecosystem.jsx'
 import AskClaude from './AskClaude.jsx'
 import { analyze, research, patterns as fetchPatterns } from '../api.js'
 import { addHistory } from '../lib/history.js'
+import { isWatched, toggleWatch } from '../lib/watchlist.js'
 
 const REFRESH_MS = 7 * 60 * 1000
 
@@ -43,6 +44,7 @@ export default function Research({ data, onBack, onSearch, onNavigate }) {
   const [q, setQ] = useState('')
   const [assign, setAssign] = useState({ metrics: 'L', news: 'L', ecosystem: 'R', references: 'R' })
   const [tick, setTick] = useState(0)
+  const [watched, setWatched] = useState(false)
 
   const ticker = live.ticker
   const refs = useRef({})
@@ -61,6 +63,8 @@ export default function Research({ data, onBack, onSearch, onNavigate }) {
   }, [data.ticker])
 
   useEffect(() => { setPatSel(0) }, [timeframe])
+  useEffect(() => { setWatched(isWatched(live.ticker)) }, [live.ticker])
+  const onWatch = () => { toggleWatch({ ticker: live.ticker, name: live.quote?.name }); setWatched(isWatched(live.ticker)) }
 
   // Save each analysed stock to history (with its 2-line AI takeaway).
   useEffect(() => {
@@ -199,9 +203,12 @@ export default function Research({ data, onBack, onSearch, onNavigate }) {
       <div className="top">
         <div style={{ display: 'flex', alignItems: 'center' }}>
           <div className="logo"><Logo /> Trade Craft</div>
-          <div className="tabs"><a className="on">Research</a><a onClick={() => onNavigate('compare')} style={{ cursor: 'pointer' }}>Comparison</a><a onClick={() => onNavigate('history')} style={{ cursor: 'pointer' }}>History</a></div>
+          <div className="tabs"><a className="on">Research</a><a onClick={() => onNavigate('compare')} style={{ cursor: 'pointer' }}>Comparison</a><a onClick={() => onNavigate('watchlist')} style={{ cursor: 'pointer' }}>Watchlist</a><a onClick={() => onNavigate('history')} style={{ cursor: 'pointer' }}>History</a></div>
         </div>
-        <button className="backbtn" onClick={onBack}>← New search</button>
+        <div style={{ display: 'flex', gap: 8 }}>
+          <button className={'watchbtn' + (watched ? ' on' : '')} onClick={onWatch}>{watched ? '★ Watching' : '☆ Watch'}</button>
+          <button className="backbtn" onClick={onBack}>← New search</button>
+        </div>
       </div>
 
       <div className="strip">

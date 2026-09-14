@@ -21,7 +21,8 @@ export default function History({ onNavigate, onOpen }) {
           <div className="logo"><Logo /> Trade Craft</div>
           <div className="tabs">
             <a onClick={() => onNavigate('home')}>Research</a>
-            <a onClick={() => onNavigate('home')}>Comparison</a>
+            <a onClick={() => onNavigate('compare')}>Comparison</a>
+            <a onClick={() => onNavigate('watchlist')}>Watchlist</a>
             <a className="on">History</a>
           </div>
         </div>

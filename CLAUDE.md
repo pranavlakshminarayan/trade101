@@ -68,12 +68,19 @@ Firecrawl/Exa provider for deeper non-US scraping, and **deploying a shareable U
 leaves Phase 2 essentially complete bar the two deferred items. Full rationale:
 `docs/trade101-phase-2-recommendations.md`.
 
+**Phase 3 — started** (2026-09-15). Done: **Watchlist** — `components/Watchlist.jsx` +
+`lib/watchlist.js` (localStorage; ☆ Watch toggle on the research header; a `watchlist` view with
+live quotes via `/research`, framed as tracking, not trade prompts). App views are now
+`home | compare | watchlist | history`. Remaining Phase 3 (user to prioritise): desktop packaging
+(Tauri/Electron), more markets fully supported, an optional simulated *practice lab*, and
+accessibility polish. Still deferred per the user: shareable-URL deploy + paid Firecrawl.
+
 ## Architecture
 Hybrid: deterministic **services** for exact data + Claude **agents** for judgment, behind a FastAPI API; **React/Vite** frontend.
 ```
 backend/  app.py (FastAPI) · services/{marketdata,indicators,patterns,news,company,search,evidence,safe,cache}.py
           agents/{orchestrator,analysis,chat,llm}.py · tests/
-frontend/ src/{App,api}.jsx · components/{Welcome,Research,PriceChart,Metrics,AiRead,NewsPanel,Ecosystem,AskClaude,Compare,ComparisonChart,History,Logo}.jsx · lib/history.js
+frontend/ src/{App,api}.jsx · components/{Welcome,Research,PriceChart,Metrics,AiRead,NewsPanel,Ecosystem,AskClaude,Compare,ComparisonChart,Watchlist,History,Logo}.jsx · lib/{history,watchlist}.js
 ```
 - `services/evidence.py` — deterministic relevance filter; drops unrelated news before the AI
   sees it (Phase 1.5 guardrail). `services/safe.py` — `redact_secrets` for anything client-bound.

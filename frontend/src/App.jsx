@@ -3,6 +3,7 @@ import Welcome from './components/Welcome.jsx'
 import Research from './components/Research.jsx'
 import History from './components/History.jsx'
 import Compare from './components/Compare.jsx'
+import Watchlist from './components/Watchlist.jsx'
 import { research as fetchResearch, search as searchSymbols } from './api.js'
 
 export default function App() {
@@ -11,7 +12,7 @@ export default function App() {
   const [error, setError] = useState(null)
   const [recent, setRecent] = useState([])
   const [candidates, setCandidates] = useState(null) // disambiguation list
-  const [view, setView] = useState('home') // 'home' | 'history' | 'compare'
+  const [view, setView] = useState('home') // 'home' | 'history' | 'compare' | 'watchlist'
 
   async function doResearch(symbol, push = true) {
     setLoading(true); setError(null); setCandidates(null)
@@ -82,6 +83,10 @@ export default function App() {
 
   if (view === 'compare') {
     return <Compare onNavigate={setView} onOpen={(t) => { setView('home'); doResearch(t) }} initial={data?.ticker} />
+  }
+
+  if (view === 'watchlist') {
+    return <Watchlist onNavigate={setView} onOpen={(t) => { setView('home'); doResearch(t) }} />
   }
 
   if (loading) {

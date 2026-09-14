@@ -13,6 +13,7 @@ export default function Welcome({ onSearch, recent, onNavigate }) {
         <div className="logo"><Logo /> Trade Craft</div>
         <button className="railitem on" style={{ marginTop: 12 }}>✚ New research</button>
         <button className="railitem" onClick={() => onNavigate('compare')}>⚖️ Comparison</button>
+        <button className="railitem" onClick={() => onNavigate('watchlist')}>★ Watchlist</button>
         <button className="railitem" onClick={() => onNavigate('history')}>🕘 History</button>
         {recent?.length > 0 && <div className="railsec">Recent research</div>}
         {recent?.map((r) => (

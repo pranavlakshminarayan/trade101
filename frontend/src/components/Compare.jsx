@@ -122,6 +122,7 @@ export default function Compare({ onNavigate, onOpen, initial }) {
           <div className="tabs">
             <a onClick={() => onNavigate('home')} style={{ cursor: 'pointer' }}>Research</a>
             <a className="on">Comparison</a>
+            <a onClick={() => onNavigate('watchlist')} style={{ cursor: 'pointer' }}>Watchlist</a>
             <a onClick={() => onNavigate('history')} style={{ cursor: 'pointer' }}>History</a>
           </div>
         </div>

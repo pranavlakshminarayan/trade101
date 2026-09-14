@@ -235,6 +235,23 @@ savings are needed later — left as-is for now to preserve quality.
 
 ---
 
+## Phase 3 — started 2026-09-15
+
+- **Watchlist.** `lib/watchlist.js` (localStorage, mirrors the History pattern) + a
+  `components/Watchlist.jsx` view and a ☆/★ **Watch** toggle on the research header. The
+  watchlist view pulls a fresh quote per tracked name via `/research` (deterministic, **no Claude
+  spend**) and lists ticker · name · price · change with a remove button. Framed as a *study/
+  tracking* list — "information, not trade prompts", no positions/P&L/signals — per the
+  learning north star. New app view `watchlist`; tab added across Research/Compare/History/Welcome
+  (also fixed History's Comparison tab, which used to go home). Verified live with seeded AAPL/
+  MSFT/7974.T (quotes loaded; test data cleared afterward).
+- Remaining Phase 3 (awaiting the user's priority): desktop packaging (Tauri/Electron), more
+  markets fully supported, an optional simulated *practice lab* (kept separate from the main
+  learning flow, per the recommendations doc), and accessibility/keyboard polish. Shareable-URL
+  deploy + paid Firecrawl stay deferred by the user's instruction.
+
+**Mistakes / course-corrections in this pass:** none material.
+
 ## Rebrand + dark theme — 2026-09-15
 
 - **Renamed Trade101 → Trade Craft** across the UI (headers, Welcome, tab `<title>`, News/Ecosystem
