@@ -123,6 +123,25 @@ the existing single-stock read is demonstrably trustworthy end to end.
 - Backtesting a pattern's historical hit-rate (as a *learning* stat, with heavy caveats — never a signal).
 - Multi-language / currency niceties for non-US markets.
 
+## Pre-share checklist (BLOCKER before distributing the URL)
+
+The repo is private and the deploy URL is **personal-use only** until this is done. **Remind
+Pranav at the END of Phase 3 execution** (his explicit request) — only after this can the link
+be shared:
+
+- [ ] **Guard the paid endpoints.** `/analyze` and `/ask` spend the owner's Claude key with no
+  auth or rate-limit; a public visitor could run up the bill. Add before sharing:
+  a shared password/access-token gate on the app, and/or rate-limiting or a per-day cap on
+  `/analyze` + `/ask`, and/or a spend cap on the Claude key in the Anthropic console.
+
+## Deploy (single-service) — 2026-09-15
+
+- [x] App is single-service: FastAPI serves the built React app (`app.py` mounts `frontend/dist`;
+  `api.js` uses same-origin in prod). `Dockerfile` + `.dockerignore` + `docs/DEPLOY.md` ready.
+- [x] GitHub repo set **private**.
+- [ ] Go live: connect the repo to a host (Render/Fly, needs Pranav's account) → get the URL →
+  add it to the repo About/README. (Deferred host signup is the user's step.)
+
 ## Guardrails (never drop)
 - Numbers are exact (deterministic code); every AI claim is sourced.
 - The AI describes momentum + teaches understanding; it **never** says buy/sell or predicts profit.

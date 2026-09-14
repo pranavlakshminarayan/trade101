@@ -1,4 +1,7 @@
-const BASE = 'http://127.0.0.1:8000'
+// Dev: the API runs on its own port (separate Vite server). Production: the
+// FastAPI backend serves this built frontend, so the API is same-origin (relative
+// paths) — one service, one URL, no CORS.
+const BASE = import.meta.env.DEV ? 'http://127.0.0.1:8000' : ''
 
 // Session result cache — the fix for "switch tabs and everything reloads".
 // Like a browser tab, a stock already researched this session is restored from

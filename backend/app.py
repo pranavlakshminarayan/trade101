@@ -154,3 +154,15 @@ def analyze(ticker: str):
     if result is None:
         raise HTTPException(status_code=404, detail=f"No market data found for '{ticker}'.")
     return {"available": True, **result}
+
+
+# --- serve the built frontend (single-service deploy) --------------------------
+# When frontend/dist exists (i.e. after `npm run build`), serve it from the same
+# origin as the API. Mounted LAST so every API route above takes precedence; the
+# static mount is the catch-all (html=True → SPA index fallback). In dev the dist
+# folder is absent and Vite serves the UI separately, so this is a no-op then.
+from fastapi.staticfiles import StaticFiles  # noqa: E402
+
+_DIST = Path(__file__).resolve().parent.parent / "frontend" / "dist"
+if _DIST.exists():
+    app.mount("/", StaticFiles(directory=str(_DIST), html=True), name="spa")

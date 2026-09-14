@@ -3,6 +3,13 @@
 > **Brand: Trade Craft** (renamed from "Trade101" on 2026-09-15). The GitHub repo, local
 > folder, and internal package names stay `trade101` — only the user-facing brand + logo changed.
 > Theme is deep navy with cream/near-white text (`frontend/src/styles.css` `:root`).
+> **Repo is PRIVATE** (set 2026-09-15). Deploy is **single-service** — FastAPI serves the built
+> React app (`app.py` mounts `frontend/dist`); `Dockerfile` + `docs/DEPLOY.md` are deploy-ready.
+>
+> **⚠️ PRE-SHARE BUG (fix before sharing the URL with ANYONE):** `/analyze` and `/ask` spend the
+> owner's Claude key with no auth/rate-limit — a public visitor could run up the bill. Fine while
+> the URL is private/personal. **User asked to be reminded at the END of Phase 3 to fix this**
+> (password/token gate + rate-limit/cap) before distributing. Tracked in `BACKLOG.md` → Pre-share.
 
 Auto-loaded each session in this folder. **This file is the project's living memory** — treat
 it as more current than your own assumptions, and keep it that way (see Memory protocol

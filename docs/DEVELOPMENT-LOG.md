@@ -252,6 +252,36 @@ savings are needed later — left as-is for now to preserve quality.
 
 **Mistakes / course-corrections in this pass:** none material.
 
+### 2026-09-15 — Single-service deploy setup (pivot from desktop packaging)
+
+The user asked to "start desktop packaging," but on discussion the actual goal was a **shareable
+link**. Clarified the distinction: a desktop app is a downloadable installer (Electron/Tauri),
+whereas a shareable link is a **web deploy** — different channels. The web deploy is far more
+efficient for a link and sidesteps bundling the Python backend, so we pivoted to it (desktop
+packaging parked). Env check had shown Node 24 but **no Rust** (Tauri) and no PyInstaller, which
+also pointed away from desktop.
+
+Done:
+- **Made the app single-service.** `app.py` now mounts `frontend/dist` (built React) via
+  `StaticFiles(html=True)` *after* all API routes, so one origin serves both the API and the UI.
+  `api.js` switches its base URL on `import.meta.env.DEV` — dev still hits `:8000`, the built app
+  uses same-origin (relative), so no CORS in prod. Verified locally at `:8000`: `/health` + API
+  routes work, `/` serves the Trade Craft app, `/assets/*` load. `npm run build` succeeds.
+- **Deploy config:** multi-stage `Dockerfile` (node build → python runtime), `.dockerignore`,
+  and `docs/DEPLOY.md` with exact Render steps. Any Dockerfile host works.
+- **Repo set PRIVATE** (`gh repo edit --visibility private`), per the user.
+- The final "go live" step (host signup + connect repo → live URL) is the user's — it needs
+  their account; I can't create it. Once they have the URL, add it to the repo About/README.
+
+**Pre-share reminder (user's explicit request):** the URL is personal-use only for now because
+`/analyze` and `/ask` spend the owner's Claude key with no auth/rate-limit — a public visitor
+could run up the bill. **Remind the user at the END of Phase 3 to fix this** (password/token gate
++ rate-limit/cap) before sharing. Tracked in `BACKLOG.md` → Pre-share checklist and `CLAUDE.md`.
+
+**Mistakes / course-corrections in this pass:** none material. (Good catch on the user's part
+that "desktop packaging" and "shareable link" were being conflated — surfacing that before
+building an Electron app saved a lot of wasted work.)
+
 ## Rebrand + dark theme — 2026-09-15
 
 - **Renamed Trade101 → Trade Craft** across the UI (headers, Welcome, tab `<title>`, News/Ecosystem
