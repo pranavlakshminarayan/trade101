@@ -235,11 +235,45 @@ savings are needed later — left as-is for now to preserve quality.
 
 ---
 
-## Phase 2 — depth _(not started)_
+## Phase 2 — depth _(started 2026-09-14)_
 
-Planned: Ask-Claude chat over the research bundle; Comparison tab; deeper non-US sourcing
-(Firecrawl/alternative — provider slot already pluggable); richer pattern library + teaching
-replay; the real data-cube logo; **deploy a shareable/public URL** so the app is checkable from
-any device. See `BACKLOG.md` for the full list.
+Planned: Ask-Claude chat (done, below); Comparison tab; deeper non-US sourcing
+(Firecrawl/alternative — provider slot already pluggable); richer ecosystem graph; the real
+data-cube logo; **deploy a shareable/public URL** so the app is checkable from any device. See
+`BACKLOG.md` for the full list.
 
-**Mistakes / course-corrections:** _(to be recorded when Phase 2 begins.)_
+### 2026-09-14 — Ask-Claude chat (first Phase 2 feature)
+
+A conversational tutor over one stock's research bundle. Verified live end to end.
+
+- **Backend.** `orchestrator.gather()` was extracted so the analysis run and the chat share ONE
+  deterministic data bundle (exact numbers + relevance-filtered evidence) — reasoning over the
+  same sourced data, fetched once. `agents/chat.py` renders that bundle into a cached system
+  prompt (same north-star guardrails: exact numbers, cite what you lean on, teach, never
+  buy/sell) and runs the conversation in `messages`. `POST /ask/{ticker}` degrades gracefully
+  (no key / error → `available:false`) and scrubs secrets from any error. `agents/chat.py` uses
+  `effort="medium"` to keep chat cheap.
+- **Caching, two layers.** `services/cache.py` (new, TTL 5 min) memoises `gather()` so chat
+  turns don't re-fetch and the numbers stay identical across a conversation; that stability is
+  also what lets Claude's **prompt cache** hit — the rendered context is byte-identical turn to
+  turn. Verified in the server log: chat turn 1 `cache_write=1693, cache_read=0`; turn 2
+  `cache_write=0, cache_read=1693` — the whole 1693-token context prefix served from cache at
+  ~0.1× cost, with only the 49-token question at full price. This closes the Phase 1.5 cache
+  item (frontend session cache + backend TTL cache + Claude prompt caching).
+- **Frontend.** `components/AskClaude.jsx` — a chat card in the research masonry with starter
+  questions, per-ticker threads kept in module memory (survive tab-switches, like the api
+  cache), and a visible "each question is one Claude call · educational only" note. `api.ask()`
+  posts the question + history.
+
+**Mistakes / course-corrections in this pass:**
+- **Zombie backends held the port and served stale code — the real bug behind a confusing
+  404.** `POST /ask` kept returning 404 even though a fresh `import app` showed the route
+  registered. Cause: several `uvicorn --reload` backends started across previous turns had
+  orphaned worker processes still bound to port 8000 (Windows lets multiple inherit the socket),
+  and requests were landing on an old worker without the new route. `taskkill //PID` didn't
+  clear them because killing a `--reload` *worker* makes its reloader parent respawn one. Fix:
+  list python processes with their command lines, identify the orphaned `multiprocessing.spawn`
+  workers (careful NOT to kill the unrelated yfinance-mcp processes), kill exactly those, confirm
+  the port was clear, then start a single clean backend. *Lesson: one dev backend at a time —
+  verify the port is actually clear before starting another, and diagnose a "route 404s but
+  imports fine" as a stale-process problem, not a code problem.*

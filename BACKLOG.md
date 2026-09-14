@@ -57,9 +57,9 @@ the existing single-stock read is demonstrably trustworthy end to end.
 - [ ] **Coverage-truthfulness badges** — per company, show supported/limited/unavailable for
   price, company news, filings, fundamentals, instead of implying every market is covered
   equally. (Backend `company.get_profile` already returns a `coverage` map — extend it.)
-- [~] **Cache abstraction** — frontend session cache done (`api.js`: research/analyze/ecosystem/
-  patterns; `/analyze` runs once per ticker per session, fixing tab-switch reloads + key waste).
-  Backend-side caching (in-memory/SQLite for shared market bars/profiles/analysis) still to do.
+- [x] **Cache abstraction** — frontend session cache (`api.js`) + backend TTL cache
+  (`services/cache.py`, memoises `orchestrator.gather`) + Claude prompt caching (`llm.py`).
+  (SQLite/Redis still optional if this ever goes multi-process.)
 - [ ] Visible "educational, not financial advice" notice near the momentum narrative itself,
   not only in the footer.
 
@@ -80,7 +80,9 @@ the existing single-stock read is demonstrably trustworthy end to end.
   can check it from any device. Keep API keys backend-only.
 - **Deeper search / scrape for non-US markets.** US data is easy/free (Wall Street sources, etc.); other countries (China, Japan, Korea, HK, Singapore, India) are harder → **Firecrawl or an alternative** to scrape/extract where clean APIs don't exist. Pluggable provider slot already designed for this.
 - **Broader web sourcing** — add **Exa** (wide semantic search) and premium sources where accessible/legal (the WSJ / Bloomberg / JP Morgan / investment-bank-report depth). Always sourced.
-- **"Ask Claude" chat** — conversational Q&A and discussion over the current research bundle (button already reserved in the UI).
+- [x] **"Ask Claude" chat** — DONE 2026-09-14. `POST /ask/{ticker}` + `agents/chat.py` +
+  `components/AskClaude.jsx`; grounded in the same exact data + filtered evidence as `/analyze`,
+  never advice, prompt-cached context so multi-turn stays cheap.
 - **Richer pattern library + step-by-step teaching replay** — beyond triple-top/bottom + head-and-shoulders; the magnifier walks through "peak 1 → peak 2 → peak 3 is a lower high → weakening," teaching the read.
 - **Ecosystem depth** — fuller supply-chain graph (node-graph visualization), not just a chain.
 - **Real logo** — generate from the data-cube spec (via OpenRouter image gen) and replace the placeholder mark.

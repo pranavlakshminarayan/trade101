@@ -49,19 +49,23 @@ MVP complete (M0–M5), public on GitHub: https://github.com/pranavlakshminaraya
 **Phase 1 flaw pass done** (2026-09-14, see `docs/HANDOVER.md` §4.2) — key leak, raw errors,
 ecosystem-gap messaging, datetime all fixed; user still needs to rotate the Finnhub key.
 
-**Phase 1.5 — trust and coherence, in progress** (see `BACKLOG.md`). Done: evidence relevance
-filter (`services/evidence.py`) + claim-level Fact/Interpretation/Unknown labels + evidence
-tests + keys-backend-only confirmed. Remaining: timeframe integrity (shared as-of label +
-timeframe-correct indicators), coverage badges, a cache layer, and a not-advice notice by the
-narrative. Then Phase 2 proper (Ask-Claude chat, Comparison tab, Firecrawl non-US sourcing,
-richer patterns, real logo). Full rationale: `docs/trade101-phase-2-recommendations.md`.
+**Phase 1.5 — trust and coherence, mostly done** (see `BACKLOG.md`). Done: evidence relevance
+filter + claim-level Fact/Interpretation/Unknown labels + evidence tests + keys-backend-only +
+prompt caching + a backend TTL cache (`services/cache.py`). Remaining: timeframe integrity,
+coverage badges, a not-advice notice by the narrative.
+
+**Phase 2 — started** (see `BACKLOG.md`). Done: **Ask-Claude chat** — `/ask/{ticker}` +
+`agents/chat.py`, grounded in the same exact data + filtered evidence as `/analyze`, no advice,
+prompt-cached context (verified: 2nd turn reads the full prefix from cache). Next Phase 2:
+Comparison tab, deeper non-US sourcing (Firecrawl/Exa), richer ecosystem graph, real logo,
+deploy a shareable URL. Full rationale: `docs/trade101-phase-2-recommendations.md`.
 
 ## Architecture
 Hybrid: deterministic **services** for exact data + Claude **agents** for judgment, behind a FastAPI API; **React/Vite** frontend.
 ```
-backend/  app.py (FastAPI) · services/{marketdata,indicators,patterns,news,company,search,evidence,safe}.py
-          agents/{orchestrator,analysis,llm}.py · tests/
-frontend/ src/{App,api}.jsx · components/{Welcome,Research,PriceChart,Metrics,AiRead,NewsPanel,Ecosystem,History,Logo}.jsx · lib/history.js
+backend/  app.py (FastAPI) · services/{marketdata,indicators,patterns,news,company,search,evidence,safe,cache}.py
+          agents/{orchestrator,analysis,chat,llm}.py · tests/
+frontend/ src/{App,api}.jsx · components/{Welcome,Research,PriceChart,Metrics,AiRead,NewsPanel,Ecosystem,AskClaude,History,Logo}.jsx · lib/history.js
 ```
 - `services/evidence.py` — deterministic relevance filter; drops unrelated news before the AI
   sees it (Phase 1.5 guardrail). `services/safe.py` — `redact_secrets` for anything client-bound.
@@ -76,7 +80,14 @@ frontend/ src/{App,api}.jsx · components/{Welcome,Research,PriceChart,Metrics,A
   (prompt caching) — served at ~0.1× input cost within the 5-min window. Requires the prefix to
   clear the model minimum (Sonnet 5 = 1024 tok, Opus 5 = 512); ours is ~1306 tok so it fires.
   `llm.py` logs `cache_write`/`cache_read`/`in`/`out` per call — check the server log to confirm.
-Endpoints: `/health`, `/search?q=`, `/research/{ticker}?period&interval`, `/analyze/{ticker}` (AI, degrades w/o key), `/patterns/{ticker}`, `/ecosystem/{ticker}`.
+- **Ask-Claude chat**: `POST /ask/{ticker}` → `orchestrator.ask` → `agents/chat.py`. Same
+  guardrails as analysis; the ticker's data bundle is rendered into a cached system prompt so
+  multi-turn chat reuses it (chat turn 2+ reads the whole prefix from cache). `agents/chat.py`
+  uses `effort="medium"` (cheaper). `orchestrator.gather()` is the shared deterministic bundle,
+  memoised by `services/cache.py` (TTL 5 min) so chat turns don't re-fetch and numbers stay
+  stable across a conversation. Frontend: `components/AskClaude.jsx` (per-ticker threads kept in
+  module memory), placed in the masonry `FLOW`.
+Endpoints: `/health`, `/search?q=`, `/research/{ticker}?period&interval`, `/analyze/{ticker}` (AI, degrades w/o key), `POST /ask/{ticker}` (Ask-Claude chat), `/patterns/{ticker}`, `/ecosystem/{ticker}`.
 
 ## Run (two terminals)
 ```
