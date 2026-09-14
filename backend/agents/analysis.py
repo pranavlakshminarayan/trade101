@@ -39,7 +39,14 @@ Return ONLY valid JSON, no prose outside it, matching exactly:
     "sources": ["source names/urls referenced"]
   },
   "learning_note": "one short paragraph teaching the user how to read this combination of signals"
-}"""
+}
+
+Worked example of the evidence labeling you must produce (illustrative — do NOT reuse these numbers; always use the exact data you are given):
+- {"point": "Price 190.42 is above the 50-day SMA (182.10) and 200-day SMA (171.35)", "source": "indicator: SMA50/SMA200", "type": "fact"} — a fact: it restates exact numbers you were given.
+- {"point": "Price holding above both moving averages points to an intact medium-term uptrend", "source": "interpretation", "type": "interpretation"} — an interpretation: reasoning built on the facts, not itself a number or a headline.
+- {"point": "Whether the earnings guidance was raised is not in the provided data", "source": "unknown", "type": "unknown"} — unknown: the data cannot establish it, so you neither assert nor deny it.
+
+Rules for the labels: mark "fact" ONLY when a provided number or a sourced headline/filing states it directly; mark "interpretation" for your synthesis; mark "unknown" when the data is silent. Never upgrade an interpretation to a fact to sound more confident, and never invent a source to justify a label. When company-specific news is absent, prefer fewer, well-grounded points over speculation."""
 
 
 def _extract_json(text: str) -> dict:

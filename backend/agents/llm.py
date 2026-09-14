@@ -23,7 +23,16 @@ class MissingKeyError(RuntimeError):
 
 
 def call(key_env: str, system: str, user: str, effort: str = "high", max_tokens: int = 4000) -> str:
-    """Call Claude with the key named by `key_env`. Returns the text response."""
+    """Call Claude with the key named by `key_env`. Returns the text response.
+
+    The system prompt is sent as a cache_control block: it's byte-identical on
+    every call (only the per-ticker `user` payload varies, and it comes after),
+    so Claude serves it from the prompt cache at ~0.1× input cost on any call
+    within the 5-min window — cutting spend across tickers/sessions. Effective
+    only when the system prompt clears the model's minimum cacheable size
+    (512 tok on Opus 5 / Fable; 1024 on Sonnet 5) — ours does. A prefix below the
+    minimum silently won't cache, but the marker is harmless.
+    """
     key = os.environ.get(key_env)
     if not key:
         raise MissingKeyError(
@@ -40,10 +49,17 @@ def call(key_env: str, system: str, user: str, effort: str = "high", max_tokens:
     resp = client.messages.create(
         model=MODEL,
         max_tokens=max_tokens,
-        system=system,
+        system=[{"type": "text", "text": system, "cache_control": {"type": "ephemeral"}}],
         messages=[{"role": "user", "content": user}],
         **kwargs,
     )
     if resp.stop_reason == "refusal":
         raise RuntimeError("The model declined this request.")
+    # Surface cache activity to the server log so we can confirm it's working
+    # (cache_read_input_tokens > 0 on the 2nd+ call within the window).
+    u = resp.usage
+    print(f"[llm] {MODEL} in={u.input_tokens} "
+          f"cache_write={getattr(u, 'cache_creation_input_tokens', 0)} "
+          f"cache_read={getattr(u, 'cache_read_input_tokens', 0)} "
+          f"out={u.output_tokens}")
     return "".join(b.text for b in resp.content if b.type == "text").strip()
