@@ -1,6 +1,9 @@
-# Trade101 — Development Log (phase by phase)
+# Trade Craft — Development Log (phase by phase)
 
-The story of how Trade101 was built, in order: how the idea was broken down and visualised,
+> Brand **Trade Craft** (renamed from "Trade101" on 2026-09-15; repo/folder/package stay
+> `trade101`). This log keeps the old name in the early phases where it was accurate at the time.
+
+The story of how the app was built, in order: how the idea was broken down and visualised,
 what each phase executed, the inputs/suggestions that shaped it, and — honestly — the mistakes
 made and how they were corrected.
 
@@ -9,10 +12,14 @@ protocol). It is the narrative "how we got here" companion to:
 - `CLAUDE.md` — concise current-state reference (auto-loaded each session)
 - `BACKLOG.md` — the live feature/bug checklist
 - `docs/HANDOVER.md` — the full, detailed technical handover (deep detail lives there)
+- `docs/DEPLOY.md` — how to deploy the single-service app (shareable URL)
 - `docs/trade101-phase-2-recommendations.md` — the 2026-09-10 product/technical review
 
-Local app while in development: **http://127.0.0.1:5173** (two dev servers — see `CLAUDE.md` →
-Run). A shareable/deployed URL is planned *after* the full build (see `BACKLOG.md`).
+**Order of the log:** Phase 0 → 1 → 1 flaw pass → 1.5 → 2 → Rebrand → 3.
+
+Local app in development: **http://127.0.0.1:5173** (Vite dev) or **http://127.0.0.1:8000** (the
+backend now also serves the production build). A hosted shareable URL is deploy-ready (`docs/DEPLOY.md`);
+going live is the user's one host-signup step, and is gated on the pre-share endpoint-guard fix.
 
 ---
 
@@ -235,66 +242,6 @@ savings are needed later — left as-is for now to preserve quality.
 
 ---
 
-## Phase 3 — started 2026-09-15
-
-- **Watchlist.** `lib/watchlist.js` (localStorage, mirrors the History pattern) + a
-  `components/Watchlist.jsx` view and a ☆/★ **Watch** toggle on the research header. The
-  watchlist view pulls a fresh quote per tracked name via `/research` (deterministic, **no Claude
-  spend**) and lists ticker · name · price · change with a remove button. Framed as a *study/
-  tracking* list — "information, not trade prompts", no positions/P&L/signals — per the
-  learning north star. New app view `watchlist`; tab added across Research/Compare/History/Welcome
-  (also fixed History's Comparison tab, which used to go home). Verified live with seeded AAPL/
-  MSFT/7974.T (quotes loaded; test data cleared afterward).
-- Remaining Phase 3 (awaiting the user's priority): desktop packaging (Tauri/Electron), more
-  markets fully supported, an optional simulated *practice lab* (kept separate from the main
-  learning flow, per the recommendations doc), and accessibility/keyboard polish. Shareable-URL
-  deploy + paid Firecrawl stay deferred by the user's instruction.
-
-**Mistakes / course-corrections in this pass:** none material.
-
-### 2026-09-15 — Single-service deploy setup (pivot from desktop packaging)
-
-The user asked to "start desktop packaging," but on discussion the actual goal was a **shareable
-link**. Clarified the distinction: a desktop app is a downloadable installer (Electron/Tauri),
-whereas a shareable link is a **web deploy** — different channels. The web deploy is far more
-efficient for a link and sidesteps bundling the Python backend, so we pivoted to it (desktop
-packaging parked). Env check had shown Node 24 but **no Rust** (Tauri) and no PyInstaller, which
-also pointed away from desktop.
-
-Done:
-- **Made the app single-service.** `app.py` now mounts `frontend/dist` (built React) via
-  `StaticFiles(html=True)` *after* all API routes, so one origin serves both the API and the UI.
-  `api.js` switches its base URL on `import.meta.env.DEV` — dev still hits `:8000`, the built app
-  uses same-origin (relative), so no CORS in prod. Verified locally at `:8000`: `/health` + API
-  routes work, `/` serves the Trade Craft app, `/assets/*` load. `npm run build` succeeds.
-- **Deploy config:** multi-stage `Dockerfile` (node build → python runtime), `.dockerignore`,
-  and `docs/DEPLOY.md` with exact Render steps. Any Dockerfile host works.
-- **Repo set PRIVATE** (`gh repo edit --visibility private`), per the user.
-- The final "go live" step (host signup + connect repo → live URL) is the user's — it needs
-  their account; I can't create it. Once they have the URL, add it to the repo About/README.
-
-**Pre-share reminder (user's explicit request):** the URL is personal-use only for now because
-`/analyze` and `/ask` spend the owner's Claude key with no auth/rate-limit — a public visitor
-could run up the bill. **Remind the user at the END of Phase 3 to fix this** (password/token gate
-+ rate-limit/cap) before sharing. Tracked in `BACKLOG.md` → Pre-share checklist and `CLAUDE.md`.
-
-**Mistakes / course-corrections in this pass:** none material. (Good catch on the user's part
-that "desktop packaging" and "shareable link" were being conflated — surfacing that before
-building an Electron app saved a lot of wasted work.)
-
-## Rebrand + dark theme — 2026-09-15
-
-- **Renamed Trade101 → Trade Craft** across the UI (headers, Welcome, tab `<title>`, News/Ecosystem
-  copy) and the AI prompts (`analysis.py`, `chat.py`) so the model refers to itself correctly.
-  The GitHub repo / folder / package names stay `trade101` (renaming those is out of scope and
-  risky) — only the user-facing brand changed.
-- **New logo** (`Logo.jsx`): a growth-spiral ribbon (green→teal gradient) ending in an arrowhead,
-  an ascending bar chart in the loop, and small $/€/¥ currency nodes — per the brand spec, as
-  transparent-background SVG so it sits on the dark header.
-- **Deeper palette**: `styles.css` `:root` moved to a deep navy (`--bg:#070E1A`, navy surfaces)
-  with soft cream/near-white text (`--ink:#F4F1E9`) and slightly brightened teal/green accents so
-  they pop on the darker ground. Verified on the Welcome page.
-
 ## Phase 2 — depth _(started 2026-09-14)_
 
 Planned: Ask-Claude chat (done, below); Comparison tab; deeper non-US sourcing
@@ -431,3 +378,72 @@ With these, Phase 2's build items are essentially done except the two the user d
 free Welcome page and *not* open a research view just to see the ecosystem graph, since that
 fires a paid `/analyze` — the graph is deterministic SVG, so it's trusted to the user's next
 research view. Noting it so a reviewer knows the graph wasn't screenshot-verified here.)
+
+---
+
+## Rebrand + dark theme — 2026-09-15
+
+- **Renamed Trade101 → Trade Craft** across the UI (headers, Welcome, tab `<title>`, News/Ecosystem
+  copy) and the AI prompts (`analysis.py`, `chat.py`) so the model refers to itself correctly.
+  The GitHub repo / folder / package names stay `trade101` (renaming those is out of scope and
+  risky) — only the user-facing brand changed.
+- **New logo** (`Logo.jsx`): a growth-spiral ribbon (green→teal gradient) ending in an arrowhead,
+  an ascending bar chart in the loop, and small $/€/¥ currency nodes — per the brand spec, as
+  transparent-background SVG so it sits on the dark header. (This replaced the Phase-2 isometric
+  data-cube mark.)
+- **Deeper palette**: `styles.css` `:root` moved to a deep navy (`--bg:#070E1A`, navy surfaces)
+  with soft cream/near-white text (`--ink:#F4F1E9`) and slightly brightened teal/green accents so
+  they pop on the darker ground. Verified on the Welcome page.
+
+---
+
+## Phase 3 — surface & scale _(started 2026-09-15)_
+
+### 2026-09-15 — Watchlist (first Phase 3 feature)
+
+- `lib/watchlist.js` (localStorage, mirrors the History pattern) + a `components/Watchlist.jsx`
+  view and a ☆/★ **Watch** toggle on the research header. The watchlist view pulls a fresh quote
+  per tracked name via `/research` (deterministic, **no Claude spend**) and lists ticker · name ·
+  price · change with a remove button. Framed as a *study/tracking* list — "information, not trade
+  prompts", no positions/P&L/signals — per the learning north star. New app view `watchlist`; tab
+  added across Research/Compare/History/Welcome (also fixed History's Comparison tab, which used to
+  go home). Verified live with seeded AAPL/MSFT/7974.T (quotes loaded; test data cleared after).
+
+**Mistakes / course-corrections in this pass:** none material.
+
+### 2026-09-15 — Single-service deploy setup (pivot from desktop packaging)
+
+The user asked to "start desktop packaging," but on discussion the actual goal was a **shareable
+link**. Clarified the distinction: a desktop app is a downloadable installer (Electron/Tauri),
+whereas a shareable link is a **web deploy** — different channels. The web deploy is far more
+efficient for a link and sidesteps bundling the Python backend, so we pivoted to it (desktop
+packaging parked). Env check had shown Node 24 but **no Rust** (Tauri) and no PyInstaller, which
+also pointed away from desktop.
+
+Done:
+- **Made the app single-service.** `app.py` now mounts `frontend/dist` (built React) via
+  `StaticFiles(html=True)` *after* all API routes, so one origin serves both the API and the UI.
+  `api.js` switches its base URL on `import.meta.env.DEV` — dev still hits `:8000`, the built app
+  uses same-origin (relative), so no CORS in prod. Verified locally at `:8000`: `/health` + API
+  routes work, `/` serves the Trade Craft app, `/assets/*` load. `npm run build` succeeds.
+- **Deploy config:** multi-stage `Dockerfile` (node build → python runtime), `.dockerignore`,
+  and `docs/DEPLOY.md` with exact Render steps. Any Dockerfile host works.
+- **Repo set PRIVATE** (`gh repo edit --visibility private`), per the user.
+- The final "go live" step (host signup + connect repo → live URL) is the user's — it needs
+  their account; I can't create it. Once they have the URL, add it to the repo About/README.
+
+**Pre-share reminder (user's explicit request):** the URL is personal-use only for now because
+`/analyze` and `/ask` spend the owner's Claude key with no auth/rate-limit — a public visitor
+could run up the bill. **Remind the user at the END of Phase 3 to fix this** (password/token gate
++ rate-limit/cap) before sharing. Tracked in `BACKLOG.md` → Pre-share checklist and `CLAUDE.md`.
+
+**Mistakes / course-corrections in this pass:** none material. (Good catch on the user's part
+that "desktop packaging" and "shareable link" were being conflated — surfacing that before
+building an Electron app saved a lot of wasted work.)
+
+### Remaining in Phase 3 (awaiting the user's priority)
+
+More markets fully supported · optional simulated **practice lab** (kept separate from the main
+learning flow, per the recommendations doc) · accessibility / keyboard-nav polish. Desktop
+packaging is **parked** (the web deploy gives the shareable link instead). Deploy go-live + the
+paid Firecrawl tier + the **pre-share endpoint-guard fix** come at Phase 3's end.
