@@ -118,7 +118,7 @@ export default function Compare({ onNavigate, onOpen, initial }) {
     <div className="research">
       <div className="top">
         <div style={{ display: 'flex', alignItems: 'center' }}>
-          <div className="logo"><Logo /> Trade101</div>
+          <div className="logo"><Logo /> Trade Craft</div>
           <div className="tabs">
             <a onClick={() => onNavigate('home')} style={{ cursor: 'pointer' }}>Research</a>
             <a className="on">Comparison</a>

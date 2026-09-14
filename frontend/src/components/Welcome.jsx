@@ -10,7 +10,7 @@ export default function Welcome({ onSearch, recent, onNavigate }) {
   return (
     <div className="welcome">
       <aside className="rail">
-        <div className="logo"><Logo /> Trade101</div>
+        <div className="logo"><Logo /> Trade Craft</div>
         <button className="railitem on" style={{ marginTop: 12 }}>✚ New research</button>
         <button className="railitem" onClick={() => onNavigate('compare')}>⚖️ Comparison</button>
         <button className="railitem" onClick={() => onNavigate('history')}>🕘 History</button>
@@ -21,7 +21,7 @@ export default function Welcome({ onSearch, recent, onNavigate }) {
       </aside>
 
       <main className="welc-main">
-        <div className="logo" style={{ fontSize: 22 }}><Logo size={34} /> Trade101</div>
+        <div className="logo" style={{ fontSize: 22 }}><Logo size={34} /> Trade Craft</div>
         <div className="big">Which stock shall we study, <span>Pranav?</span></div>
         <div className="sub">
           Just type a <b>company name</b> (or ticker) — any market: US, China, Japan, Korea, Hong Kong, Singapore, India, Europe.

@@ -18,7 +18,7 @@ export default function History({ onNavigate, onOpen }) {
     <div className="research">
       <div className="top">
         <div style={{ display: 'flex', alignItems: 'center' }}>
-          <div className="logo"><Logo /> Trade101</div>
+          <div className="logo"><Logo /> Trade Craft</div>
           <div className="tabs">
             <a onClick={() => onNavigate('home')}>Research</a>
             <a onClick={() => onNavigate('home')}>Comparison</a>

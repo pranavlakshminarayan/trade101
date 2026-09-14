@@ -1,9 +1,10 @@
 :root{
-  --bg:#0E1A26; --bg2:#0A131C; --surface:#152534; --surface2:#1C3141; --hair:#294056;
-  --ink:#EAF1F6; --muted:#9FB4C4; --faint:#6C8299;
-  --teal:#34A9BE; --teal-soft:#123039; --navy:#1E3A5F;
-  --up:#00D68F; --up-soft:#0c2f2a; --down:#F0616D; --down-soft:#301a1e; --amber:#F2A93B;
-  --radius:16px; --shadow:0 1px 2px rgba(0,0,0,.3),0 10px 30px rgba(0,0,0,.28);
+  /* Deep-navy theme with soft cream/near-white text. */
+  --bg:#070E1A; --bg2:#040911; --surface:#0D1726; --surface2:#152437; --hair:#213249;
+  --ink:#F4F1E9; --muted:#B4C2D2; --faint:#7C90A6;
+  --teal:#3BB6CB; --teal-soft:#0d2733; --navy:#16233b;
+  --up:#12E29A; --up-soft:#0a2b25; --down:#F26B76; --down-soft:#2c181c; --amber:#F2B24B;
+  --radius:16px; --shadow:0 1px 2px rgba(0,0,0,.45),0 12px 34px rgba(0,0,0,.42);
 }
 *{box-sizing:border-box}
 html,body,#root{height:100%}

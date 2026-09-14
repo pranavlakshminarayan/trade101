@@ -235,6 +235,19 @@ savings are needed later — left as-is for now to preserve quality.
 
 ---
 
+## Rebrand + dark theme — 2026-09-15
+
+- **Renamed Trade101 → Trade Craft** across the UI (headers, Welcome, tab `<title>`, News/Ecosystem
+  copy) and the AI prompts (`analysis.py`, `chat.py`) so the model refers to itself correctly.
+  The GitHub repo / folder / package names stay `trade101` (renaming those is out of scope and
+  risky) — only the user-facing brand changed.
+- **New logo** (`Logo.jsx`): a growth-spiral ribbon (green→teal gradient) ending in an arrowhead,
+  an ascending bar chart in the loop, and small $/€/¥ currency nodes — per the brand spec, as
+  transparent-background SVG so it sits on the dark header.
+- **Deeper palette**: `styles.css` `:root` moved to a deep navy (`--bg:#070E1A`, navy surfaces)
+  with soft cream/near-white text (`--ink:#F4F1E9`) and slightly brightened teal/green accents so
+  they pop on the darker ground. Verified on the Welcome page.
+
 ## Phase 2 — depth _(started 2026-09-14)_
 
 Planned: Ask-Claude chat (done, below); Comparison tab; deeper non-US sourcing

@@ -47,7 +47,7 @@ export default function NewsPanel({ ai, loading, ticker }) {
 
       {!loading && ai?.available && tab === 'means' && (
         <div className="infer">
-          <span className="tagline">Trade101's inference · evidence-based, not advice</span>
+          <span className="tagline">Trade Craft's inference · evidence-based, not advice</span>
           <p style={{ marginTop: 8 }}>{inference.summary || news.note || 'No news to interpret yet.'}</p>
           {inference.sources?.length > 0 && (
             <div className="faint" style={{ fontSize: 12, marginTop: 6 }}>Sources: {inference.sources.join(' · ')}</div>

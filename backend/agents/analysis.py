@@ -12,7 +12,7 @@ import json
 
 from agents import llm
 
-SYSTEM = """You are the analysis engine of Trade101, a hands-on LEARNING tool for a beginning trader.
+SYSTEM = """You are the analysis engine of Trade Craft, a hands-on LEARNING tool for a beginning trader.
 
 Your job is to EXTRACT MEANING from the data, not read labels back. Anyone can see "RSI is 56". Your value is synthesis: what do the signals mean TOGETHER, and why — explained so the user learns to read it themselves.
 

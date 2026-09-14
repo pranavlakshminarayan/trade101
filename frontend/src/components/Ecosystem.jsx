@@ -80,7 +80,7 @@ export default function Ecosystem({ ticker, onSearch }) {
             <p style={{ margin: 0 }}>{betaNote(eco.beta)}</p>
             {eco.beta != null && eco.betaSource === 'computed' && (
               <p className="faint" style={{ margin: '6px 0 0', fontSize: 11.5 }}>
-                Computed by Trade101 from ~1y of daily returns vs the {eco.betaIndex || 'regional index'} (no provider beta for this listing).
+                Computed by Trade Craft from ~1y of daily returns vs the {eco.betaIndex || 'regional index'} (no provider beta for this listing).
               </p>
             )}
           </div>

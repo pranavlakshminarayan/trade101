@@ -1,4 +1,8 @@
-# CLAUDE.md — Trade101
+# CLAUDE.md — Trade Craft
+
+> **Brand: Trade Craft** (renamed from "Trade101" on 2026-09-15). The GitHub repo, local
+> folder, and internal package names stay `trade101` — only the user-facing brand + logo changed.
+> Theme is deep navy with cream/near-white text (`frontend/src/styles.css` `:root`).
 
 Auto-loaded each session in this folder. **This file is the project's living memory** — treat
 it as more current than your own assumptions, and keep it that way (see Memory protocol
