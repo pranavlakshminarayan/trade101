@@ -1,0 +1,18 @@
+# Render Blueprint — native runtime, no Dockerfile.
+# Render's build image already has Node + Python, so the build command can run
+# the frontend build and the backend install in one native Python service.
+services:
+  - type: web
+    name: trade-craft
+    runtime: python
+    plan: free
+    buildCommand: "cd frontend && npm install && npm run build && cd ../backend && pip install -r requirements.txt"
+    startCommand: "cd backend && uvicorn app:app --host 0.0.0.0 --port $PORT"
+    healthCheckPath: /health
+    envVars:
+      - key: TRADE101_ANALYSIS_KEY
+        sync: false
+      - key: TRADE101_NEWS_KEY
+        sync: false
+      - key: TRADE101_MODEL
+        value: claude-sonnet-5

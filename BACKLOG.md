@@ -137,7 +137,11 @@ be shared:
 ## Deploy (single-service) — 2026-09-15
 
 - [x] App is single-service: FastAPI serves the built React app (`app.py` mounts `frontend/dist`;
-  `api.js` uses same-origin in prod). `Dockerfile` + `.dockerignore` + `docs/DEPLOY.md` ready.
+  `api.js` uses same-origin in prod).
+- [x] Two deploy paths ready, both free: `render.yaml` (**no Docker** — Render native Python
+  runtime; recommended) and `Dockerfile` + `.dockerignore` (container, for hosts that want one).
+  Both documented in `docs/DEPLOY.md`. Native build verified locally (fresh `npm install && npm
+  run build` succeeds; backend serves the rebuilt `dist/`).
 - [x] GitHub repo set **private**.
 - [ ] Go live: connect the repo to a host (Render/Fly, needs Pranav's account) → get the URL →
   add it to the repo About/README. (Deferred host signup is the user's step.)

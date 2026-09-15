@@ -4,7 +4,9 @@
 > folder, and internal package names stay `trade101` — only the user-facing brand + logo changed.
 > Theme is deep navy with cream/near-white text (`frontend/src/styles.css` `:root`).
 > **Repo is PRIVATE** (set 2026-09-15). Deploy is **single-service** — FastAPI serves the built
-> React app (`app.py` mounts `frontend/dist`); `Dockerfile` + `docs/DEPLOY.md` are deploy-ready.
+> React app (`app.py` mounts `frontend/dist`). Two deploy paths, both free, no code changes
+> either way: `render.yaml` (**no Docker** — Render native Python runtime, recommended) or
+> `Dockerfile` (for hosts that want a container). See `docs/DEPLOY.md`.
 >
 > **⚠️ PRE-SHARE BUG (fix before sharing the URL with ANYONE):** `/analyze` and `/ask` spend the
 > owner's Claude key with no auth/rate-limit — a public visitor could run up the bill. Fine while

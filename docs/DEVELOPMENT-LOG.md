@@ -441,6 +441,24 @@ could run up the bill. **Remind the user at the END of Phase 3 to fix this** (pa
 that "desktop packaging" and "shareable link" were being conflated — surfacing that before
 building an Electron app saved a lot of wasted work.)
 
+### 2026-09-15 — No-Docker deploy option (Render native runtime)
+
+User asked for a free alternative to Docker. Since `app.py` already serves the built frontend
+itself, single-service deploy was never actually Docker-dependent — Docker was just *one way*
+to build the image. Render's build environment ships Node **and** Python, so a plain Python web
+service can run the frontend build as its build step, no Dockerfile at all.
+
+- Added `render.yaml` (Render Blueprint): `runtime: python`, `buildCommand` runs
+  `npm install && npm run build` then `pip install -r requirements.txt`, `startCommand` runs
+  uvicorn on Render's `$PORT`, `healthCheckPath: /health`, free plan, env vars for the two keys.
+- `docs/DEPLOY.md` restructured: **Option A (no Docker, recommended)** using the Blueprint,
+  **Option B (Docker)** kept for hosts that want a container. No app-code changes either way.
+- Verified locally: fresh `rm -rf frontend/dist && npm install && npm run build` (exactly what
+  the Blueprint's buildCommand does) succeeds, and the running backend still serves the rebuilt
+  `dist/` at `:8000`.
+
+**Mistakes / course-corrections in this pass:** none material.
+
 ### Remaining in Phase 3 (awaiting the user's priority)
 
 More markets fully supported · optional simulated **practice lab** (kept separate from the main
