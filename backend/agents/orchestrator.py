@@ -27,7 +27,7 @@ def _gather(ticker: str) -> dict | None:
     hist, quote = data
     ind = indicators.compute_indicators(hist)
 
-    news_items, news_note = news.get_news(ticker)
+    news_items, news_note = news.get_news(ticker, name=quote.get("name"))
     filings, fil_note = news.get_recent_filings(ticker)
 
     # Deterministic relevance filter BEFORE the model sees anything: drop articles
