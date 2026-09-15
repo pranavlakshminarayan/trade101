@@ -48,7 +48,7 @@ as a separate favor to the user:
   don't just note it and move on.
 
 ## What this is
-**Trade101** — a personal stock-research **and learning** web app for Pranav (student, beginning trader). Type a **company name** (any market) → live chart, indicators explained *in context*, chart patterns, a **sourced AI momentum read**, news + "what it means" inference, ecosystem/peers, and a search History.
+**Trade Craft** (renamed from "Trade101" 2026-09-15) — a personal stock-research **and learning** web app for Pranav (student, beginning trader). Type a **company name** (any market) → live chart, indicators explained *in context*, chart patterns, a **sourced AI momentum read**, an Ask-Claude chat, news + "what it means" inference, ecosystem/peers, a Comparison tab, a Watchlist, and a search History.
 
 **North-star guardrails (never break):**
 - The app **describes and teaches; it never gives buy/sell advice** or price targets.
@@ -57,7 +57,8 @@ as a separate favor to the user:
 - The goal is to **extract and make sense of data**, not read labels back.
 
 ## Status
-MVP complete (M0–M5), public on GitHub: https://github.com/pranavlakshminarayan/trade101 (branch `master`).
+MVP complete (M0–M5). Repo: https://github.com/pranavlakshminarayan/trade101 (branch `master`,
+**PRIVATE** since 2026-09-15 — do not make public without being asked).
 
 **Phase 1 flaw pass done** (2026-09-14, see `docs/HANDOVER.md` §4.2) — key leak, raw errors,
 ecosystem-gap messaging, datetime all fixed; user still needs to rotate the Finnhub key.
@@ -67,22 +68,31 @@ filter + claim-level Fact/Interpretation/Unknown labels + evidence tests + keys-
 prompt caching + a backend TTL cache (`services/cache.py`). Remaining: timeframe integrity,
 coverage badges, a not-advice notice by the narrative.
 
-**Phase 2 — in progress** (see `BACKLOG.md`). Done: **Ask-Claude chat** (floating chatbot
-widget) — `/ask/{ticker}` + `agents/chat.py`, grounded, no advice, prompt-cached; **non-US
-sourcing (free tier)** — computed beta vs the regional index (`company.py`) + Yahoo news
-fallback + name fix; **Comparison tab** — two stocks side by side (normalized chart + metrics
-table), deterministic, no AI call, "describes differences, never which to buy". **real data-cube logo** (`Logo.jsx`, hand-crafted SVG); **ecosystem node graph** (peers as a
-radial graph in `Ecosystem.jsx::EcoGraph`). Deferred to post-deploy (user's call): the **paid**
-Firecrawl/Exa provider for deeper non-US scraping, and **deploying a shareable URL**. That
-leaves Phase 2 essentially complete bar the two deferred items. Full rationale:
-`docs/trade101-phase-2-recommendations.md`.
+**Phase 2 — essentially complete** (see `BACKLOG.md`). Done: **Ask-Claude chat** (floating
+chatbot widget) — `/ask/{ticker}` + `agents/chat.py`, grounded, no advice, prompt-cached;
+**non-US sourcing (free tier)** — computed beta vs the regional index (`company.py`) + Yahoo
+news fallback + name fix; **Comparison tab** — two stocks side by side (normalized chart +
+metrics table), deterministic, no AI call, "describes differences, never which to buy", with the
+same name→symbol disambiguation picker as the main search; **ecosystem node graph** (peers as a
+radial graph in `Ecosystem.jsx::EcoGraph`); **real logo** — superseded by the 2026-09-15 rebrand
+below. Deferred to post-deploy (user's call): the **paid** Firecrawl/Exa provider for deeper
+non-US scraping. Full rationale: `docs/trade101-phase-2-recommendations.md`.
+
+**Rebrand — Trade101 → Trade Craft** (2026-09-15). New growth-spiral logo (`Logo.jsx`,
+green→teal ribbon + arrow + bar chart + $/€/¥ nodes), deep-navy theme (`styles.css` `:root`),
+brand string updated everywhere user-facing incl. the AI prompts. See `docs/HANDOVER.md` §11.
 
 **Phase 3 — started** (2026-09-15). Done: **Watchlist** — `components/Watchlist.jsx` +
 `lib/watchlist.js` (localStorage; ☆ Watch toggle on the research header; a `watchlist` view with
 live quotes via `/research`, framed as tracking, not trade prompts). App views are now
-`home | compare | watchlist | history`. Remaining Phase 3 (user to prioritise): desktop packaging
-(Tauri/Electron), more markets fully supported, an optional simulated *practice lab*, and
-accessibility polish. Still deferred per the user: shareable-URL deploy + paid Firecrawl.
+`home | compare | watchlist | history`. Also done as part of Phase 3: **single-service deploy is
+ready** (two free paths — `render.yaml` no-Docker or `Dockerfile`, see `docs/DEPLOY.md`) and the
+**GitHub repo is now private** — but **not yet live** (needs the user's host signup) and **not to
+be shared even once live** until the pre-share fix above is done. Desktop packaging was
+considered and **parked** in favor of the web deploy (see `docs/HANDOVER.md` §13 — no Rust/
+PyInstaller installed, and the actual goal was a shareable link, which packaging doesn't produce).
+Remaining Phase 3 (user to prioritise): more markets fully supported, an optional simulated
+*practice lab* (kept separate from the main learning flow), and accessibility polish.
 
 ## Architecture
 Hybrid: deterministic **services** for exact data + Claude **agents** for judgment, behind a FastAPI API; **React/Vite** frontend.
@@ -123,6 +133,15 @@ frontend/ src/{App,api}.jsx · components/{Welcome,Research,PriceChart,Metrics,A
   stable across a conversation. Frontend: `components/AskClaude.jsx` is a **floating chatbot
   widget** (bubble pinned bottom-right → opens an overlay panel over the content), rendered at
   the `Research` root (not in the masonry); per-ticker threads kept in module memory.
+- **Watchlist**: `lib/watchlist.js` (localStorage, mirrors `lib/history.js`) + `components/
+  Watchlist.jsx`. ☆/★ toggle on the research header; the view fetches a live quote per tracked
+  ticker via `/research` (no Claude spend). Framed as tracking/study, never positions/P&L/signals.
+- **Single-service deploy**: `app.py` mounts `frontend/dist` (built React) via `StaticFiles`
+  *after* all API routes, so one process/origin serves both — `api.js` uses same-origin in prod
+  (`import.meta.env.DEV` switch), `:8000` directly in dev. Two build paths, no app-code
+  difference between them: `render.yaml` (Render Blueprint, native Python runtime, **no
+  Docker**) or `Dockerfile` + `.dockerignore` (multi-stage, for hosts that want a container).
+  Full steps: `docs/DEPLOY.md`.
 Endpoints: `/health`, `/search?q=`, `/research/{ticker}?period&interval`, `/analyze/{ticker}` (AI, degrades w/o key), `POST /ask/{ticker}` (Ask-Claude chat), `/patterns/{ticker}`, `/ecosystem/{ticker}`.
 
 ## Run (two terminals)
@@ -137,8 +156,10 @@ Open http://127.0.0.1:5173. Tests: `cd backend && .venv/Scripts/python.exe -m py
 **App-link rule (hard rule):** whenever you run/build the app for the user to check, make sure
 both servers are up and **return the local link `http://127.0.0.1:5173`** in the reply — Pranav
 checks it on this machine and reports back what works/breaks so we fix issues one by one.
-The app is **local-only during development**; a shareable/deployed URL is a Phase 2 task (see
-`BACKLOG.md`), to be created after the full execution.
+The app is **local-only for now**; a hosted deploy is config-ready (`docs/DEPLOY.md` — Render,
+either `render.yaml` no-Docker or `Dockerfile`) but not yet live, since going live needs the
+user's own host-account signup. **Even once live, that URL is personal-use only — never suggest
+sharing it** until the pre-share fix in the header above is done (`BACKLOG.md` → Pre-share checklist).
 
 ## Config / conventions
 - `.env` in project root (git-ignored). `TRADE101_ANALYSIS_KEY` (Claude), `TRADE101_NEWS_KEY` (free Finnhub). `TRADE101_MODEL` default **claude-sonnet-5** (cost); use `claude-opus-5` for max depth. Named per-agent keys per `.env.example`.
@@ -149,7 +170,14 @@ The app is **local-only during development**; a shareable/deployed URL is a Phas
 - Windows 11, Git Bash available; the `claude` CLI is at `C:\Users\prana\.local\bin\claude.exe`.
 
 ## Known bugs
-- _(none open right now — non-US news was fixed 2026-09-14 via the Yahoo fallback below.)_
+- _(none open right now.)_
+
+### Fixed 2026-09-14/15 (Comparison tab — see `docs/HANDOVER.md` §10)
+- ~~Comparison pickers took the first search match blindly~~ (e.g. "samsung" → wrong/failed
+  symbol) — `Compare.jsx` now has the same name→symbol disambiguation picker as the main search.
+- ~~`/research/005930.KS` (and similar) 500'd~~ — `ValueError: nan not JSON compliant` from a bad
+  holiday/partial OHLC bar. Fixed at the source: `marketdata.get` now `dropna`s NaN OHLC rows +
+  zero-fills NaN volume, protecting every consumer (research/patterns/analyze), not just Compare.
 
 ### Fixed 2026-09-14 (UX/data fixes — see `docs/DEVELOPMENT-LOG.md` 2026-09-14 entry)
 - ~~Non-US listings get no news~~ — `services/news.py` now falls back to keyless Yahoo Finance

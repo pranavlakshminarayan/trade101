@@ -1,16 +1,16 @@
-# Trade101 — Backlog & Future Features
+# Trade Craft (né Trade101) — Backlog & Future Features
 
 A running list so we don't lose ideas. Add freely; we pull from here after the MVP.
 
-**North-star principle (applies to every phase):** Trade101 must **extract data and make sense of it** — interpret, connect, and *teach understanding* — not just display labels. Reading a number is something you could do by hand; the app's job is to help you *understand* what the data means, together.
+**North-star principle (applies to every phase):** Trade Craft must **extract data and make sense of it** — interpret, connect, and *teach understanding* — not just display labels. Reading a number is something you could do by hand; the app's job is to help you *understand* what the data means, together.
 
 ---
 
-## MVP (Phase 1) — in progress
+## MVP (Phase 1) — DONE
 - [x] M0 Scaffold · [x] M1 real-time core · [x] M2 frontend (welcome + research view + live chart + click-to-learn)
-- [ ] **M3 AI narration** — momentum read + news Feed + "What it means" inference (sense-making, sourced). News via **Finnhub (free) + SEC EDGAR**.
-- [ ] M4 patterns (magnifier) + ecosystem + index/beta + references + history
-- [ ] M5 resilience + tests + the "surprise-ticker" true test
+- [x] **M3 AI narration** — momentum read + news Feed + "What it means" inference (sense-making, sourced). News via **Finnhub (free) + SEC EDGAR**.
+- [x] M4 patterns (magnifier) + ecosystem + index/beta + references + history
+- [x] M5 resilience + tests + the "surprise-ticker" true test
 
 ---
 
@@ -75,9 +75,9 @@ the existing single-stock read is demonstrably trustworthy end to end.
 ---
 
 ## Phase 2 — depth
-- **Deploy a shareable/public URL.** Currently local-only (`http://127.0.0.1:5173`); after the
-  full execution, host the React frontend + FastAPI backend (e.g. Vercel + Render/Fly) so Pranav
-  can check it from any device. Keep API keys backend-only.
+- [~] **Deploy a shareable URL.** Single-service config is DONE — see the "Deploy" section below
+  for the full status (both deploy paths ready, repo private, going live is the only remaining
+  step). Keep API keys backend-only (already true).
 - **Deeper search / scrape for non-US markets.**
   - [x] Free tier (2026-09-14): Yahoo news fallback + company-name fix + **computed beta vs the
     regional index** (`company.py`) so non-US listings get a real beta.
@@ -99,15 +99,22 @@ the existing single-stock read is demonstrably trustworthy end to end.
 - **TradingView widget option** — embed the exact TV chart look as an alternative to Lightweight-Charts.
 
 ## Phase 3 — surface & scale
-- [x] **Comparison tab** — DONE 2026-09-14. Two stocks side by side: normalized price chart
+- [x] **Comparison tab** — DONE 2026-09-14/15. Two stocks side by side: normalized price chart
   (rebased to 100) + metrics table (RSI/MACD/SMA/Bollinger/volume/beta/sector/mktcap).
   Deterministic (no AI call); "describes differences, never which to buy". `Compare.jsx` +
-  `ComparisonChart.jsx`.
+  `ComparisonChart.jsx`. Fixed after initial ship: pickers now use the same disambiguation
+  picker as the main search (blind first-match had broken on "samsung"), and a latent
+  `/research` 500 on some non-US symbols (bad NaN OHLC bar) was fixed at the `marketdata.py`
+  source. See `docs/HANDOVER.md` §10.
 - [x] **Full History tab** — DONE (MVP): saved searches with 2-line summaries, revisit past research.
 - [x] **Watchlist** — DONE 2026-09-15. Track companies (`lib/watchlist.js` + `Watchlist.jsx`,
   ☆ Watch toggle on the research header); live quotes via `/research`, framed as tracking /
   information — no positions, P&L, or signals.
-- **Desktop packaging** — Tauri/Electron so it feels like a native app (Moomoo-style).
+- **Desktop packaging** — Tauri/Electron so it feels like a native app (Moomoo-style). **Parked
+  2026-09-15**: the user's actual near-term goal turned out to be a shareable *link*, which a
+  desktop app doesn't produce — the web deploy (below) covers that instead, more efficiently
+  (no Rust toolchain or PyInstaller currently installed for either packaging path). Revisit if a
+  native installed app is wanted later. See `docs/HANDOVER.md` §13.
 - **More markets fully supported** — all seven target markets with tuned data + news adapters.
 - **Optional simulated practice lab** — kept SEPARATE from the main learning flow (delayed/
   hypothetical, reflection-focused), per `docs/trade101-phase-2-recommendations.md` Phase 3.
@@ -123,17 +130,6 @@ the existing single-stock read is demonstrably trustworthy end to end.
 - Backtesting a pattern's historical hit-rate (as a *learning* stat, with heavy caveats — never a signal).
 - Multi-language / currency niceties for non-US markets.
 
-## Pre-share checklist (BLOCKER before distributing the URL)
-
-The repo is private and the deploy URL is **personal-use only** until this is done. **Remind
-Pranav at the END of Phase 3 execution** (his explicit request) — only after this can the link
-be shared:
-
-- [ ] **Guard the paid endpoints.** `/analyze` and `/ask` spend the owner's Claude key with no
-  auth or rate-limit; a public visitor could run up the bill. Add before sharing:
-  a shared password/access-token gate on the app, and/or rate-limiting or a per-day cap on
-  `/analyze` + `/ask`, and/or a spend cap on the Claude key in the Anthropic console.
-
 ## Deploy (single-service) — 2026-09-15
 
 - [x] App is single-service: FastAPI serves the built React app (`app.py` mounts `frontend/dist`;
@@ -145,6 +141,17 @@ be shared:
 - [x] GitHub repo set **private**.
 - [ ] Go live: connect the repo to a host (Render/Fly, needs Pranav's account) → get the URL →
   add it to the repo About/README. (Deferred host signup is the user's step.)
+
+## ⚠️ Pre-share checklist (BLOCKER before distributing the URL — do this right after "Go live" above)
+
+The repo is private and the deploy URL is **personal-use only** until this is done. **Remind
+Pranav at the END of Phase 3 execution** (his explicit request) — only after this can the link
+be shared:
+
+- [ ] **Guard the paid endpoints.** `/analyze` and `/ask` spend the owner's Claude key with no
+  auth or rate-limit; a public visitor could run up the bill. Add before sharing:
+  a shared password/access-token gate on the app, and/or rate-limiting or a per-day cap on
+  `/analyze` + `/ask`, and/or a spend cap on the Claude key in the Anthropic console.
 
 ## Guardrails (never drop)
 - Numbers are exact (deterministic code); every AI claim is sourced.
