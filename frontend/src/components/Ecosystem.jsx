@@ -1,12 +1,18 @@
 import { useEffect, useState } from 'react'
 import { ecosystem as fetchEco } from '../api.js'
+import { currencySymbol } from '../lib/currency.js'
 
-function marketCap(v) {
+// marketCap arrives from the backend in the LISTING'S OWN currency (yfinance
+// convention) — never assume USD. Formatting with the wrong symbol doesn't just
+// mislabel the unit, it makes a false claim: without this, Nintendo's cap (in
+// JPY) rendered as "$9.36T", larger than Apple's real $4.81T.
+function marketCap(v, currency) {
   if (v == null) return '—'
-  if (v >= 1e12) return '$' + (v / 1e12).toFixed(2) + 'T'
-  if (v >= 1e9) return '$' + (v / 1e9).toFixed(1) + 'B'
-  if (v >= 1e6) return '$' + (v / 1e6).toFixed(0) + 'M'
-  return '$' + v
+  const sym = currencySymbol(currency)
+  if (v >= 1e12) return sym + (v / 1e12).toFixed(2) + 'T'
+  if (v >= 1e9) return sym + (v / 1e9).toFixed(1) + 'B'
+  if (v >= 1e6) return sym + (v / 1e6).toFixed(0) + 'M'
+  return sym + v
 }
 
 function betaNote(b) {
@@ -71,7 +77,7 @@ export default function Ecosystem({ ticker, onSearch }) {
           <div className="eco-facts">
             {eco.sector && <div><span className="faint">Sector</span><b>{eco.sector}</b></div>}
             {eco.industry && <div><span className="faint">Industry</span><b>{eco.industry}</b></div>}
-            <div><span className="faint">Market cap</span><b className="mono">{marketCap(eco.marketCap)}</b></div>
+            <div><span className="faint">Market cap</span><b className="mono">{marketCap(eco.marketCap, eco.marketCapCurrency)}</b></div>
             <div><span className="faint">Listing</span><b>{eco.exchange}{eco.country ? ` · ${eco.country}` : ''}</b></div>
           </div>
 

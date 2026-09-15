@@ -104,7 +104,12 @@ def compute_indicators(df: pd.DataFrame) -> dict:
         },
         "volume": int(vol_latest),
         "volume_vs_20d_pct": vol_change,
-        # convenience flags (deterministic, used by the UI/agents downstream)
-        "above_sma50": (price is not None and sma50 is not None and price > sma50),
-        "above_sma200": (price is not None and sma200 is not None and price > sma200),
+        # convenience flags (deterministic, used by the UI/agents downstream).
+        # Tri-state on purpose: None means "the average isn't available" (e.g. under
+        # 200 days of history), which is NOT the same claim as "price is below it".
+        # A bare False here used to be sent to the analysis agent as an exact fact,
+        # so a short-history stock could be told (and could then assert) it was
+        # "below its 200-day average" when no such average exists at all.
+        "above_sma50": (price > sma50) if (price is not None and sma50 is not None) else None,
+        "above_sma200": (price > sma200) if (price is not None and sma200 is not None) else None,
     }

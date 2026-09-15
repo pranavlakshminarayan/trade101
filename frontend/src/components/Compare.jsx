@@ -8,12 +8,16 @@ import { currencySymbol } from '../lib/currency.js'
 const TF = { '1Y': { period: '1y', interval: '1d' }, '1M': { period: '1mo', interval: '1d' } }
 const TF_ORDER = ['1Y', '1M']
 
-function marketCap(v) {
+// marketCap arrives in the LISTING'S OWN currency (yfinance convention) —
+// never assume USD; comparing e.g. a JPY cap formatted as "$" against a real
+// USD cap makes a false claim about relative size.
+function marketCap(v, currency) {
   if (v == null) return '—'
-  if (v >= 1e12) return '$' + (v / 1e12).toFixed(2) + 'T'
-  if (v >= 1e9) return '$' + (v / 1e9).toFixed(1) + 'B'
-  if (v >= 1e6) return '$' + (v / 1e6).toFixed(0) + 'M'
-  return '$' + v
+  const sym = currencySymbol(currency)
+  if (v >= 1e12) return sym + (v / 1e12).toFixed(2) + 'T'
+  if (v >= 1e9) return sym + (v / 1e9).toFixed(1) + 'B'
+  if (v >= 1e6) return sym + (v / 1e6).toFixed(0) + 'M'
+  return sym + v
 }
 function pct(v) {
   if (v == null) return '—'
@@ -112,7 +116,7 @@ export default function Compare({ onNavigate, onOpen, initial }) {
     ...METRICS.map((m) => [metricLabel(m), (S) => S.data ? metricValue(m, S.data.indicators) : '—']),
     ['Beta', (S) => S.eco?.beta ?? '—'],
     ['Sector', (S) => S.eco?.sector || '—'],
-    ['Market cap', (S) => marketCap(S.eco?.marketCap)],
+    ['Market cap', (S) => marketCap(S.eco?.marketCap, S.eco?.marketCapCurrency)],
   ]
 
   return (

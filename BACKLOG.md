@@ -18,22 +18,21 @@ A running list so we don't lose ideas. Add freely; we pull from here after the M
 
 ---
 
-## Audit — Wave 0: critical, do first (from `docs/AUDIT.md`, 2026-09-16)
+## Audit — Wave 0: critical, do first (from `docs/AUDIT.md`, 2026-09-16) — ✅ DONE 2026-09-16
 
-- [ ] **C3 — Phase 3 work is stranded off `master`.** Branch `claude/trading-idea-phase-3-297572`
-  (commit `8d80ef9`, 24 files, +1256) holds the **pre-share access guard** (`services/access.py`),
-  the Google-News fallback, `lib/currency.js`, the Practice Lab and accessibility fixes. It is
-  **unmerged and unpushed** — local-worktree-only. Review, merge, push, then reconcile the status
-  in `CLAUDE.md` + this file.
-- [ ] **C1 — Market cap is rendered as USD for every listing.** `Ecosystem.jsx:4` hardcodes `$`, so
-  Nintendo shows **`$9.36T`** (really ¥9.36T ≈ $63B) against Apple's `$4.81T`. Breaks the
-  "numbers are exact" north star on screen. Format with the listing's own currency.
-- [ ] **C2 — `above_sma50/200` reports `false` when the average is unknown**
-  (`indicators.py:108`), and that false is sent to Claude as exact data. Make it tri-state
-  (`True|False|None`) and teach the agent prompt to read `null` as unknown.
-- [ ] **C4 — `/analyze` + `/ask` unauthenticated/uncapped on `master`** — resolved by the C3 merge.
-- [ ] **M8** — news items with no URL render `href="#"`, which resets the hash route and kicks the
-  user back to the home screen. **M9** — add a React error boundary.
+- [x] **C3 — Phase 3 work was stranded off `master`.** Turned out to already be merged via PR #2
+  in a parallel session; this session's `master` (one commit behind) merged up to match. Verified
+  on `master`: `services/access.py`, Google-News fallback, `lib/currency.js`, Practice Lab,
+  accessibility fixes.
+- [x] **C1 — Market cap was rendered as USD for every listing.** `company.get_profile` now
+  returns `marketCapCurrency`; `Ecosystem.jsx` + `Compare.jsx` format with `currencySymbol()`.
+  Verified: 7974.T → `¥9.36T`, not `$9.36T`.
+- [x] **C2 — `above_sma50/200` reported `false` when the average was unknown.** Now tri-state
+  (`True|False|None`); both agent prompts explicitly told `null` ≠ false. Regression test added.
+- [x] **C4 — `/analyze` + `/ask` unauthenticated/uncapped on `master`** — resolved by the C3 merge.
+- [x] **M8** — news items with no URL now render as a non-link block, not `href="#"`.
+- [x] **M9** — `components/ErrorBoundary.jsx` wraps `<App/>`; a render crash now shows a
+  recoverable message instead of a white screen.
 
 ## Audit — Wave 1: the four flaws the user named
 

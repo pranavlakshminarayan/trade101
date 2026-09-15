@@ -230,16 +230,26 @@ on the host** — the gate is a no-op until that env var is set.
 
 ## Known bugs
 **Full ranked list with evidence: [`docs/AUDIT.md`](docs/AUDIT.md) (critical audit, 2026-09-16).**
-Mirrored as checkboxes in `BACKLOG.md` → "Audit — Wave 0/1". Open criticals:
+Mirrored as checkboxes in `BACKLOG.md` → "Audit — Wave 0/1".
 
-- **Phase 3 work is stranded off `master`** — branch `claude/trading-idea-phase-3-297572`
-  (`8d80ef9`, 24 files, +1256) holds the pre-share access guard (`services/access.py`), the
-  Google-News fallback, `lib/currency.js`, the Practice Lab and accessibility fixes. **Unmerged
-  AND unpushed** (worktree-only). Merge + push before anything else.
-- **Market cap rendered as USD for every listing** (`Ecosystem.jsx:4` hardcodes `$`) — Nintendo
-  displays `$9.36T` (really ¥9.36T ≈ $63B) vs Apple `$4.81T`. Breaks "numbers are exact". ✅ verified
-- **`above_sma50/200` returns `false` for *unknown*** (`indicators.py:108`) and that false is sent
-  to Claude as exact data — the deterministic layer feeding the model a wrong fact. ✅ verified
+### Fixed 2026-09-16 (Audit Wave 0)
+- ~~Phase 3 work stranded off `master`~~ — was already merged to `origin/master` via PR #2 in a
+  parallel session by the time this session checked; this session's `master` (one commit behind,
+  the audit doc) merged up to match. Verified: `services/access.py`, the Google-News fallback,
+  `lib/currency.js`, Practice Lab and accessibility fixes are all on `master` now.
+- ~~Market cap rendered as USD for every listing~~ — `company.get_profile` now returns
+  `marketCapCurrency`; `Ecosystem.jsx` and `Compare.jsx` format with `currencySymbol()` instead
+  of a hardcoded `$`. Verified: 7974.T now reads `¥9.36T`, not `$9.36T`.
+- ~~`above_sma50/200` returned `false` for *unknown*~~ — `indicators.py` now emits
+  `True|False|None`; `None` when the average itself isn't available. Both agent prompts
+  (`analysis.py`, `chat.py`) now explicitly instruct: a `null` figure means not-available, never
+  treat it as "below". Regression test in `test_indicators.py`. Verified live.
+- ~~News items with no URL rendered `href="#"`~~ (reset the hash route → kicked the user home) —
+  `NewsPanel.jsx` now renders those as a non-link block instead.
+- ~~No React error boundary~~ — `components/ErrorBoundary.jsx` now wraps `<App/>` in `main.jsx`;
+  a render crash shows a recoverable message (remounts the tree) instead of a white screen.
+
+### Open — Wave 1 (the four flaws the user named; not yet started)
 - **Search auto-picks on a name/ticker collision** (`App.jsx:56`) — typing "Sony" silently opens the
   NYSE ADR, never offering Tokyo. Ranking also puts ADR/OTC above primary listings. ✅ verified
 - **News only reaches the UI via the paid `/analyze` call** (`NewsPanel.jsx:8`) — no key, an AI

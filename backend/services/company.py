@@ -115,6 +115,9 @@ def get_profile(ticker: str) -> dict:
         "betaSource": beta_source,   # "provider" | "computed" | None
         "betaIndex": beta_index,     # index name when computed (e.g. "Nikkei 225")
         "marketCap": info.get("marketCap"),
+        # marketCap is denominated in the LISTING'S OWN currency (yfinance convention,
+        # same as the quote) — never assume USD. The frontend must format it accordingly.
+        "marketCapCurrency": info.get("currency"),
         "exchange": info.get("fullExchangeName") or info.get("exchange"),
         "country": info.get("country"),
         "peers": peers,

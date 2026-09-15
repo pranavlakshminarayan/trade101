@@ -75,6 +75,14 @@ def test_compute_indicators_shape_and_bounds():
 
 
 def test_short_history_returns_none_not_fabricated():
-    df = _synthetic_ohlcv(n=30)               # too short for SMA200
+    df = _synthetic_ohlcv(n=100)              # enough for SMA50, too short for SMA200
     out = ind.compute_indicators(df)
     assert out["sma200"] is None              # honest None, never invented
+    # Regression (docs/AUDIT.md finding C2): when the average itself is unknown,
+    # "above the average" must ALSO be unknown (None) — not silently False. A
+    # bare False here used to reach the analysis agent as an exact fact, letting
+    # it assert e.g. "price is below its 200-day average" on a stock that has no
+    # 200-day average at all.
+    assert out["above_sma200"] is None
+    assert out["sma50"] is not None
+    assert isinstance(out["above_sma50"], bool)  # SMA50 IS available at 100 rows

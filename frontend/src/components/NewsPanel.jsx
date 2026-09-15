@@ -30,16 +30,24 @@ export default function NewsPanel({ ai, loading, ticker }) {
 
       {!loading && ai?.available && tab === 'feed' && (
         feed.length ? (
-          feed.slice(0, 8).map((n, i) => (
-            <a className="newsbox" key={i} href={n.url || '#'} target="_blank" rel="noreferrer">
-              <div className="newsbox-head">
-                <span className="newsbox-src">{n.source || 'source'}</span>
-                <span className="when">{n.datetime || ''}</span>
-              </div>
-              <div className="newsbox-title">{n.headline}</div>
-              {n.summary && <div className="newsbox-sum">{n.summary}</div>}
-            </a>
-          ))
+          feed.slice(0, 8).map((n, i) => {
+            // A source URL isn't always available. Render those as a plain (non-link)
+            // block instead of href="#" — a "#" link both goes nowhere useful and
+            // mutates the URL hash, which doubles as this app's ticker route and would
+            // otherwise silently kick the user back to the home screen.
+            const Tag = n.url ? 'a' : 'div'
+            const linkProps = n.url ? { href: n.url, target: '_blank', rel: 'noreferrer' } : {}
+            return (
+              <Tag className={'newsbox' + (n.url ? '' : ' newsbox-nolink')} key={i} {...linkProps}>
+                <div className="newsbox-head">
+                  <span className="newsbox-src">{n.source || 'source'}</span>
+                  <span className="when">{n.datetime || ''}</span>
+                </div>
+                <div className="newsbox-title">{n.headline}</div>
+                {n.summary && <div className="newsbox-sum">{n.summary}</div>}
+              </Tag>
+            )
+          })
         ) : (
           <div className="placeholder">{news.note || `No recent news returned for ${ticker}.`}</div>
         )
