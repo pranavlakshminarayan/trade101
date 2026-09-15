@@ -1,11 +1,13 @@
-# Trade101 — Full Project Handover
+# Trade Craft (née Trade101) — Full Project Handover
 
-A faithful, detailed record of the entire conversation and build that produced Trade101, written so a new chat (or a new person) can pick up with full context. It captures every topic discussed, every decision, every round of feedback, and what was delivered.
+A faithful, detailed record of the entire conversation and build that produced Trade Craft, written so a new chat (or a new person) can pick up with full context. It captures every topic discussed, every decision, every round of feedback, and what was delivered.
 
-- **Repo:** https://github.com/pranavlakshminarayan/trade101 (public)
+- **Repo:** https://github.com/pranavlakshminarayan/trade101 (**PRIVATE** as of 2026-09-15 — set on the user's explicit instruction; do not make it public again without being asked). Local folder, package names, and internal `Trade101` references in code/prompts are being migrated to the "Trade Craft" brand gradually; the repo name itself stays `trade101`.
 - **Local:** `C:\Users\prana\Documents\Claude Code\Trading idea`
-- **Status (2026-09-12):** MVP complete (Milestones 0–5) and pushed to GitHub.
+- **Brand:** **Trade Craft** (renamed from "Trade101" on 2026-09-15 — see §11). Dark deep-navy theme with cream/near-white text.
+- **Status (2026-09-15):** MVP (M0–M5) + Phase 1 flaw pass + Phase 1.5 (mostly) + Phase 2 (essentially complete) + Phase 3 (started: Watchlist) all shipped. Deploy-ready (two free paths, Docker and no-Docker) but **not yet live** — going live is the user's one remaining step (host signup). See §14/§15 for deploy, and the **pre-share reminder** in §16 before any link is ever shared with anyone.
 - **User:** Pranav (student, beginning trader; trades on Moomoo; workspace.sonic@gmail.com). GitHub: pranavlakshminarayan.
+- **Companion docs (all kept current, cross-reference this one):** `CLAUDE.md` (concise current-state reference, auto-loaded every session, carries the hard "memory protocol" rules), `BACKLOG.md` (live checklist), `docs/DEVELOPMENT-LOG.md` (phase-by-phase narrative + an explicit "mistakes/course-corrections" note per phase — lighter-weight than this file), `docs/DEPLOY.md` (deploy instructions), `docs/trade101-phase-2-recommendations.md` (the 2026-09-10 product/technical review that shaped Phase 1.5's priorities).
 
 ---
 
@@ -212,9 +214,550 @@ not-financial-advice notice next to the narrative.
 
 ---
 
-## 5. What's next — Phase 2 (from `BACKLOG.md`)
-- **Ask Claude** chat over the research bundle (seam reserved).
-- **Comparison tab** (two stocks side by side).
-- Deeper non-US sourcing (**Firecrawl** or alternative) — the news provider is already pluggable (`TRADE101_NEWS_PROVIDER`).
-- Richer pattern library + step-by-step teaching replay; the real data-cube **logo**; desktop packaging; broader premium sourcing (Exa, etc.).
-- North-star reminder: **extract and make sense of data; teach understanding; never advise.**
+## 5. Memory/documentation infrastructure (2026-09-12, before the work below)
+
+Before continuing the build, the user asked for the project's own memory system: `CLAUDE.md`
+should be a **living, self-updating** document (not a static reference), so that a fresh chat —
+or this same chat after a context reset — has full clarity without being re-briefed. This became
+a standing rule that shaped everything documented in this file from here on:
+
+- **`CLAUDE.md` "Memory protocol" section** (hard rule): before ending any turn that changes
+  status, architecture, config, endpoints, or known bugs, update the matching section of
+  `CLAUDE.md` in the same turn; mirror bug fixes into `BACKLOG.md`; put long narrative/decisions
+  in `docs/HANDOVER.md` (this file); link any new standalone doc from both docs immediately.
+- **`docs/DEVELOPMENT-LOG.md` created** as a second, complementary hard rule (added 2026-09-14,
+  see §12 below): a phase-by-phase story of the *journey* — inputs/suggestions per phase and,
+  explicitly, **mistakes made and how they were corrected** — updated after every phase completes.
+- **Persistent cross-session memory** (outside the repo, in Claude's own memory store) was also
+  seeded: a project summary of what Trade Craft is/its guardrails, plus feedback memories
+  recording the user's standing preferences — e.g. "return the local app link on every run",
+  "keep the dev log updated with mistakes after every phase", and the pre-share reminder (§16).
+  These survive even if this conversation's context is fully reset.
+- **Consequence for how this file is used:** `docs/HANDOVER.md` (this file) is the *deep* record;
+  `CLAUDE.md` stays short and current; `docs/DEVELOPMENT-LOG.md` is the *readable phase story*.
+  When in doubt about current state, `CLAUDE.md` is authoritative; when you need to understand
+  *why* something is the way it is, come here.
+
+---
+
+## 6. Phase 1.5 continued — UX/data fixes pass (2026-09-14)
+
+Three issues the user found by actually using the app (not from a review — direct feedback),
+fixed together in one pass, each verified live before moving on.
+
+**1. Chart patterns were limited to a couple of shapes.** The user linked the Fidelity Investments
+chart-patterns guide and strike.money's pattern library, and was explicit: *not every pattern
+applies to every stock* — the app should detect and show only the patterns actually present on
+the current chart, with an explanation of *why* it was flagged, not a menu of every possible
+pattern. `services/patterns.py` already had the reversal family (Triple/Double Top/Bottom,
+Head & Shoulders + inverse); it gained a **trendline family**: Ascending/Descending/Symmetrical
+Triangle, Rising/Falling Wedge, Ascending/Descending Channel. Detection fits least-squares
+support/resistance lines through the two or three most recent swing highs/lows, classifies by
+each line's slope (flat/up/down) and whether the pair converges (triangle/wedge) or stays
+parallel (channel), and only returns a shape when the geometry is clean — nothing is invented to
+fill space. New pattern objects carry a `lines` field (two trendlines to draw) alongside the
+existing `points`/`neckline`; `PriceChart.jsx` draws them. Verified live on AAPL 1Y: Head &
+Shoulders + Inverse Head & Shoulders + a Rising Wedge, all three genuinely present; NVDA/TSLA/
+Nintendo (7974.T) correctly returned no patterns rather than forcing one. +2 tests
+(`test_ascending_triangle_detected`, `test_descending_channel_detected`).
+
+**2. Non-US stocks displayed as the raw ticker ID, not the company name; no news for them.**
+`services/marketdata.py`'s `_quote()` was preferring `shortName` (often ALL-CAPS or absent) over
+`longName`; switched the preference order (`longName` first) and added a `_name_from_search()`
+fallback via the existing Yahoo search endpoint for the rare case `.info` has neither. Verified:
+7974.T now shows "Nintendo Co., Ltd." The frontend headline (`Research.jsx`) was changed to lead
+with the company name and show the ticker as a small tag beside it, rather than the ticker as the
+`<h1>`. Separately, `services/news.py` gained a **Yahoo Finance news fallback**
+(`_yahoo_news()`, keyless, via `yf.Ticker(ticker).news`) used whenever Finnhub returns nothing
+(no key, or its free tier's US-only 401/403) — this is what actually fixed "no news for non-US
+listings" rather than just making the error message nicer. Verified: Nintendo went from 0 to 10
+headlines. `get_news()`'s provider dispatch tries Finnhub first, then Yahoo, so US symbols keep
+using Finnhub (richer metadata) and non-US symbols get real evidence instead of silence.
+
+**3. THE MOST IMPORTANT FIX OF THIS PASS — switching tabs (History, then back) lost all page
+state and silently re-ran the paid Claude analysis.** The user's framing, verbatim: "if I search
+on Google and swap tabs and come back to the original tab, that does not mean Google deletes
+everything and restarts the search, correct?" This was a genuine architecture gap, not a
+cosmetic one — every `/analyze` re-run spends the Claude API key for nothing. Fixed with a
+**session result cache** added to `frontend/src/api.js`: an in-memory `Map` per endpoint
+(`research`, `analyze`, `ecosystem`, `patterns`), keyed by ticker (+ params for `research`/
+`patterns`). `analyze()` checks the cache before firing a request and never re-runs a completed
+analysis for the same ticker within the session; the 7-minute auto-refresh interval explicitly
+passes `{ fresh: true }` to bypass the cache (it's supposed to re-fetch). **Verified end-to-end
+in the browser**, not just by reading code: loaded AAPL (1 `/analyze` call, confirmed via the
+backend access log), navigated to History, clicked back into AAPL — **still exactly 1 `/analyze`
+call total**, full page state (chart, AI read, news, ecosystem) restored instantly from memory.
+This is also what later became the frontend half of the Phase 1.5 "cache abstraction" backlog
+item (the backend half — `services/cache.py` — came with Ask-Claude, §8).
+
+Tests after this pass: 28 passing (was 26).
+
+**Mistakes made in this pass (recorded honestly per the dev-log rule):** (a) a stray reference
+to a non-existent `ls_markers(...)` helper was left in a `PriceChart.jsx` edit and would have
+crashed every pattern render — caught by re-reading the diff before testing, not by the test
+suite (there is no frontend test suite); (b) the backend was edited while running *without*
+`--reload`, so early edits silently had no effect until the process was restarted — this became
+recurring self-inflicted pain across later sessions too (see §17).
+
+---
+
+## 7. Prompt caching for cost control (2026-09-14)
+
+Explicit user ask: **"update my API Key usage to prompt caching method, I do not want to burn
+money."** `agents/llm.py`'s `call()` was changed to send the system prompt as a
+`cache_control: {type: "ephemeral"}` content block instead of a bare string — the system prompt
+(guardrails + JSON schema) is byte-identical on every `/analyze` call, and only the per-ticker
+data payload (which varies) sits after it in the `user` message, making it a textbook cacheable
+prefix. A second function, `call_chat()`, was added later (§8) for the same treatment on
+multi-turn conversations. Both log `cache_write`/`cache_read`/`in`/`out` token counts to the
+server console via a shared `_log_usage()` helper, specifically so cache activity can be
+confirmed from a live run rather than assumed.
+
+**The catch, caught before it shipped:** prompt caching only activates once the cached prefix
+clears a *model-specific minimum token count* — 512 for Opus 5/Fable-tier models, but **1024 for
+Sonnet 5**, which is this project's default model (`TRADE101_MODEL`). Using the free
+`messages.count_tokens` API, the `agents/analysis.py` system prompt measured **897 tokens — below
+Sonnet 5's minimum**, meaning the `cache_control` marker would have silently done nothing (no
+error, just `cache_creation_input_tokens: 0` forever) on the model the user actually runs. Fixed
+by adding a genuinely useful, stable **worked example** of the Fact/Interpretation/Unknown
+evidence-labelling rule (already a Phase 1.5 requirement, see §4.3) directly into the system
+prompt — this simultaneously improved output quality and pushed the prefix to **1306 tokens**,
+clearing the threshold. Re-verified with `count_tokens` before considering it done.
+
+**Honest scope of the saving**, stated to the user rather than oversold: caching only cuts the
+*input* cost of the repeated system prompt across calls within the cache's ~5-minute window; it
+does nothing for output tokens or the varying per-ticker payload. The bigger savings levers
+already in place are the frontend session cache (§6, eliminates repeat `/analyze` calls
+entirely — the largest lever) and the evidence relevance filter (§4.3, fewer news tokens sent to
+the model at all). `effort="high"` on the analysis call was deliberately left unchanged to
+protect answer quality; lowering it remains an available lever if the user wants to squeeze
+further, not applied without being asked.
+
+Verified live in production use later (§8): a 2-turn Ask-Claude conversation showed turn 1
+`cache_write=1693, cache_read=0` and turn 2 `cache_write=0, cache_read=1693` — the entire
+1693-token context served from cache on the second call, confirming the mechanism actually works
+end to end, not just in theory.
+
+---
+
+## 8. Phase 2, feature 1 — Ask-Claude chat (2026-09-14)
+
+The first Phase 2 feature (the UI already had a reserved seam for it). A conversational tutor
+over ONE stock's research bundle, sharing every guardrail with the `/analyze` narration: exact
+numbers only, cite what it leans on, teach the reasoning, never buy/sell/hold, and (per the
+Phase 1.5 rule) never assert a company-specific catalyst when no company-specific news exists.
+
+**Backend architecture.** `agents/orchestrator.py`'s single `analyze()` function was split so
+`gather()` — the deterministic data-collection half (market data, indicators, relevance-filtered
+news/filings, sourcing report) — is now shared between the AI narration path and a new chat
+path, rather than duplicated. New `agents/chat.py` renders that shared bundle into a system
+prompt (guardrails text + the ticker's exact data as JSON) and drives the conversation through
+`messages`; `llm.call_chat()` sends it with the same `cache_control` treatment as §7. New
+endpoint `POST /ask/{ticker}` (body: `{question, history}`) degrades gracefully exactly like
+`/analyze` (`MissingKeyError` → `available:false`; any other exception scrubbed through
+`redact_secrets` before it reaches the client) and uses `effort="medium"` rather than `"high"`
+to keep per-question cost down, since chat answers are shorter and less analytically demanding
+than the full momentum read.
+
+**New caching layer — `services/cache.py`.** A tiny in-memory TTL cache (5-minute default,
+matching the Claude prompt-cache window) memoising `orchestrator.gather()` by ticker. Two
+purposes: chat turns on the same stock don't re-fetch market data/news, and — critically — the
+data bundle stays *byte-identical* across turns, which is what actually lets the Claude-side
+prompt cache hit (a re-fetch could return marginally different numbers on a live-refreshing
+market and silently break the cache). This is also the backend half of the Phase 1.5
+"cache abstraction" item that the frontend session cache (§6) started.
+
+**Frontend, first version.** `components/AskClaude.jsx` initially rendered as a card inside the
+research page's self-balancing masonry layout, with three starter-question chips, a message
+list, and a footer note ("each question makes one Claude call — educational only"). Per-ticker
+conversation threads were kept in a module-level JS object so switching tabs and returning
+(the exact problem from §6) restores the conversation too, not just the research data.
+
+**Verified live, twice, deliberately:** the feature was tested end-to-end in the browser with a
+real question ("What is the RSI telling us here, in one short paragraph?") on AAPL, which
+correctly answered using the exact RSI/SMA figures shown on the page; then a second follow-up
+turn ("And what does MACD add to that picture?") confirmed the prompt-cache hit described in §7.
+
+**Mistake made in this pass, and the recurring one it exposed:** `POST /ask` returned a
+persistent 404 even though a fresh `import app` in a Python shell showed the route registered
+correctly. Root cause: multiple `uvicorn --reload` backend processes had been started across
+earlier turns in this session, and Windows lets more than one process bind the same listening
+socket — requests were round-robining to a *stale* worker process that predated the new route.
+Killing a `--reload` worker's PID doesn't fix this, because its reloader parent immediately
+respawns a replacement. The actual fix was to enumerate all Python processes by command line
+(`Get-CimInstance Win32_Process`), identify the orphaned `multiprocessing.spawn` workers
+specifically (carefully avoiding the unrelated `yfinance-mcp` MCP-server Python processes, which
+must keep running), kill exactly those, confirm the port was genuinely free
+(`Get-NetTCPConnection -LocalPort 8000`), and only then start one clean backend. **This exact
+failure mode recurred at least twice more later in the session** (§9, §10) before the standing
+practice changed to running the local verification backend *without* `--reload` at all when
+doing a quick check, precisely to avoid spawning extra worker processes. Documented as a
+permanent Gotcha in `CLAUDE.md`.
+
+Tests after this pass: unaffected (no new backend tests added in this specific increment beyond
+what §6 already covered functionally); functional verification was via the live browser session.
+
+---
+
+## 9. Ask-Claude → floating chatbot widget, and non-US sourcing free tier (2026-09-14)
+
+Two separate user requests handled together.
+
+**Request 1 — turn Ask-Claude into a real chatbot widget.** The user's framing: "the ask claude
+part is a bot option, just like how we have a new chat bot in any website," and attached a
+screenshot of a generic website chat-widget builder (a bubble bottom-right that opens an
+overlay panel over the page). `AskClaude.jsx` was rewritten: removed entirely from the masonry's
+`FLOW` array, and rendered instead as a fixed-position launcher button (`.askbubble-btn`,
+bottom-right, "✦ Ask Claude") that toggles an overlay panel (`.askpanel`, `position: fixed`,
+with its own header/close button, message list, starters, and input) — the panel sits *on top
+of* the research page rather than occupying grid space in it. Per-ticker threads and the
+prompt-cached backend were carried over unchanged. Verified visually in the browser: the bubble
+renders correctly and the panel opens as an overlay, matching the reference screenshot's
+behaviour.
+
+**Request 2 — non-US sourcing, deterministic/free tier only.** Before building, the user was
+explicitly asked (via a structured choice) whether to spend on a paid scraping provider
+(Firecrawl) now or stay free — the answer was **free now, paid tier deferred to after full
+deployment**. The standout remaining non-US gap (beyond the news fix in §6) was **beta**: neither
+yfinance's `.info` nor Finnhub publishes a beta value for most non-US symbols, so the Ecosystem
+panel showed a blank. `services/company.py` gained `_computed_beta()`: a deterministic
+regression of ~1 year of the stock's daily returns against its **regional market index**,
+selected via a ticker-suffix → index map (`.T` → Nikkei 225 `^N225`, `.KS` → KOSPI `^KS11`, `.NS`
+→ Nifty 50 `^NSEI`, `.HK` → Hang Seng `^HSI`, `.DE` → DAX, `.L` → FTSE 100, and similar entries
+for ~15 exchanges; no-suffix/US tickers default to the S&P 500 `^GSPC`). Used only as a fallback
+when the provider has no beta; the response carries `betaSource` (`"provider"` vs `"computed"`)
+and `betaIndex` (which index was used) so the frontend can be transparent about it rather than
+presenting a computed figure as if it were sourced data — the Ecosystem panel renders a small
+note ("Computed by Trade Craft from ~1y of daily returns vs the Nikkei 225…") whenever
+`betaSource === "computed"`. Verified live: 7974.T (Nintendo) → beta 0.079 vs Nikkei 225,
+computed; AAPL unaffected, still shows its provider beta 1.085. Non-US **peers** remain gapped —
+that is explicitly left for the Firecrawl/Exa work, not attempted with free tooling.
+
+**The zombie-backend problem recurred exactly as in §8** — computed beta worked correctly when
+called directly in a Python shell but the live `/ecosystem` endpoint kept returning `null` from
+a stale worker. Same diagnosis, same fix (enumerate and kill orphaned `multiprocessing.spawn`
+uvicorn workers, sparing the MCP processes, confirm the port is clear, start exactly one clean
+backend — this time explicitly **without** `--reload** for the verification instance, to stop
+generating more of the problem while testing).
+
+---
+
+## 10. Phase 2 — Comparison tab, twice (2026-09-14 build, 2026-09-14/15 fix)
+
+**Initial build.** New `components/Compare.jsx` (a new `App.jsx` view, `'compare'`) and
+`components/ComparisonChart.jsx`. Two independent "slots," each with its own search input, load
+two stocks side by side: a shared-timeframe (1Y/1M) normalized price chart (both series rebased
+to 100 at the window start, so the comparison is of **percentage moves**, not absolute price
+levels — deliberately colored teal/amber rather than green/red so no "good/bad" judgement is
+implied by color), plus a metrics table reusing the exact same `lessons.js` value-formatting
+functions (`METRICS`, `metricValue`, `metricLabel`) the single-stock Research view uses, so the
+numbers are guaranteed to match rather than being recomputed separately. Rows: price, change%,
+RSI, MACD, SMA50/200, Bollinger, volume-vs-20d, beta, sector, market cap. "Open full research"
+chips jump either stock into the normal single-stock view. The whole tab intentionally uses only
+`/research` and `/ecosystem` — **no `/analyze` call, zero Claude spend** to use Comparison at
+all. The previously-dead "Comparison" tab links across `Research.jsx`, `History.jsx`, and the
+Welcome-page rail were wired to this view; Welcome's "soon" label on the Comparison rail item was
+removed. Verified live with Apple vs Microsoft: chart renders correctly (Apple +141 vs Microsoft
++98.59 over the window, screenshotted), full metrics table populated correctly for both.
+
+**The bug the user found next.** The initial slot loader took the **first** result from
+`/search` without disambiguation and just used it. This looked fine with "apple"/"microsoft"
+(both resolve unambiguously to their top hit) and shipped that way — then the user tried
+"Samsung," which is genuinely ambiguous across 005930.KS (Korea, the real listing), SSNLF (OTC
+ADR), SMSN.IL (London), a Frankfurt listing, and more, and got **"Failed to fetch."** Two
+separate problems were found chasing this down:
+
+1. **Missing search parity** — `Compare.jsx` needed the *same* name→symbol disambiguation flow
+   the main Research search bar already had: type a name, and if `/search` returns more than one
+   plausible match, show a "Did you mean…" candidate list (symbol · full name · exchange) and let
+   the user pick, rather than silently guessing. `useSlot()`'s API was changed to take an
+   already-resolved symbol; the resolve/disambiguate logic moved into the component with
+   per-slot `cands`/`busy` state, mirroring `App.jsx`'s existing `submitQuery()` pattern exactly.
+   Verified live: typing "samsung" now correctly lists all five candidates found above.
+
+2. **A latent, unrelated backend crash, only surfaced by trying an actual ambiguous non-US
+   symbol.** Picking `005930.KS` from the candidate list still failed — this time the real API
+   call `/research/005930.KS` was returning HTTP **500**, with the server log showing
+   `ValueError: Out of range float values are not JSON compliant: nan`. A bad holiday/partial
+   OHLC bar in the raw Yahoo data for that symbol contained a NaN, and while
+   `services/indicators.py` was already NaN-safe (its `_num()` helper converts NaN/inf to
+   `None`), the **raw OHLCV list** returned by `/research` was not — FastAPI's JSON encoder
+   cannot serialize a bare `nan`. Fixed at the true source, `services/marketdata.py::get()`:
+   `hist.dropna(subset=["Open","High","Low","Close"])` plus `Volume.fillna(0)` immediately after
+   the yfinance fetch, so **every** downstream consumer (`/research`, `/patterns`, `/analyze`,
+   the Comparison tab) is protected, not just the one caller that happened to trip over it.
+   Verified: `005930.KS` now returns 200; AAPL/7974.T unaffected; the full 29-test suite still
+   passes.
+
+**Explicit self-noted lesson:** the tab shipped with the disambiguation gap because the only
+manual test used two clean, unambiguous US tickers — the happy path hid both the missing-picker
+UX gap and the NaN crash simultaneously. Recorded as a standing testing habit going forward: a
+new search-driven feature should be smoke-tested with at least one genuinely ambiguous / non-US
+query, not just clean US names.
+
+---
+
+## 11. Phase 2 — real logo, ecosystem node graph, and the Trade Craft rebrand (2026-09-14/15)
+
+**Real logo, v1 (still under the "Trade101" brand).** The original design spec (§3.2) described
+an isometric "data cube" mark; `Logo.jsx` had been a rough placeholder pending "Phase 2, needs an
+OpenRouter key." Rather than spend on image generation, a proper isometric-cube mark was
+hand-authored directly as SVG: three shaded cube faces, an ascending teal bar-chart clipped to
+the right face, a green up-candlestick on the left face — matching the original spec's intent, at
+zero cost and infinitely scalable. Verified in the header and Welcome page.
+
+**Ecosystem node graph.** The peers list (`Ecosystem.jsx`) had been a flat row of ticker chips.
+Replaced with `EcoGraph`, a small inline SVG radial layout: the current company sits at the
+center as a highlighted node, up to 8 peer tickers are arranged evenly around it on a ring
+connected by edges, and every node (including the center) is clickable to jump research to it.
+Falls back to the existing plain-text coverage explanation when peers are unavailable (the usual
+non-US case). Explicitly scoped as v1 — a fuller *sourced* supply-chain graph with typed edges
+(supplier/customer/competitor/etc.) and public/private distinction remains a later idea, not
+attempted here.
+
+**The rebrand — Trade101 → Trade Craft (2026-09-15).** The user supplied a full, detailed SVG
+specification for a new brand mark ("Trade Craft" — a 3D-styled growth-spiral ribbon in a
+lime-green→cyan-teal gradient, spiraling from bottom-left to a sharp arrowhead top-right,
+wrapping an implied cylinder for depth, with 4–5 small currency-symbol nodes ($, €, ¥) along the
+ribbon, and a 3-bar ascending mini bar-chart nested in the top loop) along with a reference
+screenshot of a similar "Growth Spiral" icon. `Logo.jsx` was rewritten a second time to this new
+spec (SVG gradients via `<linearGradient>`, layered ribbon paths for the wrapped/3D feel, the
+arrowhead polygon, the nested bar-chart rectangles, and three small currency-node circles/text).
+The brand string "Trade101" was replaced with "Trade Craft" everywhere user-facing — page
+`<title>`, every component header, Welcome-page hero text, the AI-narration and Ask-Claude system
+prompts (`agents/analysis.py`, `agents/chat.py`, so the model refers to itself correctly), and
+copy strings in `NewsPanel.jsx`/`Ecosystem.jsx`. **Explicitly scoped out:** the GitHub repo name,
+local folder name, and internal Python package/module names all stay `trade101` — renaming those
+was judged out of scope and needlessly risky for a purely cosmetic brand change. In the same
+pass, the color palette (`styles.css` `:root`) was deepened per the user's request ("change the
+colour palette to a darker shade entirely... maybe you can go with deep navy"): background moved
+from `#0E1A26` to `#070E1A`, and the ink/text color brightened from `#EAF1F6` to a warmer
+cream-white `#F4F1E9`, with teal/green accents nudged slightly brighter so they still read
+clearly against the darker ground. Verified visually on the Welcome page (screenshotted): new
+logo, "Trade Craft" branding, and the deeper navy theme all rendering correctly together.
+
+With this, Phase 2's build items were essentially complete, leaving only the two items the user
+had explicitly deferred to **after full deployment**: the paid Firecrawl/Exa non-US provider, and
+deploying a public/shareable URL.
+
+---
+
+## 12. Phase 3 — Watchlist (2026-09-15)
+
+First Phase 3 feature. New `lib/watchlist.js` (localStorage-backed, structurally mirroring the
+existing `lib/history.js`) and `components/Watchlist.jsx`. A ☆/★ **Watch** toggle button was
+added to the Research page header; toggling it adds/removes the current ticker from the
+watchlist. The Watchlist view itself lists every tracked company with a **live** price and
+change%, fetched via `/research` per name (deterministic — **no Claude spend** to view or
+maintain the watchlist) and a remove (✕) button per row. New `App.jsx` view `'watchlist'`, with
+its tab added consistently across Research, Compare, History, and the Welcome-page rail (this
+pass also fixed a pre-existing bug where `History.jsx`'s own "Comparison" tab link went to
+`'home'` instead of `'compare'`). Deliberately framed in its own copy as a **study/tracking
+list**, not a trading tool: "companies you're tracking · information, not trade prompts" — no
+positions, no P&L, no buy/sell signal of any kind, consistent with the app's north star.
+Verified live by seeding three tickers (AAPL, MSFT, 7974.T) directly into `localStorage` via the
+browser, confirming all three rendered with correct live quotes (Apple $334.17 +0.57%, Microsoft
+$505.37 +1.97%, Nintendo ¥8268 +3.49%), then clearing the seeded test data afterward so the
+user's actual watchlist starts empty.
+
+---
+
+## 13. Desktop packaging → the "shareable link" clarification (2026-09-15)
+
+The user asked to "start desktop packaging" as the next Phase 3 item. Before writing any code,
+the environment was checked: Node 24 present, but **no Rust toolchain** (required for Tauri) and
+**no PyInstaller** (needed to bundle the Python backend into a standalone executable for
+Electron too). Both desktop-packaging paths would have required non-trivial new tooling.
+
+Before committing to either, the user was asked a structured clarifying question about how far
+to take desktop packaging — and their answer ("I am testing and building locally but I will be
+pushing and creating a shareable link of it so I am not sure what to use?") revealed that the
+actual goal was **not** a desktop app at all. This was surfaced explicitly rather than just
+proceeding: **a desktop app (Electron/Tauri) produces a downloadable installer** that someone
+runs on their own machine; **a shareable link is a web deployment** that produces a URL anyone
+opens in a browser — they are different delivery channels, and desktop packaging does not
+produce a link. A second structured question confirmed the pivot: the user chose to prioritize
+the web deploy (the actual "shareable link" goal) and park desktop packaging.
+
+**Why the web deploy is unambiguously the more efficient choice here**, as explained to the
+user: it works on any device with no install, updates are instant on every push, and — most
+importantly for this stack — it entirely sidesteps the hardest part of desktop packaging, which
+is bundling the Python/FastAPI backend into a native binary (PyInstaller with `pandas`/`scipy`/
+`yfinance`/`anthropic` is notoriously finicky and produces large builds). Desktop packaging
+remains parked in the backlog, not abandoned, should the user want a native app later once Rust
+or PyInstaller tooling is set up.
+
+**One important tradeoff surfaced proactively, not left implicit:** a *public* deploy URL means
+every visitor's `/analyze` and `/ask` calls spend the **owner's** Claude API key — there is
+currently no per-visitor authentication or rate-limiting. This became the seed of the pre-share
+requirement formalized in §16.
+
+---
+
+## 14. Single-service deploy setup, and the repo made private (2026-09-15)
+
+Given the pivot in §13, the most efficient deploy architecture was chosen and built: **one
+service**, not two. `backend/app.py` was changed to mount the built React app
+(`frontend/dist`, via `StaticFiles(html=True)`) as a catch-all route registered **after** every
+API route, so a single process serves both the API and the UI from one origin — no CORS
+configuration needed in production, and only one thing to deploy. `frontend/src/api.js`'s base
+URL was made environment-aware: `import.meta.env.DEV` still points at `http://127.0.0.1:8000`
+during local development (where Vite and the backend run as two separate processes), but the
+production build uses a same-origin relative base, since in production they're the same
+process. This required **no changes to any individual API call** — only the one shared `BASE`
+constant.
+
+A multi-stage `Dockerfile` was added at the repo root (stage 1: Node image builds the frontend;
+stage 2: a slim Python image installs backend requirements and copies in both the backend source
+and the stage-1 build output), plus `.dockerignore`, and a new `docs/DEPLOY.md` walking through
+deploying it on Render (chosen as the simplest free host that auto-detects a Dockerfile) —
+including the two environment variables that must be set on the host (`TRADE101_ANALYSIS_KEY`,
+`TRADE101_NEWS_KEY`) and an explicit note that `PORT` must be left to the host to set. All of
+this was **verified locally before considering it done**: `npm run build` was run for real,
+producing an actual `dist/` folder; the backend was restarted to pick it up; then `curl` checks
+confirmed `/health` (API) and `/` (built HTML, correct `<title>Trade Craft</title>`) and a static
+asset all served correctly from the same `:8000` origin, and that ordinary API routes
+(`/search`, `/research/AAPL`) still worked unaffected by the new catch-all mount.
+
+**Per the user's explicit instruction, the GitHub repository was switched from public to
+private** (`gh repo edit pranavlakshminarayan/trade101 --visibility private
+--accept-visibility-change-consequences`), confirmed via `gh repo view`. This is a standing
+state, not a one-off — do not make the repo public again unless specifically asked to.
+
+The user was also told plainly what remains a step only they can take: actually creating the
+live deployment requires signing into a hosting account (Render or similar) with their own
+credentials and connecting the repository — that action cannot be performed on their behalf.
+Once they have a live URL, the plan is to add it to the repository's GitHub "About" field or the
+README.
+
+---
+
+## 15. A free no-Docker deploy alternative — Render native runtime (2026-09-15)
+
+The user asked for a free alternative to Docker for the same deploy. Because §14's single-service
+design lives entirely in `app.py` (mounting the built frontend) rather than in the Dockerfile,
+switching *how* the service is built required **zero application code changes** — Docker had
+only ever been one way to produce the build, not a structural requirement. Render's own build
+image already includes both Node and Python regardless of which "runtime" a service declares, so
+a plain Python web service can run the frontend's `npm install && npm run build` as its build
+step and then `pip install -r requirements.txt`, with no container involved at all.
+
+Added `render.yaml` at the repo root — a Render "Blueprint" declaring `runtime: python`, the
+combined build command described above, a `startCommand` running uvicorn on Render's `$PORT`, a
+`/health` health-check path, the free instance plan, and placeholder slots for the two API-key
+environment variables (left `sync: false` so Render prompts for them rather than committing
+secrets). `docs/DEPLOY.md` was restructured into **Option A (no Docker, recommended — the new
+Blueprint path)** and **Option B (Docker, kept for hosts that specifically want a container)**,
+both documented with equivalent step-by-step instructions. Verified before committing anything:
+`frontend/dist` was deleted and rebuilt completely from scratch (`rm -rf frontend/dist && npm
+install && npm run build`) — exactly the sequence Render's Blueprint build command performs —
+and it succeeded cleanly; the already-running backend was then reconfirmed to serve the freshly
+rebuilt output correctly at `:8000`.
+
+The `Dockerfile` from §14 was kept in the repo rather than removed, since it remains useful for
+any host that specifically expects a container (Fly.io, Railway, etc.) or if the user simply
+prefers Docker later.
+
+---
+
+## 16. ⚠️ Pre-share requirement — READ BEFORE SHARING THE DEPLOY URL WITH ANYONE
+
+**This is a standing, unresolved item, explicitly requested by the user to be tracked and
+re-surfaced.** Verbatim from the user: *"remind me at the end of phase 3 execution to fix this
+bug and only then i can share the details."*
+
+**The bug:** `/analyze` and `/ask` currently have **no authentication and no rate-limiting**.
+Every call to either endpoint spends the **owner's** Claude API key. On a private, personal-only
+URL this is fine — but the moment the URL is shared with even one other person, that person (or
+anyone they forward it to) can trigger unlimited paid Claude calls against the owner's account
+with zero friction or cost cap.
+
+**What needs to happen before the URL is ever shared, in some combination:**
+- A shared password or access-token gate in front of the app (simplest: a single shared secret
+  checked before serving `/ask`/`/analyze`, or in front of the whole app).
+- Rate-limiting or a hard per-day/per-IP cap specifically on `/analyze` and `/ask`.
+- A spend cap configured directly on the Claude API key in the Anthropic console, as a backstop.
+
+**Where this is tracked, so it survives context resets:** a "Pre-share checklist" section at the
+top of `BACKLOG.md` (marked as a blocker, explicitly instructing "remind Pranav at the END of
+Phase 3 execution"); a `⚠️ PRE-SHARE BUG` callout in `CLAUDE.md`'s header; and a dedicated
+persistent memory file (`trading_idea_preshare_reminder.md`, outside this repo, in Claude's
+own cross-session memory) so the reminder survives even a full conversation reset, not only a
+repo-level check. **Do not treat any deploy URL as shareable, and proactively raise this again
+when Phase 3's remaining items (§17) are wrapping up, without waiting to be asked.**
+
+---
+
+## 17. Cross-cutting lesson — the recurring zombie-backend-process problem
+
+Worth its own section because it recurred at least three separate times across this session
+(§8, §9, and again during §15's verification) and cost real debugging time each occurrence, so a
+future session should recognize the *symptom* immediately rather than re-diagnosing it from
+scratch. **Symptom:** a newly added/changed backend route or behavior appears to not exist or
+not take effect when hit over HTTP (a 404 for a route that clearly exists in the source, or stale
+data from a fix that was clearly applied) — **but** a fresh `python -c "import app; ..."` in a
+new shell shows the code is correct. **Root cause:** on Windows, starting `uvicorn --reload`
+multiple times across a session (e.g. restarting after every edit, or after this conversation's
+context was compacted/resumed) can leave orphaned `multiprocessing.spawn` worker processes still
+bound to and listening on the same port; new HTTP requests can land on a stale worker rather than
+the most recently started one. **Why the obvious fix doesn't work:** killing a `--reload`
+worker's specific PID doesn't help, because its reloader *parent* process notices the worker died
+and immediately spawns a fresh replacement — you have to find and kill the actual orphaned
+worker processes, not just "the backend." **The reliable fix, every time:** enumerate all Python
+processes with their full command lines (`Get-CimInstance Win32_Process | Where-Object {
+$_.CommandLine -match 'uvicorn|multiprocessing.spawn' }`), carefully exclude the *unrelated*
+`yfinance-mcp` MCP-server Python processes (a completely different, legitimate long-running
+service that must not be touched), kill exactly the orphaned uvicorn-related ones, confirm with
+`Get-NetTCPConnection -LocalPort 8000 -State Listen` that the port is genuinely empty, and only
+then start one single clean backend process. **Standing practice adopted as a result:** for quick
+local verification checks (not active development), start the backend **without** `--reload` at
+all, since a single non-reloading process cannot accumulate this problem — `--reload` is worth
+the convenience only during active multi-edit development, not for a one-off verification. This
+is now documented as a permanent Gotcha in `CLAUDE.md` so it isn't rediscovered a fourth time.
+
+---
+
+## 18. Current state & how to run (updated from §4, 2026-09-15)
+
+**Local development** (unchanged in shape from §4, still two terminals):
+```
+# backend, from backend/
+.venv/Scripts/python.exe -m uvicorn app:app --reload --port 8000
+# frontend, from frontend/
+npm run dev
+```
+Open `http://127.0.0.1:5173` for the dev experience (hot-reloading Vite frontend calling the
+`:8000` API directly), **or** run `npm run build` in `frontend/` and hit `http://127.0.0.1:8000`
+directly to exercise the exact single-service production configuration locally before deploying.
+`.env` in the project root still needs `TRADE101_ANALYSIS_KEY` and `TRADE101_NEWS_KEY` for the
+AI/news features; everything else (chart, indicators, patterns, Comparison, Watchlist) works
+without any key. Tests: `cd backend && .venv/Scripts/python.exe -m pytest -q` — **29 passing** as
+of the end of this session's work (started at 16 in §4).
+
+**Deploying for real** (the user's own remaining step): pick Option A (no Docker, `render.yaml`,
+recommended) or Option B (Docker) from `docs/DEPLOY.md`, sign into a host with the user's own
+account, connect the (private) GitHub repo, set the two API-key environment variables, deploy.
+**Then stop — do not share the resulting URL with anyone until §16's pre-share fix is done.**
+
+---
+
+## 19. What's next — remaining Phase 3, and the deferred items
+
+**Remaining, explicitly Phase 3 (user to prioritize next):**
+- Desktop packaging (parked in §13; would need the Rust toolchain for Tauri or PyInstaller for
+  an Electron+Python bundle — neither installed as of this writing).
+- More markets fully supported end-to-end (tuned data + news adapters per target exchange).
+- An optional simulated *practice lab* — explicitly to be kept **separate** from the main
+  learning flow (delayed/hypothetical, reflection-focused), per the original Phase-2
+  recommendations review; not yet started.
+- Accessibility / keyboard-navigation / responsive polish — not yet started.
+
+**Explicitly deferred by the user, to be picked up only when asked:**
+- The **paid** Firecrawl/Exa non-US sourcing tier (deferred "until after full deployment").
+- Actually going live with the deploy (needs the user's host-account signup, §14/§15).
+- **The pre-share endpoint-guard fix (§16) — this is a blocker, not just a "later," and must be
+  raised again proactively as Phase 3 wraps up, before any link is shared with anyone.**
+
+**North-star reminder, unchanged since §0:** the app describes and teaches; it never gives
+buy/sell advice or price targets; numbers are exact (deterministic code); every AI claim is
+sourced, and an unreachable source is disclosed rather than papered over.
