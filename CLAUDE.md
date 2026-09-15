@@ -12,6 +12,15 @@
 > owner's Claude key with no auth/rate-limit — a public visitor could run up the bill. Fine while
 > the URL is private/personal. **User asked to be reminded at the END of Phase 3 to fix this**
 > (password/token gate + rate-limit/cap) before distributing. Tracked in `BACKLOG.md` → Pre-share.
+> **STATUS 2026-09-16: the fix is WRITTEN but NOT ON `master`** — `services/access.py` (token
+> header + UTC daily cap) sits on the unmerged, unpushed branch `claude/trading-idea-phase-3-297572`.
+> Merge it before deploying. Target audience confirmed as **private link for the user + a few
+> friends**, so the shared-token + cap design is the right level.
+>
+> **📋 CRITICAL AUDIT (2026-09-16): [`docs/AUDIT.md`](docs/AUDIT.md)** — adversarial end-to-end review
+> (functional / logical / executional / UI-UX), 30+ ranked findings with reproductions and a
+> wave-by-wave fix order. Read it before planning new work; its Wave 0/1 items are mirrored in
+> `BACKLOG.md` and in "Known bugs" below.
 
 Auto-loaded each session in this folder. **This file is the project's living memory** — treat
 it as more current than your own assumptions, and keep it that way (see Memory protocol
@@ -82,7 +91,11 @@ non-US scraping. Full rationale: `docs/trade101-phase-2-recommendations.md`.
 green→teal ribbon + arrow + bar chart + $/€/¥ nodes), deep-navy theme (`styles.css` `:root`),
 brand string updated everywhere user-facing incl. the AI prompts. See `docs/HANDOVER.md` §11.
 
-**Phase 3 — started** (2026-09-15). Done: **Watchlist** — `components/Watchlist.jsx` +
+**Phase 3 — partly on `master`, partly stranded** (2026-09-15/16). ⚠️ A commit titled "Complete
+Phase 3" (`8d80ef9` on `claude/trading-idea-phase-3-297572`) adds the access guard, Google-News
+fallback, `lib/currency.js`, the Practice Lab and accessibility fixes — but it is **unmerged and
+unpushed**, so none of it is in `master` or on GitHub. Treat Phase 3 as *incomplete* until that
+branch is merged. On `master` today: **Watchlist** — `components/Watchlist.jsx` +
 `lib/watchlist.js` (localStorage; ☆ Watch toggle on the research header; a `watchlist` view with
 live quotes via `/research`, framed as tracking, not trade prompts). App views are now
 `home | compare | watchlist | history`. Also done as part of Phase 3: **single-service deploy is
@@ -170,7 +183,27 @@ sharing it** until the pre-share fix in the header above is done (`BACKLOG.md` �
 - Windows 11, Git Bash available; the `claude` CLI is at `C:\Users\prana\.local\bin\claude.exe`.
 
 ## Known bugs
-- _(none open right now.)_
+**Full ranked list with evidence: [`docs/AUDIT.md`](docs/AUDIT.md) (critical audit, 2026-09-16).**
+Mirrored as checkboxes in `BACKLOG.md` → "Audit — Wave 0/1". Open criticals:
+
+- **Phase 3 work is stranded off `master`** — branch `claude/trading-idea-phase-3-297572`
+  (`8d80ef9`, 24 files, +1256) holds the pre-share access guard (`services/access.py`), the
+  Google-News fallback, `lib/currency.js`, the Practice Lab and accessibility fixes. **Unmerged
+  AND unpushed** (worktree-only). Merge + push before anything else.
+- **Market cap rendered as USD for every listing** (`Ecosystem.jsx:4` hardcodes `$`) — Nintendo
+  displays `$9.36T` (really ¥9.36T ≈ $63B) vs Apple `$4.81T`. Breaks "numbers are exact". ✅ verified
+- **`above_sma50/200` returns `false` for *unknown*** (`indicators.py:108`) and that false is sent
+  to Claude as exact data — the deterministic layer feeding the model a wrong fact. ✅ verified
+- **Search auto-picks on a name/ticker collision** (`App.jsx:56`) — typing "Sony" silently opens the
+  NYSE ADR, never offering Tokyo. Ranking also puts ADR/OTC above primary listings. ✅ verified
+- **News only reaches the UI via the paid `/analyze` call** (`NewsPanel.jsx:8`) — no key, an AI
+  error, or the daily cap means no headlines at all.
+- **Chart is destroyed/rebuilt on every parent render** (`Research.jsx:170` passes a fresh array
+  literal) — typing in the header search rebuilds it per keystroke; auto-refresh resets zoom.
+- **Pattern detector only inspects the last 3 swings** and can return at most one reversal + one
+  trendline shape; its double-top branch rejects the textbook case.
+- **Not shareable as written** — `Welcome.jsx:26` hardcodes "Pranav"; `news.py:23` sends a personal
+  email as the SEC User-Agent.
 
 ### Fixed 2026-09-14/15 (Comparison tab — see `docs/HANDOVER.md` §10)
 - ~~Comparison pickers took the first search match blindly~~ (e.g. "samsung" → wrong/failed

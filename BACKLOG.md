@@ -2,6 +2,10 @@
 
 A running list so we don't lose ideas. Add freely; we pull from here after the MVP.
 
+> **📋 Full critical audit (2026-09-16): [`docs/AUDIT.md`](docs/AUDIT.md)** — adversarial review of
+> the whole app (functional / logical / executional / UI-UX), 30+ ranked findings with a wave-by-wave
+> fix order. The "Audit — Wave 0/1" sections below are pulled from it; the audit is the detail.
+
 **North-star principle (applies to every phase):** Trade Craft must **extract data and make sense of it** — interpret, connect, and *teach understanding* — not just display labels. Reading a number is something you could do by hand; the app's job is to help you *understand* what the data means, together.
 
 ---
@@ -11,6 +15,51 @@ A running list so we don't lose ideas. Add freely; we pull from here after the M
 - [x] **M3 AI narration** — momentum read + news Feed + "What it means" inference (sense-making, sourced). News via **Finnhub (free) + SEC EDGAR**.
 - [x] M4 patterns (magnifier) + ecosystem + index/beta + references + history
 - [x] M5 resilience + tests + the "surprise-ticker" true test
+
+---
+
+## Audit — Wave 0: critical, do first (from `docs/AUDIT.md`, 2026-09-16)
+
+- [ ] **C3 — Phase 3 work is stranded off `master`.** Branch `claude/trading-idea-phase-3-297572`
+  (commit `8d80ef9`, 24 files, +1256) holds the **pre-share access guard** (`services/access.py`),
+  the Google-News fallback, `lib/currency.js`, the Practice Lab and accessibility fixes. It is
+  **unmerged and unpushed** — local-worktree-only. Review, merge, push, then reconcile the status
+  in `CLAUDE.md` + this file.
+- [ ] **C1 — Market cap is rendered as USD for every listing.** `Ecosystem.jsx:4` hardcodes `$`, so
+  Nintendo shows **`$9.36T`** (really ¥9.36T ≈ $63B) against Apple's `$4.81T`. Breaks the
+  "numbers are exact" north star on screen. Format with the listing's own currency.
+- [ ] **C2 — `above_sma50/200` reports `false` when the average is unknown**
+  (`indicators.py:108`), and that false is sent to Claude as exact data. Make it tri-state
+  (`True|False|None`) and teach the agent prompt to read `null` as unknown.
+- [ ] **C4 — `/analyze` + `/ask` unauthenticated/uncapped on `master`** — resolved by the C3 merge.
+- [ ] **M8** — news items with no URL render `href="#"`, which resets the hash route and kicks the
+  user back to the home screen. **M9** — add a React error boundary.
+
+## Audit — Wave 1: the four flaws the user named
+
+- [ ] **H1 — Search silently auto-picks on a name/ticker collision.** `App.jsx:56` skips the picker
+  when the query equals the top candidate's symbol, so **"Sony" opens the NYSE ADR** and never
+  offers Tokyo (`6758.T`). Verified.
+- [ ] **H2 — Candidate ranking favours ADR/OTC/CDR over the primary listing.** "nintendo" ranks
+  `NTDOY` (OTC) above `7974.T`; "toyota" ranks `TM` above `7203.T`. Rank by listing class, group by
+  country, badge `ADR`/`OTC`/`CDR`/`Pref`.
+- [ ] **H3 — News is gated behind the paid AI call.** `NewsPanel` reads only from `/analyze`, so no
+  Claude key / an AI error / the daily cap ⇒ **no headlines at all**, and the feed waits on the full
+  model call. Add a free `GET /news/{ticker}` (gather() already computes it, TTL-cached).
+- [ ] **H4 — The chart is destroyed and rebuilt on every parent render** — a new `[]` literal in the
+  `patterns` prop (`Research.jsx:170`) invalidates the effect, so typing in the header search
+  rebuilds the chart per keystroke and auto-refresh discards zoom/pan.
+- [ ] **H5 — No indicators are drawn on the chart.** SMA/Bollinger/RSI/MACD are computed and
+  explained but never plotted. Upgrade `lightweight-charts` v4.2 → **v5** for sub-panes, add
+  overlays + a crosshair OHLC legend. (Not the TradingView embed — it can't draw our pattern overlays.)
+- [ ] **H6 — Pattern detection is structurally limited.** Only the last 3 swings are examined; ≤1
+  reversal + ≤1 trendline is ever returned; the double-top branch requires a *higher* prior peak so
+  it rejects the textbook case; detection runs on closes, not highs/lows; confidence is a hardcoded
+  string. Rewrite: full-series scan, all matches, real fit scores, grouped Reversal/Continuation/Trendline.
+- [ ] **H7 — Not shareable as written:** `Welcome.jsx:26` hardcodes "Pranav"; `news.py:23` sends a
+  personal email as the SEC User-Agent.
+- [ ] **H8 — Currency symbols cover only INR + USD**, duplicated in three files (`lib/currency.js`
+  on the unmerged branch fixes this).
 
 ---
 
