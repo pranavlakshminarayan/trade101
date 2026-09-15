@@ -10,7 +10,7 @@ from __future__ import annotations
 from pathlib import Path
 
 from dotenv import load_dotenv
-from fastapi import FastAPI, HTTPException
+from fastapi import Depends, FastAPI, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel
 
@@ -20,6 +20,7 @@ load_dotenv(Path(__file__).resolve().parent.parent / ".env")
 
 from agents import llm, orchestrator
 from services import company, indicators, marketdata, patterns, search
+from services.access import guard_paid_endpoint
 from services.safe import redact_secrets
 
 app = FastAPI(title="Trade101 API", version="0.1.0")
@@ -117,11 +118,13 @@ class AskBody(BaseModel):
     history: list[dict] = []
 
 
-@app.post("/ask/{ticker}")
+@app.post("/ask/{ticker}", dependencies=[Depends(guard_paid_endpoint)])
 def ask(ticker: str, body: AskBody):
     """Ask-Claude chat: answer a question about a stock, grounded in the same exact
     data + filtered evidence as /analyze. Degrades gracefully (no key / error →
-    available:false) so the rest of the app is unaffected. Spends the Claude key."""
+    available:false) so the rest of the app is unaffected. Spends the Claude key.
+    Gated by services.access (pre-share fix): an access token (if configured) and
+    a shared daily cap, so a public visitor can't run up the owner's Claude bill."""
     q = (body.question or "").strip()
     if not q:
         raise HTTPException(status_code=400, detail="Ask a question first.")
@@ -136,13 +139,14 @@ def ask(ticker: str, body: AskBody):
     return {"available": True, **result}
 
 
-@app.get("/analyze/{ticker}")
+@app.get("/analyze/{ticker}", dependencies=[Depends(guard_paid_endpoint)])
 def analyze(ticker: str):
     """
     AI narration for a ticker: momentum read (sourced), news Feed + "What it
     means" inference. Separate from /research so the chart renders instantly and
     never blocks on the AI. Degrades gracefully: missing key / AI error →
-    available:false with a reason, not a crash.
+    available:false with a reason, not a crash. Gated by services.access
+    (pre-share fix): an access token (if configured) and a shared daily cap.
     """
     try:
         result = orchestrator.analyze(ticker)

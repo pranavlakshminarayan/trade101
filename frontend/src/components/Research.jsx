@@ -9,6 +9,7 @@ import AskClaude from './AskClaude.jsx'
 import { analyze, research, patterns as fetchPatterns } from '../api.js'
 import { addHistory } from '../lib/history.js'
 import { isWatched, toggleWatch } from '../lib/watchlist.js'
+import { currencySymbol } from '../lib/currency.js'
 
 const REFRESH_MS = 7 * 60 * 1000
 
@@ -122,7 +123,7 @@ export default function Research({ data, onBack, onSearch, onNavigate }) {
   }, [])
 
   const { quote, indicators, ohlcv, meta } = live
-  const sym = quote.currency === 'INR' ? '₹' : quote.currency === 'USD' ? '$' : ''
+  const sym = currencySymbol(quote.currency)
   const sources = ai?.available ? (ai.sources || []) : []
   const lean = ai?.available ? ai.momentum?.lean : null
 
@@ -203,7 +204,7 @@ export default function Research({ data, onBack, onSearch, onNavigate }) {
       <div className="top">
         <div style={{ display: 'flex', alignItems: 'center' }}>
           <div className="logo"><Logo /> Trade Craft</div>
-          <div className="tabs"><a className="on">Research</a><a onClick={() => onNavigate('compare')} style={{ cursor: 'pointer' }}>Comparison</a><a onClick={() => onNavigate('watchlist')} style={{ cursor: 'pointer' }}>Watchlist</a><a onClick={() => onNavigate('history')} style={{ cursor: 'pointer' }}>History</a></div>
+          <div className="tabs"><button className="on" aria-current="page">Research</button><button onClick={() => onNavigate('compare')}>Comparison</button><button onClick={() => onNavigate('watchlist')}>Watchlist</button><button onClick={() => onNavigate('history')}>History</button><button onClick={() => onNavigate('practice')}>Practice Lab</button></div>
         </div>
         <div style={{ display: 'flex', gap: 8 }}>
           <button className={'watchbtn' + (watched ? ' on' : '')} onClick={onWatch}>{watched ? '★ Watching' : '☆ Watch'}</button>
