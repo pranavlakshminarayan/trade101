@@ -3,6 +3,7 @@ import Logo from './Logo.jsx'
 import ComparisonChart from './ComparisonChart.jsx'
 import { research, ecosystem, search } from '../api.js'
 import { METRICS, metricLabel, metricValue } from '../lessons.js'
+import { currencySymbol } from '../lib/currency.js'
 
 const TF = { '1Y': { period: '1y', interval: '1d' }, '1M': { period: '1mo', interval: '1d' } }
 const TF_ORDER = ['1Y', '1M']
@@ -86,7 +87,7 @@ export default function Compare({ onNavigate, onOpen, initial }) {
   useEffect(() => { reloadTfA(timeframe); reloadTfB(timeframe) /* eslint-disable-next-line */ }, [timeframe])
 
   const bothLoaded = A.data && B.data
-  const sym = (q) => (q === 'INR' ? '₹' : q === 'USD' ? '$' : '')
+  const sym = currencySymbol
 
   const slotHeader = (S) => {
     if (S.loading) return <div className="faint">Loading…</div>
@@ -120,10 +121,11 @@ export default function Compare({ onNavigate, onOpen, initial }) {
         <div style={{ display: 'flex', alignItems: 'center' }}>
           <div className="logo"><Logo /> Trade Craft</div>
           <div className="tabs">
-            <a onClick={() => onNavigate('home')} style={{ cursor: 'pointer' }}>Research</a>
-            <a className="on">Comparison</a>
-            <a onClick={() => onNavigate('watchlist')} style={{ cursor: 'pointer' }}>Watchlist</a>
-            <a onClick={() => onNavigate('history')} style={{ cursor: 'pointer' }}>History</a>
+            <button onClick={() => onNavigate('home')}>Research</button>
+            <button className="on" aria-current="page">Comparison</button>
+            <button onClick={() => onNavigate('watchlist')}>Watchlist</button>
+            <button onClick={() => onNavigate('history')}>History</button>
+            <button onClick={() => onNavigate('practice')}>Practice Lab</button>
           </div>
         </div>
         <button className="backbtn" onClick={() => onNavigate('home')}>← Back</button>

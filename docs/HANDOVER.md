@@ -4,8 +4,13 @@ A faithful, detailed record of the entire conversation and build that produced T
 
 - **Repo:** https://github.com/pranavlakshminarayan/trade101 (**PRIVATE** as of 2026-09-15 — set on the user's explicit instruction; do not make it public again without being asked). Local folder, package names, and internal `Trade101` references in code/prompts are being migrated to the "Trade Craft" brand gradually; the repo name itself stays `trade101`.
 - **Local:** `C:\Users\prana\Documents\Claude Code\Trading idea`
-- **Brand:** **Trade Craft** (renamed from "Trade101" on 2026-09-15 — see §11). Dark deep-navy theme with cream/near-white text.
-- **Status (2026-09-15):** MVP (M0–M5) + Phase 1 flaw pass + Phase 1.5 (mostly) + Phase 2 (essentially complete) + Phase 3 (started: Watchlist) all shipped. Deploy-ready (two free paths, Docker and no-Docker) but **not yet live** — going live is the user's one remaining step (host signup). See §14/§15 for deploy, and the **pre-share reminder** in §16 before any link is ever shared with anyone.
+- **Brand:** **Trade Craft** (renamed from "Trade101" on 2026-09-15 — see §11). Near-black theme with a navy tint and cream/near-white text (retinted 2026-09-15, was a lighter deep navy).
+- **Status (2026-09-15):** MVP (M0–M5) + Phase 1 flaw pass + Phase 1.5 (mostly) + Phase 2
+  (essentially complete) + **Phase 3 (feature-complete)** all shipped — Comparison, Watchlist,
+  History, Practice Lab, more-markets fixes, accessibility fixes, and the pre-share endpoint
+  guard. Deploy-ready (two free paths, Docker and no-Docker) but **not yet live** — going live
+  is the user's one remaining step (host signup). See §14/§15 for deploy, and §16 for the
+  pre-share guard's status before any link is ever shared with anyone.
 - **User:** Pranav (student, beginning trader; trades on Moomoo; workspace.sonic@gmail.com). GitHub: pranavlakshminarayan.
 - **Companion docs (all kept current, cross-reference this one):** `CLAUDE.md` (concise current-state reference, auto-loaded every session, carries the hard "memory protocol" rules), `BACKLOG.md` (live checklist), `docs/DEVELOPMENT-LOG.md` (phase-by-phase narrative + an explicit "mistakes/course-corrections" note per phase — lighter-weight than this file), `docs/DEPLOY.md` (deploy instructions), `docs/trade101-phase-2-recommendations.md` (the 2026-09-10 product/technical review that shaped Phase 1.5's priorities).
 
@@ -660,31 +665,47 @@ prefers Docker later.
 
 ---
 
-## 16. ⚠️ Pre-share requirement — READ BEFORE SHARING THE DEPLOY URL WITH ANYONE
+## 16. ⚠️ Pre-share requirement — status update: code fix done 2026-09-15
 
-**This is a standing, unresolved item, explicitly requested by the user to be tracked and
+**Originally a standing, unresolved item, explicitly requested by the user to be tracked and
 re-surfaced.** Verbatim from the user: *"remind me at the end of phase 3 execution to fix this
-bug and only then i can share the details."*
+bug and only then i can share the details."* Raised proactively mid-Phase-3 (while picking up
+the "more markets" backlog item) rather than held back to the literal end, and the user asked
+to act on it then.
 
-**The bug:** `/analyze` and `/ask` currently have **no authentication and no rate-limiting**.
-Every call to either endpoint spends the **owner's** Claude API key. On a private, personal-only
-URL this is fine — but the moment the URL is shared with even one other person, that person (or
-anyone they forward it to) can trigger unlimited paid Claude calls against the owner's account
-with zero friction or cost cap.
+**The bug (now fixed in code):** `/analyze` and `/ask` had **no authentication and no
+rate-limiting**. Every call to either endpoint spends the **owner's** Claude API key. On a
+private, personal-only URL this was fine — but the moment the URL is shared with even one other
+person, that person (or anyone they forward it to) could trigger unlimited paid Claude calls
+against the owner's account with zero friction or cost cap.
 
-**What needs to happen before the URL is ever shared, in some combination:**
-- A shared password or access-token gate in front of the app (simplest: a single shared secret
-  checked before serving `/ask`/`/analyze`, or in front of the whole app).
-- Rate-limiting or a hard per-day/per-IP cap specifically on `/analyze` and `/ask`.
-- A spend cap configured directly on the Claude API key in the Anthropic console, as a backstop.
+**What was built (`backend/services/access.py`, `frontend/src/lib/access.js`):**
+- A shared access-token gate: `TRADE101_ACCESS_TOKEN` (optional, off by default) checked against
+  an `X-Access-Token` header on `/analyze` and `/ask` only — every deterministic endpoint stays
+  open, since none of them spend anything.
+- A process-wide daily cap: `TRADE101_DAILY_CAP` (default 50/day across both endpoints combined,
+  resets at UTC midnight) — a backstop even if the token leaks or is shared onward.
+- Both are no-ops when unset, so this shipped with zero effect on local dev.
+- The frontend captures a one-time `?token=...` URL param into `localStorage` and strips it from
+  the address bar, so the owner shares one link with the token embedded and it keeps working
+  silently after that.
+- 5 new tests (`tests/test_access.py`); full suite 34 passing. Full narrative:
+  `docs/DEVELOPMENT-LOG.md`'s "Pre-share endpoint guard" entry.
 
-**Where this is tracked, so it survives context resets:** a "Pre-share checklist" section at the
-top of `BACKLOG.md` (marked as a blocker, explicitly instructing "remind Pranav at the END of
-Phase 3 execution"); a `⚠️ PRE-SHARE BUG` callout in `CLAUDE.md`'s header; and a dedicated
-persistent memory file (`trading_idea_preshare_reminder.md`, outside this repo, in Claude's
-own cross-session memory) so the reminder survives even a full conversation reset, not only a
-repo-level check. **Do not treat any deploy URL as shareable, and proactively raise this again
-when Phase 3's remaining items (§17) are wrapping up, without waiting to be asked.**
+**Deliberately not built:** a real distributed rate-limiter, per-user accounts, or per-IP
+tracking — this is one free-tier process for one owner's app, not a multi-tenant product; that
+would be solving a problem this project doesn't have.
+
+**What's still the user's step, not code:** actually **set `TRADE101_ACCESS_TOKEN`** as an env
+var on the host once deployed, before sharing the link — the code is ready but inert (a no-op)
+until that value exists. `docs/DEPLOY.md` walks through exactly when/how. A spend cap on the
+Claude key in the Anthropic console remains a good additional backstop, independent of this code.
+
+**Where this was tracked, so it survived context resets:** the "Pre-share checklist" section at
+the top of `BACKLOG.md` (now checked off, with the remaining user action called out
+separately); the `CLAUDE.md` header callout (now marked done); and a persistent memory file
+(`trading_idea_preshare_reminder.md`, in Claude's own cross-session memory) — that memory should
+be updated to reflect the code fix landing, since it otherwise still reads as fully open.
 
 ---
 
@@ -730,23 +751,45 @@ Open `http://127.0.0.1:5173` for the dev experience (hot-reloading Vite frontend
 `:8000` API directly), **or** run `npm run build` in `frontend/` and hit `http://127.0.0.1:8000`
 directly to exercise the exact single-service production configuration locally before deploying.
 `.env` in the project root still needs `TRADE101_ANALYSIS_KEY` and `TRADE101_NEWS_KEY` for the
-AI/news features; everything else (chart, indicators, patterns, Comparison, Watchlist) works
-without any key. Tests: `cd backend && .venv/Scripts/python.exe -m pytest -q` — **29 passing** as
-of the end of this session's work (started at 16 in §4).
+AI/news features; everything else (chart, indicators, patterns, Comparison, Watchlist, Practice
+Lab) works without any key. Tests: `cd backend && .venv/Scripts/python.exe -m pytest -q` — **37
+passing** as of 2026-09-15's Phase 3 completion (started at 16 in §4).
 
 **Deploying for real** (the user's own remaining step): pick Option A (no Docker, `render.yaml`,
 recommended) or Option B (Docker) from `docs/DEPLOY.md`, sign into a host with the user's own
-account, connect the (private) GitHub repo, set the two API-key environment variables, deploy.
-**Then stop — do not share the resulting URL with anyone until §16's pre-share fix is done.**
+account, connect the (private) GitHub repo, set the API-key environment variables, deploy.
+**Then stop — do not share the resulting URL with anyone until `TRADE101_ACCESS_TOKEN` is also
+set** (the pre-share guard code is done, §16, but is a no-op until that value exists).
 
 ---
 
 ## 19. What's next — remaining Phase 3, and the deferred items
 
-**Remaining, explicitly Phase 3 (user to prioritize next):**
-- Desktop packaging (parked in §13; would need the Rust toolchain for Tauri or PyInstaller for
-  an Electron+Python bundle — neither installed as of this writing).
-- More markets fully supported end-to-end (tuned data + news adapters per target exchange).
+**Phase 3 is feature-complete as of 2026-09-15.** What shipped across the day's two passes:
+- More markets: a currency-display bug fixed (non-US currencies were a bare number, no symbol);
+  non-US news broadened with a keyless Google News RSS fallback (Finnhub → Google News →
+  Yahoo), verified live on 7974.T pulling in MarketWatch, BeInCrypto, Britannica, nintendo.com,
+  Anime News Network. Non-US peers (Ecosystem) remain gapped — no free substitute for
+  Finnhub's US-only peers endpoint exists; real fix is still the deferred paid Firecrawl/Exa
+  tier.
+- Accessibility polish: 10 nav-tab links that were `<a>` with no `href`
+  (keyboard/screen-reader-unreachable) converted to real `<button>`s, a global focus-visible
+  ring added, one input's missing focus outline fixed. A broader pass (modal keyboard-trap
+  review, full contrast audit, mobile layout) remains open but is no longer a Phase 3 blocker.
+- **Practice Lab** — `lib/practiceLab.js` + `components/PracticeLab.jsx`, scoped with the user
+  first (combined trade-journal + simulated portfolio, its own tab, no AI/zero Claude spend).
+  A simulated $100,000 USD-only cash pool (deliberately not multi-currency — a shared cash
+  balance across currencies would need real FX data this app doesn't have, and fabricating a
+  rate would violate the north-star "never fabricate" guardrail, so v1 is USD-only with a clear
+  message otherwise). Buy/sell always use the real live `/research` price, never a typed
+  number; selling realizes P&L against average cost and appends a reasoned journal entry.
+  Verified live end-to-end with exact numbers (bought 10 AAPL, sold 5, cash and P&L math exact
+  to the cent). Full detail: `docs/DEVELOPMENT-LOG.md`'s "Practice Lab" and "UI/UX, non-US
+  news, and accessibility fixes" entries.
+
+**What's left is no longer Phase 3 scope**, just deployment steps and deliberate deferrals:
+going live (needs the user's host signup), setting `TRADE101_ACCESS_TOKEN` before sharing the
+link, the paid Firecrawl/Exa tier for non-US peers, and desktop packaging (parked, §13).
 - An optional simulated *practice lab* — explicitly to be kept **separate** from the main
   learning flow (delayed/hypothetical, reflection-focused), per the original Phase-2
   recommendations review; not yet started.

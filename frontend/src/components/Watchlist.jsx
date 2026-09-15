@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react'
 import Logo from './Logo.jsx'
 import { getWatchlist, removeWatch } from '../lib/watchlist.js'
 import { research } from '../api.js'
+import { currencySymbol } from '../lib/currency.js'
 
 function changeChip(pct) {
   if (pct == null) return <span className="chip flat">—</span>
@@ -9,7 +10,7 @@ function changeChip(pct) {
   const a = pct > 0 ? '▲' : pct < 0 ? '▼' : '■'
   return <span className={'chip ' + cls}>{a} {pct > 0 ? '+' : ''}{pct}%</span>
 }
-const sym = (c) => (c === 'INR' ? '₹' : c === 'USD' ? '$' : '')
+const sym = currencySymbol
 
 export default function Watchlist({ onNavigate, onOpen }) {
   const [items, setItems] = useState(getWatchlist())
@@ -35,10 +36,11 @@ export default function Watchlist({ onNavigate, onOpen }) {
         <div style={{ display: 'flex', alignItems: 'center' }}>
           <div className="logo"><Logo /> Trade Craft</div>
           <div className="tabs">
-            <a onClick={() => onNavigate('home')}>Research</a>
-            <a onClick={() => onNavigate('compare')}>Comparison</a>
-            <a className="on">Watchlist</a>
-            <a onClick={() => onNavigate('history')}>History</a>
+            <button onClick={() => onNavigate('home')}>Research</button>
+            <button onClick={() => onNavigate('compare')}>Comparison</button>
+            <button className="on" aria-current="page">Watchlist</button>
+            <button onClick={() => onNavigate('history')}>History</button>
+            <button onClick={() => onNavigate('practice')}>Practice Lab</button>
           </div>
         </div>
         <button className="backbtn" onClick={() => onNavigate('home')}>＋ New research</button>

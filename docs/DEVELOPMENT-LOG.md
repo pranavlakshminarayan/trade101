@@ -18,8 +18,10 @@ protocol). It is the narrative "how we got here" companion to:
 **Order of the log:** Phase 0 → 1 → 1 flaw pass → 1.5 → 2 → Rebrand → 3.
 
 Local app in development: **http://127.0.0.1:5173** (Vite dev) or **http://127.0.0.1:8000** (the
-backend now also serves the production build). A hosted shareable URL is deploy-ready (`docs/DEPLOY.md`);
-going live is the user's one host-signup step, and is gated on the pre-share endpoint-guard fix.
+backend now also serves the production build). A hosted shareable URL is deploy-ready
+(`docs/DEPLOY.md`); going live is the user's one host-signup step. The pre-share endpoint-guard
+fix is done in code — the only remaining gate on actually *sharing* the resulting URL is the
+user setting `TRADE101_ACCESS_TOKEN` on the host once deployed.
 
 ---
 
@@ -459,9 +461,196 @@ service can run the frontend build as its build step, no Dockerfile at all.
 
 **Mistakes / course-corrections in this pass:** none material.
 
-### Remaining in Phase 3 (awaiting the user's priority)
+### 2026-09-15 — More markets: currency display fix
 
-More markets fully supported · optional simulated **practice lab** (kept separate from the main
-learning flow, per the recommendations doc) · accessibility / keyboard-nav polish. Desktop
-packaging is **parked** (the web deploy gives the shareable link instead). Deploy go-live + the
-paid Firecrawl tier + the **pre-share endpoint-guard fix** come at Phase 3's end.
+Picked up the "more markets fully supported" backlog item. Rather than guess at scope, first
+read `services/company.py`, `services/news.py`, `services/marketdata.py`, and `services/search.py`
+end to end to see what was actually tuned vs. gapped per exchange. Findings: search is already
+market-agnostic (Yahoo search, keyless); the beta suffix→index map already covers all seven
+target markets plus several European exchanges; the real, concrete, fixable gap found was in the
+**frontend**, not the backend — `Research.jsx`, `Watchlist.jsx`, and `Compare.jsx` each carried
+their own copy of a `sym()` helper that only recognized `USD`/`INR`, so every other target-market
+currency (JPY, KRW, HKD, SGD, CNY, EUR, GBP) silently rendered as a bare number with no unit.
+
+Fixed with one shared `frontend/src/lib/currency.js::currencySymbol()` (covers the seven target
+markets + common others, falls back to the currency code itself rather than blank for anything
+unmapped) and swapped all three components onto it. Verified live in the browser on 7974.T
+(Nintendo, JPY): Research now shows "¥8118" (was a bare "8118"); the Comparison tab shows the
+same for the same symbol. Backend test suite re-run clean (29 passed) since no backend logic
+changed.
+
+**Non-US peers (Ecosystem tab) remain gapped** — confirmed there's no good *free* substitute for
+Finnhub's US-only peers endpoint (yfinance exposes no peers data), so this stays parked behind
+the already-deferred paid Firecrawl/Exa tier rather than being hacked around with a curated
+static list, which would risk violating the "every AI claim is sourced / never fabricate"
+north star for what would effectively be guessed peer data.
+
+**Mistakes / course-corrections in this pass:** none material. (Deliberately read the four
+relevant services fully before writing any code, rather than guessing where "more markets" work
+was needed — this is what surfaced the currency bug, which wasn't in the backlog or handover
+notes at all.)
+
+### 2026-09-15 — Pre-share endpoint guard (the user's "remind me at end of Phase 3" item)
+
+Rather than wait until Phase 3 fully wraps, raised this proactively once "more markets" work
+was underway and picked it up on request. The gap, documented since §13/§16 of
+`docs/HANDOVER.md`: `/analyze` and `/ask` spend the owner's Claude key with no auth or
+rate-limit at all, so the moment a deploy URL is shared, anyone who has it (or anyone they
+forward it to) can trigger unlimited paid calls.
+
+Built both layers `docs/DEPLOY.md` had already sketched as the fix, together (defense in
+depth, same pattern as the earlier key-leak fix): new `backend/services/access.py`, wired as a
+FastAPI `Depends()` on `/analyze` and `/ask` only (every deterministic endpoint — chart,
+indicators, patterns, compare, watchlist — stays open, since none of them cost anything).
+
+- **Access token** (`TRADE101_ACCESS_TOKEN`, optional): if set, both routes require it as the
+  `X-Access-Token` header or return 401. Deliberately a single shared secret, not per-user
+  accounts — this is a personal app being shared with a few people, not a multi-tenant product.
+- **Daily cap** (`TRADE101_DAILY_CAP`, default 50): a process-wide counter over both endpoints
+  combined, resetting at UTC midnight, returning 429 once exhausted — a backstop even if the
+  token itself leaks or gets shared onward.
+- Both are **no-ops when unset**, so this ships with zero effect on local dev/testing — a
+  deliberate choice so the fix could be verified without touching the existing workflow.
+- Frontend half: `frontend/src/lib/access.js` captures a one-time `?token=...` URL param into
+  `localStorage` and strips it from the visible address bar; `api.js`'s `analyze()`/`ask()` send
+  it as the header. The owner shares the link once with the token in it; every visit after that
+  (including old `#TICKER` bookmarks) keeps working silently.
+- 5 new tests in `tests/test_access.py` (gate no-op when unset, wrong/missing token rejected,
+  correct token passes, cap exhausted → 429, `/ask` gated too) using the same `TestClient`
+  pattern as the existing endpoint smoke tests. Full suite: 34 passing (was 29).
+
+Verified live: restarted the backend to pick up the change, confirmed `/health` and a
+non-gated read still worked, and confirmed via the browser that the running app (no token set
+in the local `.env`, matching intent) shows no behavior change at all.
+
+**Mistakes / course-corrections in this pass:** none material. (One deliberate design call
+worth recording: chose a single in-memory counter over a "real" rate-limiter library or
+per-IP/per-user tracking — this is one free-tier process for one owner's personal app, and a
+more elaborate system would be solving a problem this project doesn't have. If Trade Craft ever
+becomes genuinely multi-tenant, this is the piece to revisit first.)
+
+### 2026-09-15 — UI/UX, non-US news, and accessibility fixes (user-reported, one batch)
+
+The user reported a punch list from actually using the app: metric text was nearly invisible,
+the browser's own Back button didn't behave like a normal site, news felt US-only, the Feed/
+What-it-means toggle looked unstyled, and the theme should go darker. Also asked to run "the
+last part of Phase 3" in the same pass.
+
+- **Invisible metric values.** `styles.css`'s `.metric`/`.metric .v` never set an explicit text
+  color; since `.metric` is a `<button>`, it fell back to the browser's own default form-control
+  color instead of inheriting the page's cream `--ink` — invisible against a dark card. Fixed
+  with explicit colors plus `color-scheme: dark` on `:root` as a root-cause guard against the
+  same class of bug recurring on a future unstyled control.
+- **Browser Back/Forward didn't walk through tabs.** Read `App.jsx`'s router closely: it only
+  ever pushed a history entry from `doResearch()` (ticker searches); clicking Comparison/
+  Watchlist/History called `setView()` directly with zero history entry, so physical Back had
+  nothing to return to from those tabs. Rewrote the router (`routeHash`/`parseRoute`/
+  `goToView`) so every navigation — search or tab switch — pushes one entry, preserving the
+  existing `#TICKER` shareable-link shape and adding `#/compare`/`#/watchlist`/`#/history` for
+  tabs. Verified live with the browser's actual Back/Forward (not just clicking in-app links):
+  Back from Watchlist → previous Research ticker; Forward → Watchlist again, correctly.
+- **News broadened beyond Yahoo/SEC.** Added a keyless Google News RSS fallback
+  (`services/news.py::_google_news`) in the chain: Finnhub → Google News → Yahoo. Searches by
+  company name (passed through from `orchestrator._gather`'s `quote["name"]`) rather than the
+  bare ticker, since ticker-only search reads as noise for most non-US symbols on Google News.
+  Verified live on 7974.T (Nintendo): the feed now shows MarketWatch, BeInCrypto, Britannica,
+  nintendo.com, and Anime News Network — genuinely diverse real-world coverage, not just
+  Yahoo's own curated feed. 3 new tests in `tests/test_news.py`.
+- **Feed / What-it-means toggle restyled.** Discovered `.newstabs`/`.ntab` had **no CSS rules
+  at all** — they were rendering as completely unstyled default HTML buttons, which is exactly
+  what the user's screenshot showed. Built a proper segmented-pill toggle matching the existing
+  chart-toggle visual language (teal gradient active state).
+- **Theme retinted near-black with a navy tint**, per explicit request (was a lighter deep
+  navy from the 2026-09-15 rebrand). Since every component already consumed `--bg`/`--surface`/
+  etc. as CSS variables rather than hardcoded hex, this was a `:root` token change, not a
+  component-by-component rewrite — confirms the variable-based theming from the rebrand pass
+  was the right call.
+- **Accessibility — the "last part of Phase 3" this pass tackled.** While reviewing the theme
+  change, found 10 tab-navigation links (Research/Compare/Watchlist/History's own
+  "Comparison · Watchlist · History" links) were `<a>` tags with **no `href`** — the DOM spec
+  doesn't make these focusable or Enter-activatable at all, so a keyboard or screen-reader user
+  simply could not reach them. Converted all 10 to real `<button>`s (native keyboard support,
+  no ARIA workaround needed) with `aria-current="page"` on the active tab; added a global
+  `:focus-visible` ring; and fixed one input (`.cmp-pick`) that removed its focus outline with
+  no replacement at all. Verified live with actual Tab-key presses and screenshots showing the
+  teal focus ring landing on each tab in sequence.
+
+Backend: 37 tests passing (was 34). Frontend: `npm run build` clean both before and after the
+accessibility pass.
+
+**Mistakes / course-corrections in this pass:** none in the shipped code, but one recorded
+scope decision: the user's ask included "run the last part of Phase 3" alongside the fix list.
+Practice lab is a genuinely new, non-trivial feature (a whole simulated trading UI/backend) —
+building a rushed version of it in the same turn as five unrelated fixes risked exactly the
+"half-finished implementation" this project's own conventions warn against. Treated
+accessibility polish as the completable "last part" instead (it's explicitly a remaining Phase
+3 item, and much of it naturally overlapped with the contrast/theme work already underway this
+pass) and left the practice lab explicitly flagged as needing its own scoping conversation.
+
+### 2026-09-15 — Practice Lab (last remaining Phase 3 feature)
+
+Scoped with the user before writing code, since "an optional simulated practice lab" in the
+backlog left real design decisions open. Three quick questions settled it: (1) a **combined**
+hypothetical-trade-journal + simulated-portfolio — log a buy/sell with a reasoning note, track
+a running cash balance and realized/unrealized P&L, not just a diary of entries; (2) its own
+**new top-level tab**, matching how Watchlist/Compare were added; (3) **no AI involvement** —
+fully deterministic, zero Claude spend, matching "reflection-focused" and the existing
+Watchlist/Compare cost posture.
+
+**Design decision made unprompted, and explained rather than silently applied:** a simulated
+portfolio needs ONE cash balance, but trades can be logged against tickers priced in wildly
+different currencies (JPY, KRW, EUR, …). Honestly converting between them would need a real FX
+rate — a data source this app doesn't have — and fabricating one would violate the north-star
+guardrail ("never fabricate"). Rather than build fake FX math, **scoped v1 to USD-priced
+tickers only**, with a clear message if someone tries to log a non-USD trade. This is a
+real limitation, not hidden — called out in `CLAUDE.md` and here.
+
+**What was built:**
+- `lib/practiceLab.js` (localStorage, mirrors `lib/watchlist.js`'s persistence pattern): a
+  portfolio object `{ cash, positions, closed }` starting at $100,000. `buy()` always takes the
+  ticker's real live price as an argument (never a user-typed number, so the exact-numbers
+  guardrail holds even though the trade itself is hypothetical) and computes a running
+  average cost basis per position. `sell()` realizes P&L against that average cost, updates
+  cash, and appends a closed-trade journal entry carrying the user's own reasoning text.
+- `components/PracticeLab.jsx`: portfolio summary (cash / positions value / total value / total
+  P&L vs the $100,000 start), a buy form reusing the exact same name→symbol disambiguation
+  picker as Compare's search slots, an open-positions list with an inline per-row sell form,
+  and a chronological closed-trades journal showing entry → exit price, realized P&L, and the
+  reasoning text. New `App.jsx` view `'practice'` (the router already generalized to `#/view`
+  hashes in the earlier fix pass this session, so `#/practice` worked with zero router changes).
+  Nav link added across Research/Compare/Watchlist/History/Welcome's rail.
+- Framed explicitly as "simulated trades only · no real money · a decision journal, not advice"
+  — consistent with the Watchlist precedent of never implying positions/signals are real.
+
+**Verified live, end to end, with real numbers:** bought 10 AAPL at the live quoted $330.02 →
+cash dropped from $100,000.00 to $96,699.80 (exactly 10 × $330.02); sold 5 at the same live
+price → cash rose to $98,349.90 (exactly +5 × $330.02), the position correctly reduced to 5
+shares, and the journal recorded "AAPL 5 sh · entry $330.02 → exit $330.02 · $0.00 (0.00%)"
+with the typed reasoning text attached. Total portfolio value stayed exactly $100,000.00
+throughout (as it should, since price never moved between the buy and sell) — confirming the
+math is exact, not approximate.
+
+**Mistakes / course-corrections in this pass:** none in the shipped code. One recorded
+near-miss: the initial instinct was to let a "reset" button run with a plain click — added a
+`window.confirm()` guard instead once it was clear an accidental click would silently destroy a
+user's whole simulated history with no way back; this was caught before shipping, not after.
+
+Frontend: `npm run build` clean (58 modules, was 56). Backend: unaffected (37 tests still
+passing) — this is a purely client-side feature with no new endpoints.
+
+With this, **Phase 3 is feature-complete** except non-US peers (deferred to the paid tier) and
+desktop packaging (deliberately parked, see §13 of `docs/HANDOVER.md`).
+
+### What's left, now that Phase 3 is feature-complete
+
+Only things that need the user's own action, or are deliberately deferred/parked, remain:
+- **Deploy go-live** — needs the user's own host-account signup (Render or similar); code side
+  is ready (`docs/DEPLOY.md`).
+- **Pre-share step** — the code guard (`services/access.py`) is done; the user still needs to
+  set `TRADE101_ACCESS_TOKEN` on the host before ever sharing a live link.
+- **Non-US peers** and the **paid Firecrawl/Exa tier** — deliberately deferred until after
+  deployment, per the user's earlier call.
+- **Desktop packaging** — parked (§13, `docs/HANDOVER.md`); the web deploy already gives the
+  shareable link that was the actual goal.
+- A broader accessibility pass (modal keyboard-trap review, full contrast audit, mobile layout)
+  remains open beyond the 2026-09-15 fixes, but is no longer a Phase 3 blocker.

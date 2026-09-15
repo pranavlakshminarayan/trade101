@@ -20,10 +20,11 @@ export default function History({ onNavigate, onOpen }) {
         <div style={{ display: 'flex', alignItems: 'center' }}>
           <div className="logo"><Logo /> Trade Craft</div>
           <div className="tabs">
-            <a onClick={() => onNavigate('home')}>Research</a>
-            <a onClick={() => onNavigate('compare')}>Comparison</a>
-            <a onClick={() => onNavigate('watchlist')}>Watchlist</a>
-            <a className="on">History</a>
+            <button onClick={() => onNavigate('home')}>Research</button>
+            <button onClick={() => onNavigate('compare')}>Comparison</button>
+            <button onClick={() => onNavigate('watchlist')}>Watchlist</button>
+            <button className="on" aria-current="page">History</button>
+            <button onClick={() => onNavigate('practice')}>Practice Lab</button>
           </div>
         </div>
         <button className="backbtn" onClick={() => onNavigate('home')}>＋ New research</button>

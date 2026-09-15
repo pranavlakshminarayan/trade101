@@ -3,6 +3,15 @@
 // paths) — one service, one URL, no CORS.
 const BASE = import.meta.env.DEV ? 'http://127.0.0.1:8000' : ''
 
+import { getAccessToken } from './lib/access.js'
+
+// The pre-share access gate only guards /analyze and /ask (the paid calls) —
+// every other endpoint is deterministic and free, so it stays open.
+function authHeaders() {
+  const token = getAccessToken()
+  return token ? { 'X-Access-Token': token } : {}
+}
+
 // Session result cache — the fix for "switch tabs and everything reloads".
 // Like a browser tab, a stock already researched this session is restored from
 // memory instead of being re-fetched (and, crucially, never re-runs the paid
@@ -82,10 +91,13 @@ export async function ask(ticker, question, history = []) {
   try {
     const res = await fetch(`${BASE}/ask/${encodeURIComponent(ticker.trim())}`, {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
+      headers: { 'Content-Type': 'application/json', ...authHeaders() },
       body: JSON.stringify({ question, history }),
     })
-    if (!res.ok) return { available: false, reason: `Ask request failed (HTTP ${res.status})` }
+    if (!res.ok) {
+      const err = await res.json().catch(() => ({}))
+      return { available: false, reason: err.detail || `Ask request failed (HTTP ${res.status})` }
+    }
     return res.json()
   } catch {
     return { available: false, reason: 'Could not reach the backend for Ask-Claude.' }
@@ -102,8 +114,11 @@ export async function analyze(ticker) {
   if (_cache.analyze.has(key)) return _cache.analyze.get(key)
   if (_inflight[key]) return _inflight[key]
   const p = (async () => {
-    const res = await fetch(`${BASE}/analyze/${encodeURIComponent(key)}`)
-    if (!res.ok) return { available: false, reason: `AI request failed (HTTP ${res.status})` }
+    const res = await fetch(`${BASE}/analyze/${encodeURIComponent(key)}`, { headers: authHeaders() })
+    if (!res.ok) {
+      const err = await res.json().catch(() => ({}))
+      return { available: false, reason: err.detail || `AI request failed (HTTP ${res.status})` }
+    }
     return res.json()
   })()
   _inflight[key] = p

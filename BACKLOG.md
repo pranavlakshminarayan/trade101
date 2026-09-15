@@ -148,6 +148,8 @@ the existing single-stock read is demonstrably trustworthy end to end.
 - **TradingView widget option** — embed the exact TV chart look as an alternative to Lightweight-Charts.
 
 ## Phase 3 — surface & scale
+**Feature-complete as of 2026-09-15**, except non-US peers (still gapped behind the deferred
+paid Firecrawl/Exa tier) and desktop packaging (deliberately parked, not planned).
 - [x] **Comparison tab** — DONE 2026-09-14/15. Two stocks side by side: normalized price chart
   (rebased to 100) + metrics table (RSI/MACD/SMA/Bollinger/volume/beta/sector/mktcap).
   Deterministic (no AI call); "describes differences, never which to buy". `Compare.jsx` +
@@ -164,10 +166,35 @@ the existing single-stock read is demonstrably trustworthy end to end.
   desktop app doesn't produce — the web deploy (below) covers that instead, more efficiently
   (no Rust toolchain or PyInstaller currently installed for either packaging path). Revisit if a
   native installed app is wanted later. See `docs/HANDOVER.md` §13.
-- **More markets fully supported** — all seven target markets with tuned data + news adapters.
-- **Optional simulated practice lab** — kept SEPARATE from the main learning flow (delayed/
-  hypothetical, reflection-focused), per `docs/trade101-phase-2-recommendations.md` Phase 3.
 - **Accessibility / keyboard nav / responsive polish.**
+  - [x] **2026-09-15 pass** — fixed 10 nav-tab links (`<a>` with no `href`, unreachable by
+    keyboard/screen reader) → real `<button>`s with `aria-current="page"`; added a global
+    `:focus-visible` ring; fixed one input (`.cmp-pick`) that removed its focus outline with no
+    replacement; fixed a contrast bug where metric values were nearly invisible. Verified live
+    with actual Tab-key navigation and screenshots (focus ring visible, tabs reachable).
+  - [ ] Broader pass still open: full keyboard-trap review of modals (disambiguation picker,
+    Ask-Claude panel), color-contrast audit beyond what this pass touched, responsive/mobile
+    layout review.
+- **More markets fully supported** — all seven target markets with tuned data + news adapters.
+  - [x] **Currency display fixed** (2026-09-15) — non-US currencies (JPY/KRW/HKD/SGD/CNY/EUR/GBP/…)
+    were rendering as a bare number with no symbol; three duplicated, USD/INR-only `sym()`
+    helpers replaced with one shared `frontend/src/lib/currency.js`. Verified live on 7974.T.
+  - [ ] Non-US peers (Ecosystem tab) — still gapped; Finnhub's peers endpoint is US-only free
+    tier, and a real free substitute wasn't found. Real fix is the paid Firecrawl/Exa tier
+    (already deferred to post-deploy elsewhere in this doc).
+  - [x] **Non-US news broadened** (2026-09-15) — added a keyless Google News RSS fallback
+    (`services/news.py::_google_news`, searches by company name) ahead of the Yahoo fallback,
+    so non-US markets get real, diverse coverage instead of relying on Yahoo Finance's own feed
+    alone. Verified live on 7974.T: MarketWatch, BeInCrypto, Britannica, nintendo.com, Anime
+    News Network all appeared.
+- [x] **Optional simulated practice lab** — DONE 2026-09-15. `lib/practiceLab.js` +
+  `components/PracticeLab.jsx`: a simulated $100,000 USD-only portfolio + trade journal, its
+  own top-level tab, kept SEPARATE from the main learning flow per
+  `docs/trade101-phase-2-recommendations.md` Phase 3. Log a hypothetical buy/sell at the real
+  live price with a reasoning note; selling realizes P&L against average cost and closes the
+  journal entry. Zero Claude spend (deterministic, like Watchlist/Compare). Scoped to USD only
+  for v1 — mixing currencies into one cash pool would need real FX data this app doesn't have.
+  Verified live: bought 10 AAPL, sold 5, cash/P&L math exact, journal entry recorded correctly.
 
 ---
 
@@ -193,14 +220,17 @@ the existing single-stock read is demonstrably trustworthy end to end.
 
 ## ⚠️ Pre-share checklist (BLOCKER before distributing the URL — do this right after "Go live" above)
 
-The repo is private and the deploy URL is **personal-use only** until this is done. **Remind
-Pranav at the END of Phase 3 execution** (his explicit request) — only after this can the link
-be shared:
+The repo is private and the deploy URL is **personal-use only** until this is done.
 
-- [ ] **Guard the paid endpoints.** `/analyze` and `/ask` spend the owner's Claude key with no
-  auth or rate-limit; a public visitor could run up the bill. Add before sharing:
-  a shared password/access-token gate on the app, and/or rate-limiting or a per-day cap on
-  `/analyze` + `/ask`, and/or a spend cap on the Claude key in the Anthropic console.
+- [x] **Guard the paid endpoints — code done 2026-09-15.** `/analyze` and `/ask` spent the
+  owner's Claude key with no auth or rate-limit; a public visitor could have run up the bill.
+  Fixed: `services/access.py` gates both behind an optional shared access token
+  (`TRADE101_ACCESS_TOKEN`) and a shared daily cap (`TRADE101_DAILY_CAP`, default 50/day). Both
+  are no-ops until set, so this didn't change local dev at all. Tests in `tests/test_access.py`.
+  - [ ] **User action still required before actually sharing a live link:** set
+    `TRADE101_ACCESS_TOKEN` as an env var on the host (Render, per `docs/DEPLOY.md`), then share
+    the URL once as `?token=<value>` — the frontend saves it locally after that. Optionally also
+    set a spend cap on the Claude key in the Anthropic console as a last-resort backstop.
 
 ## Guardrails (never drop)
 - Numbers are exact (deterministic code); every AI claim is sourced.

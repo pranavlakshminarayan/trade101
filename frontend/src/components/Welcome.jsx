@@ -15,6 +15,7 @@ export default function Welcome({ onSearch, recent, onNavigate }) {
         <button className="railitem" onClick={() => onNavigate('compare')}>⚖️ Comparison</button>
         <button className="railitem" onClick={() => onNavigate('watchlist')}>★ Watchlist</button>
         <button className="railitem" onClick={() => onNavigate('history')}>🕘 History</button>
+        <button className="railitem" onClick={() => onNavigate('practice')}>🧪 Practice Lab</button>
         {recent?.length > 0 && <div className="railsec">Recent research</div>}
         {recent?.map((r) => (
           <button key={r} className="railitem" onClick={() => submit(r)}>{r}</button>
