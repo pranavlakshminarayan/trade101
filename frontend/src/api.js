@@ -1,7 +1,9 @@
 // Dev: the API runs on its own port (separate Vite server). Production: the
 // FastAPI backend serves this built frontend, so the API is same-origin (relative
-// paths) — one service, one URL, no CORS.
-const BASE = import.meta.env.DEV ? 'http://127.0.0.1:8000' : ''
+// paths) — one service, one URL, no CORS. VITE_API_BASE (set in a local-only
+// .env.local, gitignored) overrides the dev default — e.g. if port 8000 is
+// stuck/unavailable on this machine and the backend has to run elsewhere.
+const BASE = import.meta.env.DEV ? (import.meta.env.VITE_API_BASE || 'http://127.0.0.1:8000') : ''
 
 import { getAccessToken } from './lib/access.js'
 
@@ -16,7 +18,7 @@ function authHeaders() {
 // Like a browser tab, a stock already researched this session is restored from
 // memory instead of being re-fetched (and, crucially, never re-runs the paid
 // /analyze call). Pass { fresh: true } to bypass it (the 7-min auto-refresh does).
-const _cache = { research: new Map(), analyze: new Map(), ecosystem: new Map(), patterns: new Map() }
+const _cache = { research: new Map(), analyze: new Map(), ecosystem: new Map(), patterns: new Map(), news: new Map() }
 export function clearCache(ticker) {
   if (!ticker) { for (const m of Object.values(_cache)) m.clear(); return }
   const k = ticker.trim().toUpperCase()
@@ -82,6 +84,24 @@ export async function patterns(ticker, { period, interval } = {}) {
     return data
   } catch {
     return { patterns: [] }
+  }
+}
+
+// Deterministic news feed — NO Claude call, no access-token/daily-cap gate.
+// Loads independently of /analyze so headlines show up immediately and stay
+// available even if the AI call is slow, erroring, missing a key, or capped
+// (docs/AUDIT.md finding H3: news used to reach the UI only via /analyze).
+export async function news(ticker) {
+  const k = ticker.trim().toUpperCase()
+  if (_cache.news.has(k)) return _cache.news.get(k)
+  try {
+    const res = await fetch(`${BASE}/news/${encodeURIComponent(ticker.trim())}`)
+    if (!res.ok) return { available: false, reason: `News request failed (HTTP ${res.status})` }
+    const data = await res.json()
+    if (data && data.available !== false) _cache.news.set(k, data)
+    return data
+  } catch {
+    return { available: false, reason: 'Could not reach the backend for news.' }
   }
 }
 

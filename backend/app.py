@@ -107,10 +107,31 @@ def detect_patterns(ticker: str, period: str = "1y", interval: str = "1d"):
     if data is None:
         raise HTTPException(status_code=404, detail=f"No data for '{ticker}'.")
     hist, _ = data
-    closes = hist["Close"].tolist()
+    # High/Low, not Close — real support/resistance touches the wicks, and
+    # detecting on Close alone under-detects and misplaces marked points
+    # relative to what the chart actually shows (docs/AUDIT.md finding H6).
+    highs = hist["High"].tolist()
+    lows = hist["Low"].tolist()
     times = [int(idx.timestamp()) for idx in hist.index]
     return {"ticker": ticker.upper(), "period": period, "interval": interval,
-            "patterns": patterns.detect(closes, times)}
+            "patterns": patterns.detect(highs, lows, times)}
+
+
+@app.get("/news/{ticker}")
+def news(ticker: str):
+    """Deterministic news feed for a ticker — NO Claude call, so it's free and
+    never depends on an AI key, an AI error, or the /analyze daily cap. The
+    frontend loads this immediately; the AI-derived "what it means" inference
+    layers on top separately once /analyze completes (docs/AUDIT.md H3 — news
+    used to reach the UI ONLY through /analyze, so deterministic headlines
+    were unavailable whenever the judgment layer was)."""
+    try:
+        result = orchestrator.news_bundle(ticker)
+    except Exception as e:  # keep this endpoint's own contract: never 500 the feed
+        return {"available": False, "reason": redact_secrets(f"News fetch error: {e}")}
+    if result is None:
+        raise HTTPException(status_code=404, detail=f"No market data found for '{ticker}'.")
+    return {"available": True, **result}
 
 
 class AskBody(BaseModel):

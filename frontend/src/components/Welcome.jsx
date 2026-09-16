@@ -24,7 +24,7 @@ export default function Welcome({ onSearch, recent, onNavigate }) {
 
       <main className="welc-main">
         <div className="logo" style={{ fontSize: 22 }}><Logo size={34} /> Trade Craft</div>
-        <div className="big">Which stock shall we study, <span>Pranav?</span></div>
+        <div className="big">Which stock shall we <span>study</span> today?</div>
         <div className="sub">
           Just type a <b>company name</b> (or ticker) — any market: US, China, Japan, Korea, Hong Kong, Singapore, India, Europe.
           If several match, you pick. I'll pull the live data and teach the metrics as we go.

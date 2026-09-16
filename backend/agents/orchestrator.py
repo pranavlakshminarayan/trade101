@@ -47,6 +47,37 @@ def _gather(ticker: str) -> dict | None:
     }
 
 
+def news_bundle(ticker: str) -> dict | None:
+    """Deterministic news bundle for a ticker — the SAME relevance-filtered
+    feed `analyze()` uses, but with no LLM call at all. None if the symbol has
+    no market data. Lets the News panel show real headlines immediately and
+    independently of the paid AI call: previously the feed only ever reached
+    the UI through /analyze's response, so no Claude key, an AI error, or the
+    daily cap being hit meant NO headlines at all — deterministic data held
+    hostage by the judgment layer (docs/AUDIT.md finding H3). Reuses the same
+    cached `gather()` bundle, so calling this first doesn't cost a second
+    fetch when /analyze runs afterward for the same ticker."""
+    b = gather(ticker)
+    if b is None:
+        return None
+    kept_news, sourcing = b["news"], b["sourcing"]
+    news_note = b["news_note"]
+    if sourcing["dropped"]:
+        note_bits = [news_note] if news_note else []
+        note_bits.append(
+            f"{sourcing['dropped']} unrelated article(s) were filtered out."
+        )
+        news_note = " ".join(note_bits)
+    return {
+        "ticker": b["quote"]["symbol"],
+        "feed": kept_news,
+        "note": news_note,
+        "sourcing": sourcing,
+        "filings": b["filings"],
+        "filings_note": b["fil_note"],
+    }
+
+
 def analyze(ticker: str) -> dict | None:
     """Full AI narration bundle for `ticker`, or None if the symbol has no data.
     Raises llm.MissingKeyError if no analysis key is configured."""

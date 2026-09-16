@@ -284,6 +284,14 @@ button{font:inherit;cursor:pointer;color:inherit}
   border-radius:10px;padding:11px 13px;margin-top:8px;color:var(--ink)}
 .cand:hover{border-color:var(--teal)}
 .cand-sym{font-weight:600;min-width:74px} .cand-name{flex:1;font-size:13.5px;color:var(--muted)} .cand-exch{font-size:12px}
+
+/* non-primary listing badges (OTC/CDR/Pref/Secondary) — search picker + Compare */
+.cand-badge{font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.04em;
+  padding:2px 7px;border-radius:980px;flex:none;border:1px solid transparent}
+.cand-badge-otc{background:var(--down-soft);color:var(--down);border-color:#5a2a2f}
+.cand-badge-cdr{background:var(--surface2);color:var(--muted);border-color:var(--hair)}
+.cand-badge-pref{background:var(--teal-soft);color:var(--teal);border-color:#1d4551}
+.cand-badge-secondary{background:var(--surface2);color:var(--muted);border-color:var(--hair)}
 .cand-cancel{background:none;border:none;color:var(--faint);font-size:13px;margin-top:12px;cursor:pointer}
 
 .err{background:var(--down-soft);border:1px solid #5a2a2f;color:#ffb4bb;padding:14px 16px;border-radius:12px;margin-top:20px}

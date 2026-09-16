@@ -61,7 +61,9 @@ export default function Compare({ onNavigate, onOpen, initial }) {
   const [B, loadSymbolB, reloadTfB] = useSlot()
 
   // Resolve a typed name/ticker to a symbol, showing a picker when it's ambiguous
-  // — the same behaviour as the main search bar.
+  // — the same behaviour as the main search bar (see App.jsx::looksLikeTicker;
+  // fixes docs/AUDIT.md H1 — a company name that equals its own ticker, e.g.
+  // "Sony", used to auto-pick without ever offering the picker).
   async function resolve(query, { setCands, setBusy, loadSymbol }) {
     const q = query.trim()
     if (!q) return
@@ -69,7 +71,8 @@ export default function Compare({ onNavigate, onOpen, initial }) {
     try {
       const { candidates = [] } = await search(q)
       if (candidates.length === 0) { await loadSymbol(q, timeframe); return }  // maybe an exact ticker
-      if (candidates.length === 1 || candidates[0].symbol.toUpperCase() === q.toUpperCase()) {
+      const looksLikeTicker = !/\s/.test(q) && q === q.toUpperCase() && /[A-Z]/.test(q)
+      if (candidates.length === 1 || (looksLikeTicker && candidates[0].symbol.toUpperCase() === q.toUpperCase())) {
         await loadSymbol(candidates[0].symbol, timeframe); return
       }
       setCands(candidates)  // let the user choose
@@ -155,6 +158,7 @@ export default function Compare({ onNavigate, onOpen, initial }) {
                 <button key={c.symbol} className="cmp-cand" onClick={() => pickA(c)}>
                   <span className="cmp-cand-sym mono">{c.symbol}</span>
                   <span className="cmp-cand-name">{c.name}</span>
+                  {c.listingBadge && <span className={'cand-badge cand-badge-' + c.listingBadge.toLowerCase()}>{c.listingBadge}</span>}
                   <span className="faint" style={{ fontSize: 11 }}>{c.exchange}{c.type === 'ETF' ? ' · ETF' : ''}</span>
                 </button>
               ))}
@@ -177,6 +181,7 @@ export default function Compare({ onNavigate, onOpen, initial }) {
                 <button key={c.symbol} className="cmp-cand" onClick={() => pickB(c)}>
                   <span className="cmp-cand-sym mono">{c.symbol}</span>
                   <span className="cmp-cand-name">{c.name}</span>
+                  {c.listingBadge && <span className={'cand-badge cand-badge-' + c.listingBadge.toLowerCase()}>{c.listingBadge}</span>}
                   <span className="faint" style={{ fontSize: 11 }}>{c.exchange}{c.type === 'ETF' ? ' · ETF' : ''}</span>
                 </button>
               ))}

@@ -140,11 +140,32 @@ frontend/ src/{App,api}.jsx · components/{Welcome,Research,PriceChart,Metrics,A
   `news.sourcing` (kept/dropped counts) + per-evidence Fact/Interpretation/Unknown labels.
 - News is Finnhub → **Google News RSS** (keyless, global, searches by company name) →
   **Yahoo Finance fallback** so non-US listings get real, diverse coverage, not just Yahoo's.
+- **`GET /news/{ticker}`** (`orchestrator.news_bundle`) — the SAME relevance-filtered feed
+  `/analyze` uses, but with NO Claude call and no access-token/daily-cap gate. `NewsPanel.jsx`
+  loads Feed from here independently of the AI state; "What it means" still needs `/analyze`.
+  Both share one TTL-cached `gather()` bundle, so hitting `/news` first never forces a second
+  fetch when `/analyze` runs afterward for the same ticker.
+- `services/search.py::resolve()` **scores and ranks** candidates by listing quality (home/major
+  exchange first; OTC/CDR/preferred/secondary-dealer lines demoted, tagged `listingBadge` and
+  shown as a badge+tooltip in the picker) — Yahoo's own order regularly put a thin OTC ADR above
+  the real company. `App.jsx`'s `looksLikeTicker()` also gates the picker-skip: only a genuinely
+  ticker-shaped, unambiguous query auto-picks, so a company name that equals its own ticker (e.g.
+  "Sony") no longer silently skips disambiguation.
 - `company.py` **computes beta** vs the regional index (suffix→index map: .T→Nikkei, .KS→KOSPI,
   .NS→Nifty, …) when the provider has none — deterministic; response carries `betaSource`
   ("provider"|"computed") + `betaIndex`. Non-US peers are still gapped (Firecrawl is post-deploy).
-- `patterns.py` detects reversals **and** trendline shapes (triangles/wedges/channels), drawn
-  via a `lines` field in `PriceChart.jsx`. Only shapes actually present are returned.
+  `marketCapCurrency` is also on this response — `Ecosystem.jsx`/`Compare.jsx` format market cap
+  in the listing's own currency (it's never USD by default; formatting it as `$` regardless was
+  producing false comparisons, e.g. a JPY cap reading larger than Apple's real USD cap).
+- `patterns.py` scans the WHOLE series (every consecutive pair/triple of swings, not just the
+  most recent few) for reversal **and** trendline shapes, built from High/Low (not Close — matches
+  the actual wicks). Overlapping matches are deduplicated; confidence is a real "low"/"moderate"
+  label from level-fit tightness, not a fixed string. Only shapes actually present are returned,
+  drawn via a `lines`/`points` field in `PriceChart.jsx`.
+- `PriceChart.jsx` splits chart creation / price-series updates / pattern-overlay updates into
+  three independent effects instead of one that tore the whole chart down on any prop change —
+  the chart object persists for the component's lifetime; the view only re-fits on a genuinely
+  new dataset (new ticker/timeframe), so zoom/pan survive the 7-min auto-refresh.
 - `frontend/src/api.js` holds a **session result cache** (research/analyze/ecosystem/patterns) —
   tab-switching restores from memory; `/analyze` runs at most once per ticker per session.
 - **Comparison tab**: `components/Compare.jsx` (App `view === 'compare'`, tabs in Research/Welcome)
@@ -197,7 +218,7 @@ frontend/ src/{App,api}.jsx · components/{Welcome,Research,PriceChart,Metrics,A
   difference between them: `render.yaml` (Render Blueprint, native Python runtime, **no
   Docker**) or `Dockerfile` + `.dockerignore` (multi-stage, for hosts that want a container).
   Full steps: `docs/DEPLOY.md`.
-Endpoints: `/health`, `/search?q=`, `/research/{ticker}?period&interval`, `/analyze/{ticker}` (AI, degrades w/o key), `POST /ask/{ticker}` (Ask-Claude chat), `/patterns/{ticker}`, `/ecosystem/{ticker}`.
+Endpoints: `/health`, `/search?q=` (ranked, badged candidates), `/research/{ticker}?period&interval`, `/news/{ticker}` (free, deterministic feed — no key/gate needed), `/analyze/{ticker}` (AI, degrades w/o key), `POST /ask/{ticker}` (Ask-Claude chat), `/patterns/{ticker}` (High/Low-based, full-series scan), `/ecosystem/{ticker}`.
 
 ## Run (two terminals)
 ```
@@ -222,15 +243,30 @@ on the host** — the gate is a no-op until that env var is set.
 - Claude API via the Anthropic SDK; adaptive thinking + `output_config.effort` for non-Haiku models. Models: `claude-opus-5`, `claude-sonnet-5`, `claude-haiku-4-5` (no date suffixes).
 - News provider is pluggable via `TRADE101_NEWS_PROVIDER` (`finnhub` default → Google News →
   Yahoo fallback chain; standalone `yahoo`/`google` also selectable; add `firecrawl` later).
-- Servers pinned to `127.0.0.1` (IPv6 `::1` caused issues); API base `http://127.0.0.1:8000`.
+- Servers pinned to `127.0.0.1` (IPv6 `::1` caused issues); API base `http://127.0.0.1:8000` in
+  dev, overridable via `VITE_API_BASE` in a **local-only, gitignored** `frontend/.env.local` —
+  added 2026-09-17 when port 8000 got stuck holding an orphaned listening socket on this machine
+  (see Gotchas) with no owning process any tool could find/kill; backend ran on 8001 instead as a
+  local workaround. If you hit the same thing, check `frontend/.env.local` for a live override
+  before assuming the backend is down.
 - **Each `/analyze` call spends the user's Claude key — be sparing when testing in the browser.**
+  `/news`, by contrast, is free and unlimited (no Claude call at all) — prefer it for anything
+  that only needs headlines.
 - `TRADE101_ACCESS_TOKEN` / `TRADE101_DAILY_CAP` (both optional, unset = no-op): the pre-share
-  guard on `/analyze` + `/ask`. See `services/access.py` and `docs/DEPLOY.md`.
+  guard on `/analyze` + `/ask` only — every deterministic endpoint (incl. `/news`) stays open.
+  See `services/access.py` and `docs/DEPLOY.md`.
+- `TRADE101_SEC_CONTACT` (optional): email sent as the SEC EDGAR User-Agent (their fair-access
+  policy requires a real contact). Falls back to a generic placeholder if unset — filings lookups
+  still work, it's just not a real contact then. Never hardcode a personal email in committed
+  source for this; put it in the gitignored `.env` instead.
 - Windows 11, Git Bash available; the `claude` CLI is at `C:\Users\prana\.local\bin\claude.exe`.
 
 ## Known bugs
 **Full ranked list with evidence: [`docs/AUDIT.md`](docs/AUDIT.md) (critical audit, 2026-09-16).**
-Mirrored as checkboxes in `BACKLOG.md` → "Audit — Wave 0/1".
+Mirrored as checkboxes in `BACKLOG.md` → "Audit — Wave 0/1". **Waves 0 and 1 are both done** —
+remaining audit items are `docs/AUDIT.md`'s Wave 2 (cache the analysis result, an Anthropic
+client timeout, then deploy) and Wave 3 (chart indicator overlays + the UI/UX redesign), neither
+started yet. See `docs/AUDIT.md` §10 for the full fix order.
 
 ### Fixed 2026-09-16 (Audit Wave 0)
 - ~~Phase 3 work stranded off `master`~~ — was already merged to `origin/master` via PR #2 in a
@@ -249,17 +285,47 @@ Mirrored as checkboxes in `BACKLOG.md` → "Audit — Wave 0/1".
 - ~~No React error boundary~~ — `components/ErrorBoundary.jsx` now wraps `<App/>` in `main.jsx`;
   a render crash shows a recoverable message (remounts the tree) instead of a white screen.
 
-### Open — Wave 1 (the four flaws the user named; not yet started)
-- **Search auto-picks on a name/ticker collision** (`App.jsx:56`) — typing "Sony" silently opens the
-  NYSE ADR, never offering Tokyo. Ranking also puts ADR/OTC above primary listings. ✅ verified
-- **News only reaches the UI via the paid `/analyze` call** (`NewsPanel.jsx:8`) — no key, an AI
-  error, or the daily cap means no headlines at all.
-- **Chart is destroyed/rebuilt on every parent render** (`Research.jsx:170` passes a fresh array
-  literal) — typing in the header search rebuilds it per keystroke; auto-refresh resets zoom.
-- **Pattern detector only inspects the last 3 swings** and can return at most one reversal + one
-  trendline shape; its double-top branch rejects the textbook case.
-- **Not shareable as written** — `Welcome.jsx:26` hardcodes "Pranav"; `news.py:23` sends a personal
-  email as the SEC User-Agent.
+### Fixed 2026-09-17 (Audit Wave 1 — the four flaws the user named)
+- ~~Search auto-picked on a name/ticker collision~~ (`App.jsx:56`) — typing "Sony" silently opened
+  the NYSE ADR, never offering Tokyo. Fixed with `looksLikeTicker()`: the picker is now skipped
+  only when the query is genuinely ticker-shaped (no spaces, no lowercase) AND unambiguous — a
+  company NAME that happens to equal its own ticker no longer auto-picks. Same fix in `Compare.jsx`.
+  Also: `services/search.py::resolve()` now scores and sorts candidates by listing quality (home/
+  major exchange first; OTC/CDR/preferred/secondary-dealer lines demoted and badged `OTC`/`CDR`/
+  `Pref`/`Secondary` in the picker with a plain-language tooltip) — previously Yahoo's raw,
+  unranked order regularly put a thin OTC ADR above the real company (verified: "nintendo" put
+  `NTDOY` OTC above `7974.T` Tokyo). 4 new tests in `tests/test_search.py`. Verified live in the
+  browser: "Sony" now opens the picker with `6758.T` ranked above the NYSE ADR.
+- ~~News only reached the UI via the paid `/analyze` call~~ — new `GET /news/{ticker}`
+  (`agents/orchestrator.py::news_bundle`, no Claude call, not gated by the access guard) returns
+  the same relevance-filtered feed `/analyze` uses. `NewsPanel.jsx` now loads Feed from this
+  endpoint independently of the AI state; "What it means" still needs `/analyze` for its
+  inference, but headlines render immediately regardless of AI availability. Feed is now the
+  default tab (was "What it means"). 4 new tests in `tests/test_news_endpoint.py`, incl. one
+  proving `/news` and `/analyze` share one cached `gather()` call (no double-fetch). Verified
+  live: headlines rendered while the AI panel was still "Scraping & analysing…".
+- ~~Chart was destroyed/rebuilt on every parent render~~ — `PriceChart.jsx` rewritten from one
+  effect (any prop change → `chart.remove()` + full rebuild) into three independent effects:
+  chart creation (mount-once), price series (swap series only when candles↔line actually
+  changes, else just `setData`), pattern overlay (fully separate, never touches price data).
+  View is now only re-fit on a genuinely different dataset (new ticker/timeframe), not a
+  same-shape auto-refresh — zoom/pan now survive the 7-min refresh. `Research.jsx` also
+  memoizes `chartOhlcv`/`chartPatterns` so a fresh array identity isn't manufactured on every
+  keystroke in the header search. Verified live: typing no longer visibly rebuilds the chart.
+- ~~Pattern detector only inspected the last 3 swings, returned at most one reversal + one
+  trendline, and its double-top branch rejected the textbook case~~ — `services/patterns.py`
+  rewritten: full-series scan (every consecutive pair/triple of swings, not just the tail);
+  extrema now from High/Low, not Close (matches the actual wicks); double top/bottom no longer
+  requires an unrelated third peak to be higher (that rejected a double top with a *lower* prior
+  peak — the normal case at the end of an uptrend); overlapping matches dedup'd (a Head &
+  Shoulders claims its peaks so they aren't also reported as a Double Top); confidence is now a
+  real "low"/"moderate" label from level-fit tightness, not a fixed string. 4 new regression
+  tests in `tests/test_patterns.py`. Verified live on NVDA/1Y: 11 distinct patterns found (was
+  capped at 2), markers sit precisely on the candle wicks.
+- ~~Not shareable as written~~ — `Welcome.jsx` greeting de-personalized; `news.py`'s SEC
+  User-Agent contact now reads from `TRADE101_SEC_CONTACT` (falls back to a generic placeholder)
+  instead of a hardcoded personal email in committed source — the real email still lives in the
+  gitignored local `.env`, which is the correct place for it.
 
 ### Fixed 2026-09-15 (UI/UX + news + accessibility, user-reported)
 - ~~RSI/MACD/SMA/etc. metric values were nearly invisible~~ — `.metric`/`.metric .v` in
@@ -349,7 +415,15 @@ Mirrored as checkboxes in `BACKLOG.md` → "Audit — Wave 0/1".
   respawn one. Fix: `Get-CimInstance Win32_Process | ? CommandLine -match 'uvicorn|multiprocessing.spawn'`
   (exclude the yfinance-mcp / Claude Extensions python), kill those, confirm the port is clear,
   then start ONE backend. For a throwaway verification instance, run without `--reload`.
-- Chart-pattern detection is a heuristic learning aid (returns "none" when nothing clean) — never present it as a signal.
+- **A killed process can leave a genuinely orphaned LISTENING socket on Windows** (seen 2026-09-17
+  on port 8000): `netstat -ano`/`Get-NetTCPConnection` keep reporting a PID as `LISTEN`-ing the
+  port, but `Get-Process`/`taskkill` on that same PID say it doesn't exist — a real kernel-level
+  stuck socket, not a stale display. Waited 40+s, didn't clear on its own. Do NOT run `netsh
+  winsock reset` or any other system-level network fix for this — that's a prohibited action.
+  Workaround: run the backend on a fallback port (`--port 8001`) and point the frontend at it via
+  `frontend/.env.local`'s `VITE_API_BASE` (gitignored, local-only — see Config). A machine restart
+  should reclaim the original port; this needs no code change once it does.
+- Chart-pattern detection is a heuristic learning aid (returns "none" when nothing clean) — never present it as a signal. Detects on High/Low, not Close (2026-09-17).
 - Layout is a self-balancing JS masonry (measures block heights). Browser back/forward + `#TICKER` shareable links work — and now `#/compare` `#/watchlist` `#/history` too (2026-09-15).
 - Any element that doesn't set an explicit `color` can fall back to browser UA defaults instead
   of inheriting the page's `--ink` — this bit the `.metric` buttons once already (2026-09-15).

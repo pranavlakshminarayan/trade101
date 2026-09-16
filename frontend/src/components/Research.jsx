@@ -1,4 +1,4 @@
-import { useEffect, useLayoutEffect, useRef, useState } from 'react'
+import { useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react'
 import Logo from './Logo.jsx'
 import PriceChart from './PriceChart.jsx'
 import Metrics from './Metrics.jsx'
@@ -6,7 +6,7 @@ import AiRead from './AiRead.jsx'
 import NewsPanel from './NewsPanel.jsx'
 import Ecosystem from './Ecosystem.jsx'
 import AskClaude from './AskClaude.jsx'
-import { analyze, research, patterns as fetchPatterns } from '../api.js'
+import { analyze, news as fetchNews, research, patterns as fetchPatterns } from '../api.js'
 import { addHistory } from '../lib/history.js'
 import { isWatched, toggleWatch } from '../lib/watchlist.js'
 import { currencySymbol } from '../lib/currency.js'
@@ -34,6 +34,8 @@ export default function Research({ data, onBack, onSearch, onNavigate }) {
   const [live, setLive] = useState(data)
   const [ai, setAi] = useState(null)
   const [aiLoading, setAiLoading] = useState(true)
+  const [newsData, setNewsData] = useState(null)
+  const [newsLoading, setNewsLoading] = useState(true)
   const [chartType, setChartType] = useState('candles')
   const [timeframe, setTimeframe] = useState('1Y')
   const [tfData, setTfData] = useState({})
@@ -60,6 +62,15 @@ export default function Research({ data, onBack, onSearch, onNavigate }) {
     let alive = true
     setAiLoading(true); setAi(null)
     analyze(data.ticker).then((r) => { if (alive) { setAi(r); setAiLoading(false) } })
+    return () => { alive = false }
+  }, [data.ticker])
+
+  // News loads independently of the AI call (docs/AUDIT.md H3) — free,
+  // deterministic, and unaffected by a missing key / AI error / daily cap.
+  useEffect(() => {
+    let alive = true
+    setNewsLoading(true); setNewsData(null)
+    fetchNews(data.ticker).then((r) => { if (alive) { setNewsData(r); setNewsLoading(false) } })
     return () => { alive = false }
   }, [data.ticker])
 
@@ -129,18 +140,25 @@ export default function Research({ data, onBack, onSearch, onNavigate }) {
 
   const rawTf = timeframe === '1Y' ? ohlcv : (tfData[timeframe] || [])
   const sl = TF[timeframe].slice
-  const chartOhlcv = sl ? rawTf.slice(-sl) : rawTf
+  // Memoized: Research re-renders on every keystroke in the header search box
+  // (the `q` state lives here). Without this, .slice() below returned a fresh
+  // array identity on every render, which PriceChart's effect took as "the
+  // data changed" and rebuilt the whole chart accordingly (docs/AUDIT.md H4).
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  const chartOhlcv = useMemo(() => (sl ? rawTf.slice(-sl) : rawTf), [rawTf, sl])
   const chartLoading = timeframe !== '1Y' && !tfData[timeframe] && tfLoading
 
   const pats = patData[timeframe] || []
   const selPat = pats[patSel] || null
+  // Same identity-stability fix for the pattern overlay passed to PriceChart.
+  const chartPatterns = useMemo(() => (showPatterns && selPat ? [selPat] : []), [showPatterns, selPat])
 
   const submit = () => { const s = q.trim(); if (s) onSearch(s) }
 
   // block elements the masonry places
   const blocks = {
     metrics: <Metrics indicators={indicators} ticker={ticker} />,
-    news: <NewsPanel ai={ai} loading={aiLoading} ticker={ticker} />,
+    news: <NewsPanel newsData={newsData} newsLoading={newsLoading} ai={ai} aiLoading={aiLoading} ticker={ticker} />,
     ecosystem: <Ecosystem ticker={ticker} onSearch={onSearch} />,
     references: (
       <div className="card">
@@ -168,7 +186,7 @@ export default function Research({ data, onBack, onSearch, onNavigate }) {
       </div>
       {chartLoading || !chartOhlcv.length
         ? <div className="chartwrap placeholder" style={{ display: 'grid', placeItems: 'center' }}>Loading {timeframe}…</div>
-        : <PriceChart ohlcv={chartOhlcv} type={chartType} patterns={showPatterns && selPat ? [selPat] : []} showPatterns={showPatterns} />}
+        : <PriceChart ohlcv={chartOhlcv} type={chartType} patterns={chartPatterns} showPatterns={showPatterns} />}
       <div className="note">{timeframe} · {TF[timeframe].interval} bars · updated {updatedAt.toLocaleTimeString()} · auto-refreshes every 7 min · {meta.note}</div>
       {showPatterns && (
         <div className="patterns-panel">

@@ -1,13 +1,24 @@
 import { useState } from 'react'
 
-// News block with two tabs: Feed (raw sourced headlines) and
-// "What it means" (Trade101's reasoned inference — the sense-making).
-export default function NewsPanel({ ai, loading, ticker }) {
-  const [tab, setTab] = useState('means')
+// News block with two tabs: Feed (raw sourced headlines, DETERMINISTIC — loads
+// from the free /news endpoint, independent of the AI) and "What it means"
+// (Trade Craft's reasoned inference — genuinely needs the AI call).
+//
+// Previously the Feed tab was sourced from the /analyze response too, so no
+// Claude key / an AI error / the daily cap meant NO headlines at all —
+// deterministic data held hostage by the judgment layer (docs/AUDIT.md H3).
+// Feed now renders as soon as `newsData` arrives, whether or not `ai` ever
+// becomes available; only "What it means" still depends on it.
+export default function NewsPanel({ newsData, newsLoading, ai, aiLoading, ticker }) {
+  // Defaults to Feed: it's the deterministic, always-available data and now
+  // loads independently of the AI call — no reason to make the user wait on
+  // (or lose access to) headlines while "What it means" is still thinking.
+  const [tab, setTab] = useState('feed')
 
-  const news = ai?.news || {}
-  const feed = news.feed || []
-  const inference = news.inference || {}
+  const feed = newsData?.feed || []
+  const feedNote = newsData?.reason || newsData?.note
+  const inference = ai?.news?.inference || {}
+  const inferenceNote = ai?.news?.note
 
   return (
     <div className="card">
@@ -17,19 +28,15 @@ export default function NewsPanel({ ai, loading, ticker }) {
         <button className={'ntab' + (tab === 'means' ? ' on' : '')} onClick={() => setTab('means')}>What it means ✦</button>
       </div>
 
-      {loading && (
-        <div className="scraping">
-          <div className="spinner" />
-          <div className="faint" style={{ fontSize: 13 }}>Gathering the news feed…</div>
-        </div>
-      )}
-
-      {!loading && !ai?.available && (
-        <div className="placeholder">{ai?.reason || 'News analysis unavailable.'}</div>
-      )}
-
-      {!loading && ai?.available && tab === 'feed' && (
-        feed.length ? (
+      {tab === 'feed' && (
+        newsLoading ? (
+          <div className="scraping">
+            <div className="spinner" />
+            <div className="faint" style={{ fontSize: 13 }}>Gathering the news feed…</div>
+          </div>
+        ) : !newsData?.available ? (
+          <div className="placeholder">{newsData?.reason || 'News feed unavailable.'}</div>
+        ) : feed.length ? (
           feed.slice(0, 8).map((n, i) => {
             // A source URL isn't always available. Render those as a plain (non-link)
             // block instead of href="#" — a "#" link both goes nowhere useful and
@@ -49,18 +56,27 @@ export default function NewsPanel({ ai, loading, ticker }) {
             )
           })
         ) : (
-          <div className="placeholder">{news.note || `No recent news returned for ${ticker}.`}</div>
+          <div className="placeholder">{feedNote || `No recent news returned for ${ticker}.`}</div>
         )
       )}
 
-      {!loading && ai?.available && tab === 'means' && (
-        <div className="infer">
-          <span className="tagline">Trade Craft's inference · evidence-based, not advice</span>
-          <p style={{ marginTop: 8 }}>{inference.summary || news.note || 'No news to interpret yet.'}</p>
-          {inference.sources?.length > 0 && (
-            <div className="faint" style={{ fontSize: 12, marginTop: 6 }}>Sources: {inference.sources.join(' · ')}</div>
-          )}
-        </div>
+      {tab === 'means' && (
+        aiLoading ? (
+          <div className="scraping">
+            <div className="spinner" />
+            <div className="faint" style={{ fontSize: 13 }}>Reading the signals…</div>
+          </div>
+        ) : !ai?.available ? (
+          <div className="placeholder">{ai?.reason || 'AI narration unavailable.'}</div>
+        ) : (
+          <div className="infer">
+            <span className="tagline">Trade Craft's inference · evidence-based, not advice</span>
+            <p style={{ marginTop: 8 }}>{inference.summary || inferenceNote || 'No news to interpret yet.'}</p>
+            {inference.sources?.length > 0 && (
+              <div className="faint" style={{ fontSize: 12, marginTop: 6 }}>Sources: {inference.sources.join(' · ')}</div>
+            )}
+          </div>
+        )
       )}
     </div>
   )

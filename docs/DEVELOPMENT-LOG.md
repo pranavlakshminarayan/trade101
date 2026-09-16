@@ -654,3 +654,90 @@ Only things that need the user's own action, or are deliberately deferred/parked
   shareable link that was the actual goal.
 - A broader accessibility pass (modal keyboard-trap review, full contrast audit, mobile layout)
   remains open beyond the 2026-09-15 fixes, but is no longer a Phase 3 blocker.
+
+---
+
+## Audit — critical review, and Waves 0 & 1 (2026-09-16/17)
+
+**The trigger.** With Phase 3 feature-complete, the user asked for an adversarial, no-flattery
+review of the whole app — "product critic / systems analyst / solution architect / red-teamer" —
+to find the real functional, logical, and executional flaws before treating it as done, plus a
+critique (not yet a rebuild) of the UI/UX. Full detail: `docs/AUDIT.md`.
+
+**What the audit found.** Read the entire codebase and reproduced findings by running the code,
+not just reading it. Three were worse than "unfinished": (1) market cap rendered with a
+hardcoded `$` regardless of the listing's actual currency, so Nintendo's cap read as `$9.36T` —
+larger than Apple's real `$4.81T` — a false number breaking the app's own "numbers are exact"
+guardrail, on screen, silently; (2) `above_sma50/200` collapsed "the average isn't available" and
+"price is below the average" into the same `False`, and that false reached the analysis agent as
+exact data; (3) a completed Phase 3 branch (including the pre-share access guard) was sitting
+unmerged and unpushed in a stray git worktree — the project's own status docs said the fix was
+still outstanding while git said it had been written, i.e. the memory contradicted itself. Also
+confirmed, by reproducing them: the "Sony" search bug (typing the company name silently opened
+the NYSE ADR because the name equals its own ticker), the news panel depending entirely on the
+paid `/analyze` call, the chart being torn down and rebuilt on every keystroke, and a pattern
+detector that could return at most one reversal shape from only the last 3 swings.
+
+**Wave 0 (critical fixes, 2026-09-16).** Currency-correct market cap; tri-state SMA flags with
+both agent prompts taught to read `null` as unknown (regression test added); a React error
+boundary (`ErrorBoundary.jsx`) so a render crash no longer white-screens the whole app; fixed a
+`href="#"` news-link bug that mutated the hash router and could bounce the user back to Welcome.
+The stranded-branch finding (C3) turned out to have *already* been merged via GitHub PR #2 in a
+parallel session between the audit being written and the fix session starting — this session's
+`master` was simply one commit behind and needed a routine `git merge`, which surfaced one
+conflict in `CLAUDE.md`'s own status text (resolved in favor of the newer, accurate "shipped"
+wording, with the audit doc linked in).
+
+**Wave 1 (the four flaws the user named, 2026-09-17).** Search: `App.jsx` no longer auto-picks
+on a name/ticker collision (`looksLikeTicker()` — only a genuinely ticker-shaped, unambiguous
+query skips the picker), and `services/search.py` now scores/ranks candidates by listing quality
+(OTC/CDR/preferred/secondary-dealer lines demoted and badged) instead of passing Yahoo's raw,
+unranked order straight through. News: a new free `GET /news/{ticker}` endpoint decouples the
+Feed tab from the paid `/analyze` call entirely — headlines now render immediately regardless of
+Claude-key/error/daily-cap state, sharing one cached data bundle with `/analyze` so nothing is
+fetched twice. Chart: `PriceChart.jsx` rewritten from one effect that destroyed and rebuilt the
+whole chart on any prop change into three independent effects (chart lifecycle / price data /
+pattern overlay), so the chart survives re-renders and only re-fits its view on a genuinely new
+dataset — zoom/pan now survive the 7-min auto-refresh. Patterns: `services/patterns.py`
+rewritten to scan the whole series (not just the last 3 swings) built from High/Low (not Close),
+with real per-match confidence instead of a fixed string, found **11 distinct patterns on a real
+NVDA/1Y series** where the old code could return at most 2. Also de-personalized the Welcome
+greeting and moved the SEC EDGAR contact email out of committed source into an env var. 12 new
+backend tests added across the four areas; every fix was verified against the live app, not just
+unit tests, using the browser tooling — including screenshotting the picker's new OTC/CDR badges
+and the pattern overlay markers landing precisely on the candle wicks.
+
+**Mistakes / course-corrections in this pass** (an honest accounting, not a highlight reel):
+- Added a new `orchestrator.news(ticker)` function that **shadowed the already-imported
+  `services.news` module** at module scope inside `orchestrator.py` — every call inside
+  `_gather()` to `news.get_news(...)` would have broken at runtime the moment that function was
+  defined, a real bug in the shipped-looking code, not just a test artifact. Caught immediately
+  by the new endpoint's own test suite (`AttributeError: <function news> has no attribute
+  'get_news'`) before it ever reached the running app; fixed by renaming the function to
+  `news_bundle`. The lesson, already true of Python in general: never name a module-level
+  function the same as an imported module it needs to keep using.
+- Discovered mid-session that the app the user had been running locally — before and during this
+  session — was being served from a **stray leftover git worktree**
+  (`.claude/worktrees/execution-review-final-tasks-1f86c4`, on an unrelated branch), not from
+  this repo. Both the frontend (Vite) and one backend process were launched from that worktree's
+  own copy of the code, meaning none of this session's fixes (or, potentially, other recent work)
+  were visible in the browser the user was actually looking at until it was found and killed.
+  Caught by checking `above_sma200` against the live server and getting the pre-fix answer back
+  after the fix had already landed and been tested — i.e. by not trusting "the change is
+  committed" as proof the running app reflects it, and checking the live behavior directly
+  instead. Lesson carried forward: after any restart, verify the *served* behavior, not just that
+  a process is listening on the expected port.
+- Windows left a **genuinely orphaned listening socket on port 8000** after a forced process
+  kill — `netstat`/`Get-NetTCPConnection` kept reporting a PID as bound, but no process-listing
+  tool (`Get-Process`, `taskkill`) could find that PID to kill it, and it didn't clear after 40+
+  seconds of waiting. Did not attempt a Winsock-level fix (out of scope for an app-level session,
+  and system-network changes are off-limits regardless). Worked around it with a fallback port
+  (8001) and a local-only `VITE_API_BASE` override in `frontend/.env.local` (gitignored) rather
+  than hardcoding the workaround into committed source. Documented in `CLAUDE.md` → Gotchas in
+  case it recurs.
+
+Frontend: `npm run build` clean throughout. Backend: 48/48 tests passing (was 37 at the start of
+Wave 0). **Remaining audit work** (per `docs/AUDIT.md` §10): Wave 2 (cache the analysis result,
+an Anthropic client timeout, then deploy) and Wave 3 (chart indicator overlays via a
+`lightweight-charts` v5 upgrade, and the UI/UX redesign the user asked to review before it's
+built) — neither started yet.

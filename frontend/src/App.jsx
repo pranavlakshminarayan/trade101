@@ -70,6 +70,21 @@ export default function App() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [])
 
+  // A query "looks like a ticker" (not a company name) only when it's exactly
+  // how a person types a symbol on purpose: no spaces, no lowercase letters.
+  // "AAPL" and "7974.T" pass; "Sony", "sony", "Toyota Motor" don't — even
+  // though Sony's own ticker happens to BE the word "SONY".
+  const looksLikeTicker = (s) => !/\s/.test(s) && s === s.toUpperCase() && /[A-Z]/.test(s)
+
+  // Plain-language explanation for a non-primary listing badge, shown as a
+  // tooltip in the disambiguation picker — teaches the "why", not just the tag.
+  const badgeHint = (b) => ({
+    OTC: 'Trades over-the-counter (pink sheets), not on a major exchange — usually thinner, wider-spread than the primary listing.',
+    CDR: 'A Canadian Depositary Receipt — a repackaged version of the primary listing, traded on a Canadian exchange.',
+    Pref: 'A preferred-share class, not the common stock most research refers to.',
+    Secondary: 'A secondary dealer quote on this exchange — the listing itself trades primarily elsewhere.',
+  }[b] || '')
+
   // Resolve a name/ticker → research, or show a picker when ambiguous.
   async function submitQuery(query) {
     const qn = query.trim()
@@ -80,7 +95,13 @@ export default function App() {
       // maybe it's an exact ticker Yahoo search didn't surface — try it directly
       return doResearch(qn)
     }
-    if (cands.length === 1 || cands[0].symbol.toUpperCase() === qn.toUpperCase()) {
+    // Skip the picker only when there is truly nothing to disambiguate: exactly
+    // one match, OR the user typed something ticker-shaped that exactly hits
+    // the top (best-ranked) candidate. Previously this also fired whenever a
+    // company's NAME happened to equal its own ticker symbol — e.g. searching
+    // "Sony" silently opened the NYSE ADR and never offered the Tokyo listing,
+    // because "sony".toUpperCase() === "SONY" (docs/AUDIT.md finding H1).
+    if (cands.length === 1 || (looksLikeTicker(qn) && cands[0].symbol.toUpperCase() === qn.toUpperCase())) {
       return doResearch(cands[0].symbol)
     }
     setCandidates(cands); setLoading(false)
@@ -99,6 +120,7 @@ export default function App() {
           <button key={c.symbol} className="cand" onClick={() => doResearch(c.symbol)}>
             <span className="cand-sym mono">{c.symbol}</span>
             <span className="cand-name">{c.name}</span>
+            {c.listingBadge && <span className={'cand-badge cand-badge-' + c.listingBadge.toLowerCase()} title={badgeHint(c.listingBadge)}>{c.listingBadge}</span>}
             <span className="cand-exch faint">{c.exchange}{c.type === 'ETF' ? ' · ETF' : ''}</span>
           </button>
         ))}

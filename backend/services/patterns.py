@@ -1,8 +1,28 @@
 """
 Chart-pattern detection — deterministic, from price extrema and trendlines.
 
-Two families are detected, and ONLY the ones actually present on the given
-timeframe are returned (nothing is invented to fill space):
+Rewritten for docs/AUDIT.md finding H6, which found three structural defects
+in the original version:
+  1. Only the LAST 3 swing highs/lows were ever examined, so an otherwise
+     clean pattern earlier in the window was invisible.
+  2. At most one reversal + one trendline shape could ever be returned, and
+     the double-top branch required an unrelated third peak to be strictly
+     HIGHER than the two matching peaks — which rejects the textbook case
+     (a double top forming at the end of an uptrend has a LOWER prior peak),
+     so a real double top often produced nothing at all.
+  3. Extrema were found on Close, not High/Low — under-detecting shapes and
+     misplacing the marked points relative to the actual wicks.
+
+This version scans the WHOLE series for every matching shape (not just the
+tail), builds extrema from High (peaks) and Low (troughs), requires a real
+separating move between levels (not just any two similarly-priced closes),
+and computes a genuine confidence label from how tightly each match's levels
+agree — never a fixed string. Overlapping matches are deduplicated greedily
+(a Head & Shoulders consumes its three peaks so they can't also be reported
+as a separate Double Top).
+
+Two families are detected, and ONLY the ones actually present are returned
+(nothing is invented to fill space):
 
   Reversal shapes (from swing highs/lows):
     Triple/Double Top, Triple/Double Bottom, Head & Shoulders (+ inverse)
@@ -10,20 +30,23 @@ timeframe are returned (nothing is invented to fill space):
     Ascending / Descending / Symmetrical Triangle, Rising / Falling Wedge,
     Ascending / Descending Channel
 
-Each result carries the points to mark, any lines to draw, and a plain-English
-"what it is · why it's read this way · what traders watch · caveat" note for the
-magnifier. Heuristic and noisy by nature — a LOW-to-MODERATE-confidence LEARNING
-AID, never a signal. When nothing clean is present, returns [].
+Each result carries the points to mark, any lines to draw, a confidence
+label, and a plain-English "what it is · why it's read this way · what
+traders watch · caveat" note for the magnifier. Heuristic and noisy by
+nature — a LOW-to-MODERATE-confidence LEARNING AID, never a signal.
 """
 from __future__ import annotations
 
 import numpy as np
 from scipy.signal import argrelextrema
 
-TOL = 0.04       # "similar level" tolerance (4%) for reversal shapes
-FLAT = 0.03      # a trendline is "flat" if it moves <3% across the window
-CONVERGE = 0.72  # lines converge if the end gap is <72% of the start gap
-PARALLEL = 0.28  # lines are parallel if start/end gap differ by <28%
+TOL = 0.04        # "similar level" tolerance (4%) for reversal shapes
+MIN_DIP = 0.02    # the extremum between two levels must clear this fraction
+                   # of the level itself, or it's noise, not a real separating
+                   # move (two pushes to the same level, not one wobble)
+FLAT = 0.03       # a trendline is "flat" if it moves <3% across the window
+CONVERGE = 0.72   # lines converge if the end gap is <72% of the start gap
+PARALLEL = 0.28   # lines are parallel if start/end gap differ by <28%
 
 # what it is · momentum read · what traders watch · caveat — descriptive, never advice.
 EXPL = {
@@ -43,66 +66,134 @@ EXPL = {
 }
 
 
-def _sim(closes, a, b, tol=TOL):
-    return abs(closes[a] - closes[b]) / ((closes[a] + closes[b]) / 2) <= tol
+def _sim(vals, a, b, tol=TOL):
+    return abs(vals[a] - vals[b]) / ((vals[a] + vals[b]) / 2) <= tol
 
 
-def _mk(name, direction, idxs, labels, closes, times, neckline=None, lines=None):
-    pts = [{"time": int(times[i]), "price": round(float(closes[i]), 2), "label": lab}
+def _has_real_dip(vals, i, j, want_min, min_frac=MIN_DIP):
+    """Between bar-index i and j, is there a genuine trough (want_min=True —
+    used between two peaks) or peak (want_min=False — between two troughs)
+    that actually separates them, not just noise? True if the extremum in
+    between clears min_frac of the edge level."""
+    if j <= i + 1:
+        return False
+    seg = vals[i + 1:j]
+    if len(seg) == 0:
+        return False
+    edge = min(vals[i], vals[j]) if want_min else max(vals[i], vals[j])
+    extreme = seg.min() if want_min else seg.max()
+    return (abs(edge - extreme) / edge) >= min_frac if edge else False
+
+
+def _confidence(vals, idxs, tol=TOL):
+    """A real fit score, not a fixed string: 'moderate' when the matched
+    levels sit well inside the tolerance that defines the shape at all,
+    'low' otherwise. Capped at 'moderate' on purpose — this stays a LEARNING
+    AID, never confident enough to read as 'high'/a signal."""
+    diffs = [abs(vals[idxs[i]] - vals[idxs[i + 1]]) / ((vals[idxs[i]] + vals[idxs[i + 1]]) / 2)
+             for i in range(len(idxs) - 1)]
+    worst = max(diffs) if diffs else 0.0
+    return "moderate" if (worst / tol if tol else 1) <= 0.5 else "low"
+
+
+def _mk(name, direction, idxs, labels, vals, times, confidence, neckline=None, neck_vals=None, lines=None):
+    pts = [{"time": int(times[i]), "price": round(float(vals[i]), 2), "label": lab}
            for i, lab in zip(idxs, labels)]
-    p = {"name": name, "direction": direction, "confidence": "low–moderate",
+    p = {"name": name, "direction": direction, "confidence": confidence,
          "points": pts, "explanation": EXPL.get(name, "")}
     if neckline:
-        p["neckline"] = [{"time": int(times[i]), "price": round(float(closes[i]), 2)} for i in neckline]
+        nv = neck_vals if neck_vals is not None else vals
+        p["neckline"] = [{"time": int(times[i]), "price": round(float(nv[i]), 2)} for i in neckline]
     if lines:
         p["lines"] = lines
     return p
 
 
-def _reversals(c, times, peaks, troughs) -> list[dict]:
-    out = []
-    if len(peaks) >= 3:
-        a, b, mid = peaks[-3], peaks[-2], peaks[-1]
-        if _sim(c, a, b) and _sim(c, b, mid):
-            out.append(_mk("Triple Top", "bearish", [a, b, mid],
-                           ["Peak 1", "Peak 2", "Peak 3"], c, times))
-        elif c[b] > c[a] and c[b] > c[mid] and _sim(c, a, mid):
-            neck = [t for t in troughs if a < t < mid][:2]
-            out.append(_mk("Head & Shoulders", "bearish", [a, b, mid],
-                           ["Left shoulder", "Head", "Right shoulder"], c, times,
-                           neckline=neck if len(neck) == 2 else None))
-        elif _sim(c, b, mid) and c[a] > c[b]:
-            out.append(_mk("Double Top", "bearish", [b, mid],
-                           ["Peak 1", "Peak 2"], c, times))
+def _reversals(highs, lows, times, peaks, troughs) -> list[dict]:
+    """Full-series scan: every consecutive triple, then every consecutive
+    pair, of peaks/troughs — not just the most recent window. Triples/H&S
+    are checked first and claim their peaks/troughs so a Double Top can't
+    also be reported from the same two of a Triple Top's three peaks."""
+    out: list[dict] = []
+    used_p: set[int] = set()
+    used_t: set[int] = set()
 
-    if len(troughs) >= 3:
-        a, b, mid = troughs[-3], troughs[-2], troughs[-1]
-        if _sim(c, a, b) and _sim(c, b, mid):
+    for i in range(len(peaks) - 2):
+        a, b, mid = peaks[i], peaks[i + 1], peaks[i + 2]
+        if a in used_p or b in used_p or mid in used_p:
+            continue
+        if not (_has_real_dip(lows, a, b, True) and _has_real_dip(lows, b, mid, True)):
+            continue
+        if _sim(highs, a, b) and _sim(highs, b, mid):
+            out.append(_mk("Triple Top", "bearish", [a, b, mid],
+                           ["Peak 1", "Peak 2", "Peak 3"], highs, times,
+                           _confidence(highs, [a, b, mid])))
+            used_p |= {a, b, mid}
+        elif highs[b] > highs[a] and highs[b] > highs[mid] and _sim(highs, a, mid):
+            neck = [t for t in troughs if a < t < mid]
+            neck2 = [neck[0], neck[-1]] if len(neck) >= 2 else None
+            out.append(_mk("Head & Shoulders", "bearish", [a, b, mid],
+                           ["Left shoulder", "Head", "Right shoulder"], highs, times,
+                           _confidence(highs, [a, mid]), neckline=neck2, neck_vals=lows))
+            used_p |= {a, b, mid}
+
+    for i in range(len(troughs) - 2):
+        a, b, mid = troughs[i], troughs[i + 1], troughs[i + 2]
+        if a in used_t or b in used_t or mid in used_t:
+            continue
+        if not (_has_real_dip(highs, a, b, False) and _has_real_dip(highs, b, mid, False)):
+            continue
+        if _sim(lows, a, b) and _sim(lows, b, mid):
             out.append(_mk("Triple Bottom", "bullish", [a, b, mid],
-                           ["Trough 1", "Trough 2", "Trough 3"], c, times))
-        elif c[b] < c[a] and c[b] < c[mid] and _sim(c, a, mid):
-            neck = [t for t in peaks if a < t < mid][:2]
+                           ["Trough 1", "Trough 2", "Trough 3"], lows, times,
+                           _confidence(lows, [a, b, mid])))
+            used_t |= {a, b, mid}
+        elif lows[b] < lows[a] and lows[b] < lows[mid] and _sim(lows, a, mid):
+            neck = [p for p in peaks if a < p < mid]
+            neck2 = [neck[0], neck[-1]] if len(neck) >= 2 else None
             out.append(_mk("Inverse Head & Shoulders", "bullish", [a, b, mid],
-                           ["Left shoulder", "Head", "Right shoulder"], c, times,
-                           neckline=neck if len(neck) == 2 else None))
-        elif _sim(c, b, mid) and c[a] < c[b]:
-            out.append(_mk("Double Bottom", "bullish", [b, mid],
-                           ["Trough 1", "Trough 2"], c, times))
+                           ["Left shoulder", "Head", "Right shoulder"], lows, times,
+                           _confidence(lows, [a, mid]), neckline=neck2, neck_vals=highs))
+            used_t |= {a, b, mid}
+
+    # Double Top/Bottom — on peaks/troughs a triple/H&S above didn't already claim.
+    # Fixed from the original: no longer requires an unrelated third peak to be
+    # higher than the two matching ones (that rejected the textbook case of a
+    # double top with a LOWER prior peak) — just two similar levels with a real
+    # separating move between them.
+    for i in range(len(peaks) - 1):
+        a, b = peaks[i], peaks[i + 1]
+        if a in used_p or b in used_p:
+            continue
+        if _sim(highs, a, b) and _has_real_dip(lows, a, b, True):
+            out.append(_mk("Double Top", "bearish", [a, b], ["Peak 1", "Peak 2"],
+                           highs, times, _confidence(highs, [a, b])))
+            used_p |= {a, b}
+    for i in range(len(troughs) - 1):
+        a, b = troughs[i], troughs[i + 1]
+        if a in used_t or b in used_t:
+            continue
+        if _sim(lows, a, b) and _has_real_dip(highs, a, b, False):
+            out.append(_mk("Double Bottom", "bullish", [a, b], ["Trough 1", "Trough 2"],
+                           lows, times, _confidence(lows, [a, b])))
+            used_t |= {a, b}
+
     return out
 
 
-def _fit(idxs, c):
+def _fit(idxs, vals):
     """Least-squares slope/intercept of price over the index domain."""
     xs = np.asarray(idxs, dtype=float)
-    ys = c[idxs]
+    ys = vals[idxs]
     m, b = np.polyfit(xs, ys, 1)
     return float(m), float(b)
 
 
-def _trendlines(c, times, peaks, troughs) -> list[dict]:
-    """Triangles / wedges / channels from fitted support & resistance lines."""
-    n = len(c)
-    # Need at least two of each to define two lines; use the most recent few.
+def _trendlines(highs, lows, times, peaks, troughs) -> list[dict]:
+    """Triangles / wedges / channels from fitted support & resistance lines —
+    resistance through the HIGHS, support through the LOWS (previously both
+    were fit on Close, which touches neither rail precisely)."""
+    n = len(highs)
     hp = peaks[-4:] if len(peaks) >= 2 else []
     lp = troughs[-4:] if len(troughs) >= 2 else []
     if len(hp) < 2 or len(lp) < 2:
@@ -113,11 +204,11 @@ def _trendlines(c, times, peaks, troughs) -> list[dict]:
     if x1 - x0 < max(10, n * 0.15):   # window too short to be meaningful
         return []
 
-    mr, br = _fit(hp, c)   # resistance (through the highs)
-    ms, bs = _fit(lp, c)   # support (through the lows)
+    mr, br = _fit(hp, highs)   # resistance (through the highs)
+    ms, bs = _fit(lp, lows)    # support (through the lows)
     res0, res1 = mr * x0 + br, mr * x1 + br
     sup0, sup1 = ms * x0 + bs, ms * x1 + bs
-    avg = float(np.mean(c[x0:x1 + 1])) or 1.0
+    avg = float(np.mean((highs[x0:x1 + 1] + lows[x0:x1 + 1]) / 2)) or 1.0
 
     gap0, gap1 = res0 - sup0, res1 - sup1
     if gap1 <= 0 or gap0 <= 0:        # crossed / inverted lines → not a clean shape
@@ -151,6 +242,11 @@ def _trendlines(c, times, peaks, troughs) -> list[dict]:
     if not name:
         return []
 
+    # Confidence from how well the touches actually sit on their fitted line.
+    r_err = max(abs(highs[i] - (mr * i + br)) / avg for i in hp)
+    s_err = max(abs(lows[i] - (ms * i + bs)) / avg for i in lp)
+    confidence = "moderate" if max(r_err, s_err) <= FLAT else "low"
+
     lines = [
         [{"time": int(times[x0]), "price": round(res0, 2)},
          {"time": int(times[x1]), "price": round(res1, 2)}],
@@ -159,21 +255,24 @@ def _trendlines(c, times, peaks, troughs) -> list[dict]:
     ]
     idxs = sorted(set(hp) | set(lp))
     labels = ["" for _ in idxs]
-    p = _mk(name, direction, idxs, labels, c, times, lines=lines)
+    p = _mk(name, direction, idxs, labels, highs, times, confidence, lines=lines)
     return [p]
 
 
-def detect(closes: list[float], times: list[int]) -> list[dict]:
-    """Return the pattern(s) actually present — reversal and/or trendline shapes,
-    from the most recent price action. Empty when nothing clean is found."""
-    c = np.asarray(closes, dtype=float)
-    n = len(c)
-    if n < 30:
+def detect(highs: list[float], lows: list[float], times: list[int]) -> list[dict]:
+    """Return every pattern actually present — reversal and/or trendline
+    shapes, scanned across the WHOLE series (docs/AUDIT.md H6 — previously
+    only the most recent 3 swings were ever examined). Empty when nothing
+    clean is found; never invents a shape to fill space."""
+    h = np.asarray(highs, dtype=float)
+    l = np.asarray(lows, dtype=float)
+    n = len(h)
+    if n < 30 or len(l) != n:
         return []
     order = max(3, n // 40)  # extrema window scales with data length
-    peaks = list(argrelextrema(c, np.greater, order=order)[0])
-    troughs = list(argrelextrema(c, np.less, order=order)[0])
+    peaks = list(argrelextrema(h, np.greater, order=order)[0])
+    troughs = list(argrelextrema(l, np.less, order=order)[0])
 
-    out = _reversals(c, times, peaks, troughs)
-    out += _trendlines(c, times, peaks, troughs)
+    out = _reversals(h, l, times, peaks, troughs)
+    out += _trendlines(h, l, times, peaks, troughs)
     return out

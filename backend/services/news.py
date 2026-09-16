@@ -21,8 +21,11 @@ FINNHUB = "https://finnhub.io/api/v1"
 GOOGLE_NEWS_RSS = "https://news.google.com/rss/search"
 SEC_TICKERS = "https://www.sec.gov/files/company_tickers.json"
 SEC_SUBMISSIONS = "https://data.sec.gov/submissions/CIK{cik}.json"
-# SEC requires a descriptive User-Agent with contact info.
-SEC_UA = {"User-Agent": "Trade101 research app (workspace.sonic@gmail.com)"}
+# SEC requires a descriptive User-Agent with contact info (fair-access policy).
+# Configurable via TRADE101_SEC_CONTACT so a personal email never has to live in
+# source — falls back to a generic, no-owner-identifying contact if unset.
+SEC_UA = {"User-Agent": f"Trade Craft research app "
+                        f"({os.environ.get('TRADE101_SEC_CONTACT', 'contact-not-configured@example.com')})"}
 
 _cik_cache: dict[str, str] = {}
 

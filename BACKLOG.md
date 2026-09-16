@@ -34,31 +34,39 @@ A running list so we don't lose ideas. Add freely; we pull from here after the M
 - [x] **M9** — `components/ErrorBoundary.jsx` wraps `<App/>`; a render crash now shows a
   recoverable message instead of a white screen.
 
-## Audit — Wave 1: the four flaws the user named
+## Audit — Wave 1: the four flaws the user named — ✅ DONE 2026-09-17 (H5 deferred to Wave 3)
 
-- [ ] **H1 — Search silently auto-picks on a name/ticker collision.** `App.jsx:56` skips the picker
-  when the query equals the top candidate's symbol, so **"Sony" opens the NYSE ADR** and never
-  offers Tokyo (`6758.T`). Verified.
-- [ ] **H2 — Candidate ranking favours ADR/OTC/CDR over the primary listing.** "nintendo" ranks
-  `NTDOY` (OTC) above `7974.T`; "toyota" ranks `TM` above `7203.T`. Rank by listing class, group by
-  country, badge `ADR`/`OTC`/`CDR`/`Pref`.
-- [ ] **H3 — News is gated behind the paid AI call.** `NewsPanel` reads only from `/analyze`, so no
-  Claude key / an AI error / the daily cap ⇒ **no headlines at all**, and the feed waits on the full
-  model call. Add a free `GET /news/{ticker}` (gather() already computes it, TTL-cached).
-- [ ] **H4 — The chart is destroyed and rebuilt on every parent render** — a new `[]` literal in the
-  `patterns` prop (`Research.jsx:170`) invalidates the effect, so typing in the header search
-  rebuilds the chart per keystroke and auto-refresh discards zoom/pan.
+- [x] **H1 — Search silently auto-picked on a name/ticker collision.** Fixed: `App.jsx`'s
+  `looksLikeTicker()` only skips the picker for a genuinely ticker-shaped, unambiguous query —
+  "Sony" now opens the picker with `6758.T` correctly ranked above the NYSE ADR. Same fix in
+  `Compare.jsx`. Verified live.
+- [x] **H2 — Candidate ranking favoured ADR/OTC/CDR over the primary listing.** Fixed:
+  `services/search.py::resolve()` scores and sorts by listing quality (home/major exchange
+  first; OTC/CDR/Pref/Secondary demoted + badged with a tooltip). 4 new tests in
+  `tests/test_search.py`. Verified: "nintendo" now ranks `7974.T` above `NTDOY`.
+- [x] **H3 — News was gated behind the paid AI call.** Fixed: new `GET /news/{ticker}` (no
+  Claude call, no access-token/daily-cap gate), `NewsPanel.jsx`'s Feed tab loads from it
+  independently of `/analyze` and is now the default tab. 4 new tests in
+  `tests/test_news_endpoint.py`. Verified live: headlines rendered while the AI panel was still
+  loading.
+- [x] **H4 — The chart was destroyed and rebuilt on every parent render.** Fixed: `PriceChart.jsx`
+  rewritten into three independent effects (chart lifecycle / price data / pattern overlay);
+  `Research.jsx` memoizes the arrays passed in. View only re-fits on a genuinely new dataset, so
+  zoom/pan survive the 7-min auto-refresh. Verified live.
 - [ ] **H5 — No indicators are drawn on the chart.** SMA/Bollinger/RSI/MACD are computed and
   explained but never plotted. Upgrade `lightweight-charts` v4.2 → **v5** for sub-panes, add
-  overlays + a crosshair OHLC legend. (Not the TradingView embed — it can't draw our pattern overlays.)
-- [ ] **H6 — Pattern detection is structurally limited.** Only the last 3 swings are examined; ≤1
-  reversal + ≤1 trendline is ever returned; the double-top branch requires a *higher* prior peak so
-  it rejects the textbook case; detection runs on closes, not highs/lows; confidence is a hardcoded
-  string. Rewrite: full-series scan, all matches, real fit scores, grouped Reversal/Continuation/Trendline.
-- [ ] **H7 — Not shareable as written:** `Welcome.jsx:26` hardcodes "Pranav"; `news.py:23` sends a
-  personal email as the SEC User-Agent.
-- [ ] **H8 — Currency symbols cover only INR + USD**, duplicated in three files (`lib/currency.js`
-  on the unmerged branch fixes this).
+  overlays + a crosshair OHLC legend. **Deferred to Wave 3** (UI rebuild) per `docs/AUDIT.md`'s
+  original plan — it's a design/layout change, not a bugfix, and overlaps the redesign pass.
+- [x] **H6 — Pattern detection was structurally limited.** Fixed: `services/patterns.py`
+  rewritten — full-series scan (not just the last 3 swings), all non-overlapping matches
+  returned, detection on High/Low (not Close), double top/bottom no longer requires an unrelated
+  higher prior peak, confidence is a real fit-based label. 4 new regression tests. Verified live
+  on NVDA/1Y: 11 distinct patterns found (was capped at 2).
+- [x] **H7 — Not shareable as written.** Fixed: `Welcome.jsx` greeting de-personalized;
+  `news.py`'s SEC contact now reads `TRADE101_SEC_CONTACT` (falls back to a placeholder) instead
+  of a hardcoded email in committed source.
+- [x] **H8 — Currency symbols covered only INR + USD.** Already fixed by the Phase 3 merge
+  (`lib/currency.js`) before this wave started — confirmed still in place.
 
 ---
 
