@@ -1,42 +1,35 @@
-// Trade Craft mark — an upward growth spiral (green→teal gradient ribbon) ending
-// in an arrowhead, with an ascending bar chart in the loop and small currency
-// nodes along the path. Transparent background so it sits on the dark header.
-// `size` sets both dimensions.
+// Trade Craft mark — a T/C monogram: a bold structural T ("Trade") with a
+// teal ribbon wrapping its right side into a C ("Craft"), plus a copper
+// accent node where they meet — echoing the brand brief's "information
+// streams converging into understanding." Not finance iconography (no
+// candlesticks/arrows/$/bulls/bears/coins).
+//
+// Brand-spec colors are navy/teal/copper on an off-white ground. This app
+// keeps its dark-navy theme, so the T is rendered in `--ink` (the theme's
+// near-white) rather than navy, which would vanish on a dark background —
+// teal and copper are used true to spec. Bold, simplified geometry (thick
+// strokes, a pointed ribbon-tail stem) over a literal reproduction, so the
+// T reads clearly even at the 26px header size.
 export default function Logo({ size = 26 }) {
   return (
     <svg width={size} height={size} viewBox="0 0 64 64" aria-hidden="true">
-      <defs>
-        <linearGradient id="tc-rib" x1="6" y1="58" x2="56" y2="8" gradientUnits="userSpaceOnUse">
-          <stop offset="0" stopColor="#2ecc71" />
-          <stop offset="0.55" stopColor="#12b7b0" />
-          <stop offset="1" stopColor="#00a8ff" />
-        </linearGradient>
-        <linearGradient id="tc-rib2" x1="6" y1="58" x2="56" y2="8" gradientUnits="userSpaceOnUse">
-          <stop offset="0" stopColor="#00a8ff" />
-          <stop offset="1" stopColor="#2ecc71" />
-        </linearGradient>
-      </defs>
+      {/* teal ribbon — wraps the T's right side into an open C */}
+      <path
+        d="M42 9 C 59 11, 61 37, 48 47 C 40 53, 30 54, 23 48"
+        fill="none" stroke="var(--teal)" strokeWidth="11" strokeLinecap="round"
+      />
 
-      {/* spiral ribbon — a back band and a front band for a wrapped-cylinder feel */}
-      <path d="M9 53 C 4 36, 24 26, 33 34 C 41 41, 31 52, 22 48"
-            fill="none" stroke="url(#tc-rib2)" strokeWidth="4.4" strokeLinecap="round" opacity="0.55" />
-      <path d="M14 50 C 12 38, 30 33, 34 25 C 39 15, 47 14, 52 12"
-            fill="none" stroke="url(#tc-rib)" strokeWidth="5.4" strokeLinecap="round" />
+      {/* copper accent — a small node marking where the streams meet,
+          the third brand color, tucked into the crook of the T/ribbon */}
+      <path
+        d="M49 13 C 56 15, 57 23, 51 26 C 47 28, 43 25, 43 20 C 43 15, 45 12, 49 13 Z"
+        fill="#D3A464"
+      />
 
-      {/* arrowhead top-right */}
-      <path d="M45 9 L55 8 L52 19 Z" fill="#2ecc71" />
-
-      {/* ascending bar chart nestled in the top loop */}
-      <rect x="28" y="26" width="4.2" height="8" rx="1.2" fill="#00c2d6" />
-      <rect x="34" y="21" width="4.2" height="13" rx="1.2" fill="#1f8bd6" />
-      <rect x="40" y="15" width="4.2" height="19" rx="1.2" fill="#2ecc71" />
-
-      {/* currency nodes along the spiral */}
-      <g fontFamily="'Segoe UI',system-ui,sans-serif" fontWeight="700" textAnchor="middle">
-        <circle cx="10" cy="52" r="4.4" fill="#2ecc71" /><text x="10" y="54" fontSize="6" fill="#07351f">$</text>
-        <circle cx="24" cy="47" r="4" fill="#0fbfae" /><text x="24" y="49" fontSize="5.4" fill="#062f2b">€</text>
-        <circle cx="21" cy="30" r="4" fill="#1f8bd6" /><text x="21" y="32" fontSize="5.4" fill="#04263f">¥</text>
-      </g>
+      {/* the T — bold crossbar + a pointed ribbon-tail stem, solid ink so
+          it stays crisp and legible at any size */}
+      <rect x="6" y="6" width="34" height="13" rx="5" fill="var(--ink)" />
+      <path d="M16 6 L30 6 L30 44 L23 53 L16 44 Z" fill="var(--ink)" />
     </svg>
   )
 }
