@@ -60,8 +60,13 @@ A running list so we don't lose ideas. Add freely; we pull from here after the M
 - [x] **H6 — Pattern detection was structurally limited.** Fixed: `services/patterns.py`
   rewritten — full-series scan (not just the last 3 swings), all non-overlapping matches
   returned, detection on High/Low (not Close), double top/bottom no longer requires an unrelated
-  higher prior peak, confidence is a real fit-based label. 4 new regression tests. Verified live
-  on NVDA/1Y: 11 distinct patterns found (was capped at 2).
+  higher prior peak, confidence is a real fit-based label. **Two more regressions caught by the
+  user after the first pass, both fixed 2026-09-17:** the fixed 4%/2%/3% tolerances never fired
+  on intraday timeframes (5D/1D always returned 0 patterns) — now derived per-series from the
+  series' own volatility (`_scale()`); results weren't sorted, so a months-old match could
+  outrank an equally clean recent one (UI shows index 0 by default) — now sorted most-recent-
+  first. 6 total regression tests. Verified live on NVDA across all 5 timeframes and confirmed
+  the default tab is the most recent pattern.
 - [x] **H7 — Not shareable as written.** Fixed: `Welcome.jsx` greeting de-personalized;
   `news.py`'s SEC contact now reads `TRADE101_SEC_CONTACT` (falls back to a placeholder) instead
   of a hardcoded email in committed source.

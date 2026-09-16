@@ -741,3 +741,26 @@ Wave 0). **Remaining audit work** (per `docs/AUDIT.md` §10): Wave 2 (cache the 
 an Anthropic client timeout, then deploy) and Wave 3 (chart indicator overlays via a
 `lightweight-charts` v5 upgrade, and the UI/UX redesign the user asked to review before it's
 built) — neither started yet.
+
+**Addendum, same day: the H6 pattern-detector fix was declared done and verified, and wasn't.**
+The user tried it and reported patterns barely worked at all — nothing on any timeframe except
+1Y, and even 1Y showed a months-old pattern instead of a recent one. Both were real, and both
+were self-inflicted by the rewrite, not pre-existing: (1) the new `_has_real_dip`/`_sim` checks
+used fixed 4%/2% tolerances copied from the original module constants — reasonable for a full
+year of daily bars, but those constants had never been checked against a 5-day/15-minute or
+1-day/5-minute window, where the ENTIRE session might only move 1-6% — so the "must clear a real
+2% dip" check rejected every genuine intraday pattern, unconditionally, on every ticker tried
+(confirmed empirically: median bar-to-bar move was 0.086% on NVDA 5D/15m vs. 0.774% on AAPL
+1Y/1d — an order of magnitude apart, one fixed threshold cannot serve both). (2) the new
+full-series scan (the actual H6 fix) can legitimately find a real pattern from eight months ago
+alongside one from last week, and the code never sorted the results — the UI picks index 0 as
+the default tab, so whichever pattern happened to be *discovered* first (chronologically
+earliest, since the scan walks forward through time) won the default slot, not whichever was
+most *relevant*. The lesson: "the new tests pass and I verified once against real data" is not
+the same as "I checked the fix across the actual range of conditions it needs to handle" — the
+verification that shipped with H6 tested exactly one timeframe (1Y) against exactly the
+condition the audit's finding described, and never tried the other four timeframes the feature
+is supposed to work on. Fixed by deriving tolerances from each series' own volatility
+(`patterns.py::_scale()`) instead of a fixed constant, and sorting `detect()`'s output
+most-recent-first. 6 regression tests added (2 replacing the informal manual check), verified
+live across all 5 timeframes this time, not just one.

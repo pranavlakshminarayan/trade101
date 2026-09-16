@@ -102,3 +102,40 @@ def test_short_series_returns_empty():
 
 def test_mismatched_high_low_length_returns_empty():
     assert patterns.detect(list(range(40)), list(range(35)), list(range(40))) == []
+
+
+def test_low_volatility_intraday_series_still_finds_patterns():
+    # Regression (user-reported): patterns worked on 1Y but returned NOTHING
+    # on shorter/intraday timeframes. Root cause was the OLD fixed 4%/2%
+    # tolerance/min-dip, tuned for daily/yearly swings, never firing on a
+    # series whose total range is only ~1-2% (typical for 15-min bars over a
+    # few days) — every real double top on that scale got rejected as "no
+    # real dip between the peaks". Build a double top with peaks just ~0.4%
+    # apart and a ~0.15% separating dip — proportionally identical to the
+    # 4%-tolerance/2%-min-dip version, just 10x smaller in absolute terms.
+    x = _wave([101.00, 101.00], base=100.50, seg=25)
+    pats = patterns.detect(x.tolist(), x.tolist(), list(range(len(x))))
+    assert any(p["name"] == "Double Top" for p in pats), \
+        "a proportionally-clean double top must be found regardless of the series' absolute scale"
+
+
+def test_patterns_are_sorted_most_recent_first():
+    # Regression (user-reported): on the 1Y timeframe, the pattern shown by
+    # default (index 0) was often many months old even when a much more
+    # recent, equally clean pattern existed later in the same series — the
+    # full-series scan (H6) found both but never sorted them, so the UI's
+    # default selection (patSel = 0) surfaced whichever was found first
+    # (earliest in time), not the most relevant one.
+    old_top = _wave([120, 120], base=104, seg=25)                    # early in the series
+    gap = np.linspace(104, 108, 60)                                   # unrelated drift
+    recent_bottom = _wave([90, 90], base=104, seg=25)                 # late in the series
+    x = np.concatenate([old_top, gap, recent_bottom])
+    pats = patterns.detect(x.tolist(), x.tolist(), list(range(len(x))))
+    names = [p["name"] for p in pats]
+    assert "Double Top" in names and "Double Bottom" in names
+    # the most recent pattern (the bottom, which starts after old_top+gap)
+    # must be first in the returned list.
+    assert pats[0]["name"] == "Double Bottom"
+    top_time = max(pt["time"] for p in pats if p["name"] == "Double Top" for pt in p["points"])
+    bottom_time = max(pt["time"] for p in pats if p["name"] == "Double Bottom" for pt in p["points"])
+    assert bottom_time > top_time

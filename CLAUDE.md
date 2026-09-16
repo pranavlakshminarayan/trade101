@@ -159,7 +159,10 @@ frontend/ src/{App,api}.jsx · components/{Welcome,Research,PriceChart,Metrics,A
   producing false comparisons, e.g. a JPY cap reading larger than Apple's real USD cap).
 - `patterns.py` scans the WHOLE series (every consecutive pair/triple of swings, not just the
   most recent few) for reversal **and** trendline shapes, built from High/Low (not Close — matches
-  the actual wicks). Overlapping matches are deduplicated; confidence is a real "low"/"moderate"
+  the actual wicks). Its similar-level/min-dip/flat tolerances are derived PER SERIES from that
+  series' own median bar-to-bar volatility (`_scale()`) rather than a fixed percentage — a fixed
+  threshold tuned for daily/yearly swings never fired on intraday timeframes. Results are sorted
+  most-recent-first. Overlapping matches are deduplicated; confidence is a real "low"/"moderate"
   label from level-fit tightness, not a fixed string. Only shapes actually present are returned,
   drawn via a `lines`/`points` field in `PriceChart.jsx`.
 - `PriceChart.jsx` splits chart creation / price-series updates / pattern-overlay updates into
@@ -319,9 +322,19 @@ started yet. See `docs/AUDIT.md` §10 for the full fix order.
   requires an unrelated third peak to be higher (that rejected a double top with a *lower* prior
   peak — the normal case at the end of an uptrend); overlapping matches dedup'd (a Head &
   Shoulders claims its peaks so they aren't also reported as a Double Top); confidence is now a
-  real "low"/"moderate" label from level-fit tightness, not a fixed string. 4 new regression
-  tests in `tests/test_patterns.py`. Verified live on NVDA/1Y: 11 distinct patterns found (was
-  capped at 2), markers sit precisely on the candle wicks.
+  real "low"/"moderate" label from level-fit tightness, not a fixed string.
+  **User caught two real regressions in this first pass, both now fixed (2026-09-17):**
+  (a) the 4%/2%/3% tolerance/min-dip/flat constants were tuned for daily-or-longer swings and
+  never fired on intraday timeframes (5D/1D returned 0 patterns on every ticker tried) —
+  `_scale()` now derives tol/min_dip/flat from the SERIES' OWN median bar-to-bar volatility, so a
+  proportionally-clean pattern is found regardless of absolute price scale; also lowered the
+  hard `n < 30` bar-count floor to `n < 20` (1M/22 bars was always empty purely on bar count).
+  (b) results weren't sorted, so the full-series scan could surface a months-old match ahead of
+  an equally-clean recent one (the UI selects index 0 by default) — `detect()` now sorts
+  most-recent-first. 6 new regression tests total. Verified live on NVDA across all 5
+  timeframes (was 0 patterns on 1M/5D/1D, now finds patterns on every one) and confirmed the
+  default-selected pattern is the most recent (Double Bottom near the current date, not a
+  Triple Top from January).
 - ~~Not shareable as written~~ — `Welcome.jsx` greeting de-personalized; `news.py`'s SEC
   User-Agent contact now reads from `TRADE101_SEC_CONTACT` (falls back to a generic placeholder)
   instead of a hardcoded personal email in committed source — the real email still lives in the
