@@ -196,8 +196,10 @@ Most cleared in the flaw pass on 2026-09-14 — detail in `docs/HANDOVER.md` §4
 - [x] **Ecosystem thin outside the US showed a blank** — `services/company.py` returns a
   `coverage` map explaining missing beta/peers; the panel renders it.
 - [x] **`datetime.utcnow()` deprecated** — now timezone-aware.
-- [ ] **Non-US listings get no news** (Finnhub free tier 403s on non-US symbols). Now degrades
-  with a plain message, but the news half stays US-only until the Firecrawl work below lands.
+- [x] **Non-US listings get no news** (Finnhub free tier 403s on non-US symbols) — resolved
+  across several later fixes: Google News RSS fallback searches by company name (2026-09-15),
+  then widened to a 90-day window + an honest "little findable coverage" note when a listing
+  genuinely has almost nothing (Wave 3, 2026-09-17). No longer US-only.
 
 ---
 
