@@ -365,6 +365,30 @@ sides:
 - 87 backend tests pass throughout (no test changes needed — `TimeoutError` is a subclass of
   `Exception`, so it flows through every existing degrade-gracefully path unchanged). Frontend
   build verified clean.
+- **The actual root cause of the reported "loading forever," found doing a full button-by-button
+  audit right after this fix**: it wasn't (only) a timeout issue. `Research.jsx`'s chart
+  placeholder condition was `chartLoading || !chartOhlcv.length` — when a timeframe genuinely has
+  no data (SKHY, a brand-new listing, lacks 60 days of 30-min bars for its 10D tab, a legitimate
+  404, not a hang), `chartOhlcv` stays permanently empty even after `tfLoading` correctly clears,
+  so the UI kept showing "Loading 10D…" forever — indistinguishable from an actually-stuck fetch.
+  Fixed with a new `tfError` state tracking a per-timeframe fetch failure; the chart now shows
+  "No 10D data for SKHY — try a different timeframe" instead of lying that it's still working.
+  Reproduced and verified fixed locally (fresh page load, clicked 10D, confirmed the new message
+  appears immediately instead of hanging).
+- **Also found and fixed in the same audit — `/ecosystem` was slow even when nothing failed**:
+  `company.get_profile()` ran its `info`/`calendar`/beta-history/peer-name yfinance calls
+  sequentially — harmless when each is fast, but they stack: AAPL (a completely normal, healthy
+  ticker) took ~19s to load in the Comparison tab, easily read as "stuck." Parallelized with
+  `ThreadPoolExecutor` — `info` and `peers` fetch concurrently first, then `fundamentals`,
+  `peer_names`, and a computed beta (when needed) all run concurrently in a second round.
+  Measured: AAPL's `/ecosystem` call dropped from ~19s to ~3.6s. 87 backend tests still pass
+  (pure internal refactor, same return shape).
+- **Full button-by-button audit performed after these fixes** (user explicitly asked to verify
+  every control works, not just the reported bug): SMA/Bollinger/RSI/MACD toggles, all 5
+  timeframes, Candles/Line, Patterns + pattern-pill switching, Metrics tap-to-learn, Watch,
+  ecosystem peer-node navigation, Watchlist (add/note/persist), Comparison (both slots, picker,
+  chart), History, Practice Lab (buy — verified exact cash math), and Glossary search — all
+  confirmed working live, screenshots taken at each step. No other bugs found in this pass.
 - **Separately observed, not yet fixed**: `services/search.py::resolve()`'s OTC/secondary
   detection doesn't catch every thin/low-quality listing — `SKHY` (a brand-new NASDAQ line,
   `exchange: "NMS"`, not in `_OTC_EXCHANGES`) ranked ABOVE `000660.KS` with no badge, despite

@@ -40,6 +40,13 @@ export default function Research({ data, onBack, onSearch, onNavigate, onHome })
   const [timeframe, setTimeframe] = useState('1Y')
   const [tfData, setTfData] = useState({})
   const [tfLoading, setTfLoading] = useState(false)
+  // Bug (user-reported 2026-09-17): a timeframe with genuinely no data (e.g.
+  // a brand-new/thin listing without 60 days of 30-min bars yet) 404s, and
+  // the chart placeholder's old condition (`chartLoading || !chartOhlcv.length`)
+  // showed "Loading…" forever for that case — indistinguishable from an
+  // actually-stuck fetch. Tracking the failure explicitly lets the UI say
+  // "no data for this timeframe" instead of lying that it's still working.
+  const [tfError, setTfError] = useState({})
   const [showPatterns, setShowPatterns] = useState(false)
   const [patData, setPatData] = useState({})
   // Chart indicator overlays/panes (docs/AUDIT.md H5). SMA on by default — the
@@ -57,7 +64,7 @@ export default function Research({ data, onBack, onSearch, onNavigate, onHome })
   const ticker = live.ticker
 
   useEffect(() => {
-    setLive(data); setTfData({}); setPatData({}); setShowPatterns(false); setPatSel(0)
+    setLive(data); setTfData({}); setTfError({}); setPatData({}); setShowPatterns(false); setPatSel(0)
     setChartType('candles'); setTimeframe('1Y'); setUpdatedAt(new Date())
   }, [data])
 
@@ -89,12 +96,13 @@ export default function Research({ data, onBack, onSearch, onNavigate, onHome })
   }, [ai])
 
   useEffect(() => {
-    if (timeframe === '1Y' || tfData[timeframe]) return
+    if (timeframe === '1Y' || tfData[timeframe] || tfError[timeframe]) return
     let alive = true
     setTfLoading(true)
     research(ticker, TF[timeframe])
       .then((r) => { if (alive) setTfData((c) => ({ ...c, [timeframe]: { ohlcv: r.ohlcv, indicatorSeries: r.indicatorSeries, indicators: r.indicators } })) })
-      .catch(() => {}).finally(() => { if (alive) setTfLoading(false) })
+      .catch((e) => { if (alive) setTfError((c) => ({ ...c, [timeframe]: e.message || 'No data for this timeframe.' })) })
+      .finally(() => { if (alive) setTfLoading(false) })
     return () => { alive = false }
   }, [timeframe, ticker, tfData])
 
@@ -197,8 +205,12 @@ export default function Research({ data, onBack, onSearch, onNavigate, onHome })
         <button className={showRsi ? 'on' : ''} onClick={() => setShowRsi((v) => !v)} title="RSI in its own pane below price">RSI</button>
         <button className={showMacd ? 'on' : ''} onClick={() => setShowMacd((v) => !v)} title="MACD in its own pane below price">MACD</button>
       </div>
-      {chartLoading || !chartOhlcv.length
+      {chartLoading
         ? <div className="chartwrap placeholder" style={{ display: 'grid', placeItems: 'center' }}>Loading {timeframe}…</div>
+        : !chartOhlcv.length
+        ? <div className="chartwrap placeholder" style={{ display: 'grid', placeItems: 'center' }}>
+            {tfError[timeframe] ? `No ${timeframe} data for ${ticker} — try a different timeframe.` : `No ${timeframe} data available.`}
+          </div>
         : <PriceChart ohlcv={chartOhlcv} type={chartType} patterns={chartPatterns} showPatterns={showPatterns}
                       indicatorSeries={chartIndicatorSeries} overlays={overlaysActive} panes={panesActive} />}
       <div className="note">{timeframe} · {TF[timeframe].interval} bars · updated {updatedAt.toLocaleTimeString()} · auto-refreshes every 7 min · {meta.note}</div>

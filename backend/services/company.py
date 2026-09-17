@@ -203,32 +203,53 @@ def _fundamentals(ticker: str, info: dict) -> dict:
 
 
 def get_profile(ticker: str) -> dict:
+    """Assembles the ecosystem panel from several independent yfinance/Finnhub
+    round trips. These used to run one after another — harmless when Yahoo is
+    fast, but on a shared host (or just an ordinary slow moment) 4-5 sequential
+    provider calls stack into 15-20+ seconds for one panel (user-reported
+    2026-09-17: AAPL, a perfectly normal ticker, took ~19s in the Comparison
+    tab). `info` and `peers` don't depend on each other, so they run
+    concurrently; `fundamentals` (needs `info`), `peer_names` (needs `peers`),
+    and a computed beta (needs to know `info` had none) then also run
+    concurrently in a second round — critical path is roughly the length of
+    the two SLOWEST calls, not the sum of all of them."""
     t = yf.Ticker(ticker)
-    info = {}
-    try:
-        info = with_timeout(lambda: t.info, timeout=12)
-    except Exception:
-        info = {}
+
+    with ThreadPoolExecutor(max_workers=2) as ex:
+        info_fut = ex.submit(lambda: with_timeout(lambda: t.info, timeout=12))
+        peers_fut = ex.submit(_peers, ticker)
+        try:
+            info = info_fut.result()
+        except Exception:
+            info = {}
+        peers, peers_source = peers_fut.result()
 
     beta = info.get("beta")
-    peers, peers_source = _peers(ticker)
     is_us = "." not in ticker  # US symbols have no exchange suffix (e.g. AAPL vs 7974.T)
-
-    # If no published beta (the usual non-US case), compute it ourselves against
-    # the regional index — deterministic, exact, no external key.
     beta_source = "provider" if beta is not None else None
     beta_index = None
-    if beta is None:
-        beta, beta_index = _computed_beta(ticker)
-        if beta is not None:
-            beta_source = "computed"
-    elif beta_index is None:
-        # Provider betas (the common case) don't come with a named benchmark,
-        # but Yahoo/most providers measure US beta against the S&P 500 and
-        # non-US beta against the local index — the same map _computed_beta
-        # uses. Naming it (rather than just saying "the market") is what lets
-        # the UI actually explain "vs the S&P 500" instead of something vague.
-        _, beta_index = _index_for(ticker)
+    needs_computed_beta = beta is None
+
+    with ThreadPoolExecutor(max_workers=3) as ex:
+        fundamentals_fut = ex.submit(_fundamentals, ticker, info)
+        peer_names_fut = ex.submit(_peer_names, peers)
+        beta_fut = ex.submit(_computed_beta, ticker) if needs_computed_beta else None
+
+        fundamentals = fundamentals_fut.result()
+        peer_names = peer_names_fut.result()
+        if beta_fut is not None:
+            # If no published beta (the usual non-US case), compute it ourselves
+            # against the regional index — deterministic, exact, no external key.
+            beta, beta_index = beta_fut.result()
+            if beta is not None:
+                beta_source = "computed"
+        elif beta_index is None:
+            # Provider betas (the common case) don't come with a named benchmark,
+            # but Yahoo/most providers measure US beta against the S&P 500 and
+            # non-US beta against the local index — the same map _computed_beta
+            # uses. Naming it (rather than just saying "the market") is what lets
+            # the UI actually explain "vs the S&P 500" instead of something vague.
+            _, beta_index = _index_for(ticker)
 
     # Explain the gaps rather than showing a blank panel. Coverage outside the US
     # is thinner: yfinance often has no beta, and Finnhub's peers endpoint is US-only.
@@ -241,7 +262,6 @@ def get_profile(ticker: str) -> dict:
     if not peers:
         coverage["peers"] = "Peer/related companies aren't available for this listing."
 
-    fundamentals = _fundamentals(ticker, info)
     if fundamentals["coverage"]:
         coverage["fundamentals"] = fundamentals["coverage"]
 
@@ -268,7 +288,7 @@ def get_profile(ticker: str) -> dict:
         # tooltip — kept separate from `peers` (a plain ticker list) because
         # services/evidence.py matches news relevance against `peers` directly
         # and expects strings, not {symbol, name} objects.
-        "peerNames": _peer_names(peers),
+        "peerNames": peer_names,
         "summary": _truncate_summary(info.get("longBusinessSummary")),
         "coverage": coverage,
     }
