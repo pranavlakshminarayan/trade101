@@ -234,6 +234,13 @@ frontend/ src/{App,api}.jsx · components/{Welcome,Research,PriceChart,Metrics,A
 - **Watchlist**: `lib/watchlist.js` (localStorage, mirrors `lib/history.js`) + `components/
   Watchlist.jsx`. ☆/★ toggle on the research header; the view fetches a live quote per tracked
   ticker via `/research` (no Claude spend). Framed as tracking/study, never positions/P&L/signals.
+  Each entry can carry a one-line study note (`setNote()`, 2026-09-17, docs/AUDIT.md §9) —
+  editable inline, saved on blur, preserved across a plain re-`addWatch` but cleared if the entry
+  is actually removed then re-added. A note, never a position/target/signal.
+- **Glossary** (2026-09-17, docs/AUDIT.md §9): `lib/glossary.js` (static, stock-independent
+  reference terms — indicators, chart patterns, fundamentals figures) + `components/
+  Glossary.jsx`, a normal nav tab with a search box filtering term+definition text. Distinct
+  from `lessons.js`, which teaches a metric IN CONTEXT of the current stock's own numbers.
 - **Practice Lab**: `lib/practiceLab.js` (localStorage) + `components/PracticeLab.jsx`. A
   simulated $100,000 USD-only portfolio + trade journal — deliberately separate from the main
   learning flow. Buy/sell always use the real live `/research` price (never a typed number);

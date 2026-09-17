@@ -34,6 +34,12 @@ Each result carries the points to mark, any lines to draw, a confidence
 label, and a plain-English "what it is · why it's read this way · what
 traders watch · caveat" note for the magnifier. Heuristic and noisy by
 nature — a LOW-to-MODERATE-confidence LEARNING AID, never a signal.
+
+Wedge vs. channel definitions verified 2026-09-17 against a source the user
+supplied (https://www.strike.money/technical-analysis/chart-patterns):
+a wedge's two trendlines CONVERGE (support/resistance narrow toward a
+point); a channel's stay PARALLEL (consistent distance). That's exactly
+what CONVERGE/PARALLEL below implement — confirmed correct, not a bug.
 """
 from __future__ import annotations
 

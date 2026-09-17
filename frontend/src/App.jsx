@@ -5,6 +5,7 @@ import History from './components/History.jsx'
 import Compare from './components/Compare.jsx'
 import Watchlist from './components/Watchlist.jsx'
 import PracticeLab from './components/PracticeLab.jsx'
+import Glossary from './components/Glossary.jsx'
 import { research as fetchResearch, search as searchSymbols } from './api.js'
 import { captureTokenFromUrl } from './lib/access.js'
 
@@ -43,7 +44,7 @@ export default function App() {
   const [error, setError] = useState(null)
   const [recent, setRecent] = useState([])
   const [candidates, setCandidates] = useState(null) // disambiguation list
-  const [view, setView] = useState('home') // 'home' | 'history' | 'compare' | 'watchlist' | 'practice'
+  const [view, setView] = useState('home') // 'home' | 'history' | 'compare' | 'watchlist' | 'practice' | 'glossary'
 
   async function doResearch(symbol, push = true) {
     setLoading(true); setError(null); setCandidates(null)
@@ -148,6 +149,10 @@ export default function App() {
 
   if (view === 'practice') {
     return <PracticeLab onNavigate={goToView} onOpen={(t) => doResearch(t)} onHome={goHome} />
+  }
+
+  if (view === 'glossary') {
+    return <Glossary onNavigate={goToView} onHome={goHome} />
   }
 
   if (loading) {

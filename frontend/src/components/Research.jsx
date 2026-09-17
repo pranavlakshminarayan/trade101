@@ -236,7 +236,7 @@ export default function Research({ data, onBack, onSearch, onNavigate, onHome })
       <div className="top">
         <div style={{ display: 'flex', alignItems: 'center' }}>
           <button className="logo logo-btn" onClick={onHome}><Logo /> Trade Craft</button>
-          <div className="tabs"><button className="on" aria-current="page">Research</button><button onClick={() => onNavigate('compare')}>Comparison</button><button onClick={() => onNavigate('watchlist')}>Watchlist</button><button onClick={() => onNavigate('history')}>History</button><button onClick={() => onNavigate('practice')}>Practice Lab</button></div>
+          <div className="tabs"><button className="on" aria-current="page">Research</button><button onClick={() => onNavigate('compare')}>Comparison</button><button onClick={() => onNavigate('watchlist')}>Watchlist</button><button onClick={() => onNavigate('history')}>History</button><button onClick={() => onNavigate('practice')}>Practice Lab</button><button onClick={() => onNavigate('glossary')}>Glossary</button></div>
         </div>
         <div style={{ display: 'flex', gap: 8 }}>
           <button className={'watchbtn' + (watched ? ' on' : '')} onClick={onWatch}>

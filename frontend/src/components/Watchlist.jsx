@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react'
 import Logo from './Logo.jsx'
-import { getWatchlist, removeWatch } from '../lib/watchlist.js'
+import { getWatchlist, removeWatch, setNote } from '../lib/watchlist.js'
 import { research } from '../api.js'
 import { currencySymbol } from '../lib/currency.js'
 import { PlusIcon, ArrowIcon, CloseIcon } from './Icons.jsx'
@@ -30,6 +30,7 @@ export default function Watchlist({ onNavigate, onOpen, onHome }) {
   }, [])
 
   const drop = (t) => setItems(removeWatch(t))
+  const editNote = (t, note) => setItems(setNote(t, note))
 
   return (
     <div className="research">
@@ -42,6 +43,7 @@ export default function Watchlist({ onNavigate, onOpen, onHome }) {
             <button className="on" aria-current="page">Watchlist</button>
             <button onClick={() => onNavigate('history')}>History</button>
             <button onClick={() => onNavigate('practice')}>Practice Lab</button>
+            <button onClick={() => onNavigate('glossary')}>Glossary</button>
           </div>
         </div>
         <button className="backbtn" onClick={() => onNavigate('home')}><PlusIcon className="icon" /> New research</button>
@@ -59,14 +61,22 @@ export default function Watchlist({ onNavigate, onOpen, onHome }) {
           {items.map((it) => {
             const q = quotes[it.ticker]
             return (
-              <div className="watch-item" key={it.ticker}>
-                <button className="watch-open" onClick={() => onOpen(it.ticker)}>
-                  <span className="watch-tk mono">{it.ticker}</span>
-                  <span className="watch-name">{q?.name || it.name || ''}</span>
-                  <span className="watch-px mono">{q ? `${sym(q.currency)}${q.price}` : '…'}</span>
-                  {q ? changeChip(q.changePercent) : <span className="chip flat">—</span>}
-                </button>
-                <button className="watch-x" title="Remove" onClick={() => drop(it.ticker)}><CloseIcon className="icon" /></button>
+              <div className="watch-entry" key={it.ticker}>
+                <div className="watch-item">
+                  <button className="watch-open" onClick={() => onOpen(it.ticker)}>
+                    <span className="watch-tk mono">{it.ticker}</span>
+                    <span className="watch-name">{q?.name || it.name || ''}</span>
+                    <span className="watch-px mono">{q ? `${sym(q.currency)}${q.price}` : '…'}</span>
+                    {q ? changeChip(q.changePercent) : <span className="chip flat">—</span>}
+                  </button>
+                  <button className="watch-x" title="Remove" onClick={() => drop(it.ticker)}><CloseIcon className="icon" /></button>
+                </div>
+                <input
+                  className="watch-note"
+                  placeholder="Why are you watching this? (optional study note)"
+                  defaultValue={it.note || ''}
+                  onBlur={(e) => editNote(it.ticker, e.target.value)}
+                />
               </div>
             )
           })}

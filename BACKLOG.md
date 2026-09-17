@@ -121,7 +121,7 @@ A running list so we don't lose ideas. Add freely; we pull from here after the M
 
 ---
 
-## Audit — Wave 4: depth (in progress, started 2026-09-17)
+## Audit — Wave 4: depth — ✅ DONE 2026-09-17
 
 From `docs/AUDIT.md` §10 item 14-17. Working through in order per the audit's own sequencing.
 
@@ -169,8 +169,17 @@ From `docs/AUDIT.md` §10 item 14-17. Working through in order per the audit's o
   `routeHash`/`parseRoute` (extracted to module scope + exported so they're directly testable —
   the H1 disambiguation-skip logic, previously untested anywhere), and one component test
   (`Metrics.jsx`, via Testing Library) to prove the render/interaction path works end to end.
-- [ ] **Glossary + watchlist notes.** A beginner meeting "beta" or "neckline" in prose has
-  nowhere to look it up; the watchlist has no field to record why a user is tracking a stock.
+- [x] **Glossary + watchlist notes.** Done 2026-09-17.
+  - **Glossary**: new `lib/glossary.js` (static reference terms, grouped: Indicators / Chart
+    patterns / Company-fundamentals) + `components/Glossary.jsx` (new nav tab, search box that
+    filters term + definition text). Distinct from `lessons.js`, which teaches a metric IN
+    CONTEXT of the current stock's own numbers — this is a plain, stock-independent lookup.
+  - **Watchlist notes**: `lib/watchlist.js::setNote()` — a one-line "why I'm watching this" field
+    per entry, editable inline in `Watchlist.jsx` (save on blur), preserved across a plain
+    re-`addWatch` (not wiped by a refresh) but cleared if the entry is actually removed and
+    re-added. Stays inside the "describes, never advises" guardrail — a note, not a
+    position/target/signal.
+  - 3 new tests (watchlist notes). Verified live.
 
 ---
 

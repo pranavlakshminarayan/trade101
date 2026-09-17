@@ -113,6 +113,17 @@ export function CloseIcon(props) {
   )
 }
 
+export function BookIcon(props) {
+  return (
+    <svg {...base} {...props}>
+      <path d="M2 3.2c0-.66.54-1.2 1.2-1.2H8v11.6H3.2c-.66 0-1.2.54-1.2 1.2z"
+            fill="none" stroke="currentColor" strokeWidth="1.2" strokeLinejoin="round" />
+      <path d="M14 3.2c0-.66-.54-1.2-1.2-1.2H8v11.6h4.8c.66 0 1.2.54 1.2 1.2z"
+            fill="none" stroke="currentColor" strokeWidth="1.2" strokeLinejoin="round" />
+    </svg>
+  )
+}
+
 export function ChevronIcon({ open, ...props }) {
   return (
     <svg {...base} {...props} style={{ transform: open ? 'rotate(90deg)' : 'none', transition: 'transform .12s ease', ...props.style }}>

@@ -133,6 +133,7 @@ export default function Compare({ onNavigate, onOpen, initial, onHome }) {
             <button onClick={() => onNavigate('watchlist')}>Watchlist</button>
             <button onClick={() => onNavigate('history')}>History</button>
             <button onClick={() => onNavigate('practice')}>Practice Lab</button>
+            <button onClick={() => onNavigate('glossary')}>Glossary</button>
           </div>
         </div>
         <button className="backbtn" onClick={() => onNavigate('home')}>← Back</button>

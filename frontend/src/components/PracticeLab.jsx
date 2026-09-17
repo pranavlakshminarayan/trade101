@@ -120,6 +120,7 @@ export default function PracticeLab({ onNavigate, onOpen, onHome }) {
             <button onClick={() => onNavigate('watchlist')}>Watchlist</button>
             <button onClick={() => onNavigate('history')}>History</button>
             <button className="on" aria-current="page">Practice Lab</button>
+            <button onClick={() => onNavigate('glossary')}>Glossary</button>
           </div>
         </div>
         <button className="backbtn" onClick={() => onNavigate('home')}><PlusIcon className="icon" /> New research</button>

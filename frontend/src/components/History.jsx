@@ -26,6 +26,7 @@ export default function History({ onNavigate, onOpen, onHome }) {
             <button onClick={() => onNavigate('watchlist')}>Watchlist</button>
             <button className="on" aria-current="page">History</button>
             <button onClick={() => onNavigate('practice')}>Practice Lab</button>
+            <button onClick={() => onNavigate('glossary')}>Glossary</button>
           </div>
         </div>
         <button className="backbtn" onClick={() => onNavigate('home')}><PlusIcon className="icon" /> New research</button>

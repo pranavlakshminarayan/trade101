@@ -1,6 +1,6 @@
 import { useState } from 'react'
 import Logo from './Logo.jsx'
-import { SearchIcon, ScaleIcon, StarIcon, ClockIcon, PlusIcon, FlaskIcon } from './Icons.jsx'
+import { SearchIcon, ScaleIcon, StarIcon, ClockIcon, PlusIcon, FlaskIcon, BookIcon } from './Icons.jsx'
 
 const SUGGEST = ['NVDA', 'Apple', 'Samsung', 'Toyota', 'Tencent', 'Reliance']
 
@@ -17,6 +17,7 @@ export default function Welcome({ onSearch, recent, onNavigate }) {
         <button className="railitem" onClick={() => onNavigate('watchlist')}><StarIcon className="icon" /> Watchlist</button>
         <button className="railitem" onClick={() => onNavigate('history')}><ClockIcon className="icon" /> History</button>
         <button className="railitem" onClick={() => onNavigate('practice')}><FlaskIcon className="icon" /> Practice Lab</button>
+        <button className="railitem" onClick={() => onNavigate('glossary')}><BookIcon className="icon" /> Glossary</button>
         {recent?.length > 0 && <div className="railsec">Recent research</div>}
         {recent?.map((r) => (
           <button key={r} className="railitem" onClick={() => submit(r)}>{r}</button>

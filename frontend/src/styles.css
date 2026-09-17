@@ -99,6 +99,13 @@ button{font:inherit;cursor:pointer;color:inherit}
 .eco-facts{display:grid;grid-template-columns:1fr 1fr;gap:10px 16px}
 .eco-facts > div{display:flex;flex-direction:column;gap:2px;font-size:13.5px}
 .eco-facts .faint{font-size:11px;text-transform:uppercase;letter-spacing:.05em}
+/* glossary */
+.gloss-list{display:flex;flex-direction:column;gap:12px}
+.gloss-item{border-top:1px solid var(--hair);padding-top:10px}
+.gloss-item:first-child{border-top:none;padding-top:0}
+.gloss-term{font-weight:600;font-size:14px;color:var(--ink);margin-bottom:3px}
+.gloss-def{font-size:13px;color:var(--muted);line-height:1.55}
+
 /* history tab */
 .hist-list{display:flex;flex-direction:column;gap:10px}
 .hist-item{display:block;width:100%;text-align:left;background:var(--surface);border:1px solid var(--hair);border-radius:12px;padding:14px 16px;color:var(--ink)}
@@ -176,7 +183,12 @@ button{font:inherit;cursor:pointer;color:inherit}
 .watchbtn:hover{border-color:var(--amber);color:var(--ink)}
 .watchbtn.on{background:rgba(242,178,75,.12);border-color:var(--amber);color:var(--amber)}
 .watch-list{display:flex;flex-direction:column;gap:8px}
+.watch-entry{display:flex;flex-direction:column;gap:6px}
 .watch-item{display:flex;align-items:stretch;gap:6px}
+.watch-note{width:100%;background:var(--bg);border:1px solid var(--hair);border-radius:10px;
+  padding:8px 12px;color:var(--ink);font-size:12.5px}
+.watch-note::placeholder{color:var(--faint)}
+.watch-note:focus{outline:none;border-color:var(--teal)}
 .watch-open{flex:1;display:flex;align-items:center;gap:14px;background:var(--surface);border:1px solid var(--hair);
   border-radius:12px;padding:12px 16px;text-align:left;color:var(--ink)}
 .watch-open:hover{border-color:var(--teal)}
