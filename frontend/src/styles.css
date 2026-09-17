@@ -102,7 +102,18 @@ button{font:inherit;cursor:pointer;color:inherit}
 .hist-name{color:var(--muted);font-size:13.5px}
 .hist-sum{margin-top:7px;font-size:13px;color:var(--muted);line-height:1.5;
   display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden}
-.chartwrap{height:340px;width:100%}
+.chartwrap-outer{position:relative}
+.chartwrap{height:340px;width:100%;transition:height .15s ease}
+.chartlegend{position:absolute;top:4px;left:8px;z-index:5;font-size:11.5px;
+  color:var(--muted);font-family:'SF Mono',ui-monospace,Consolas,monospace;
+  pointer-events:none;background:rgba(7,14,26,.72);padding:2px 8px;border-radius:6px;
+  min-height:1.4em}
+.chartlegend b{color:var(--faint);font-weight:600;margin-right:2px}
+.chartlegend-up{color:var(--up);font-weight:600}
+.chartlegend-down{color:var(--down);font-weight:600}
+.chartlegend-flat{color:var(--muted);font-weight:600}
+.chart-indtoggle{margin-bottom:10px}
+.chart-indtoggle button{font-size:11.5px}
 
 /* deterministic snapshot */
 .snap li{padding:7px 0;border-top:1px solid var(--hair);font-size:14px;color:var(--muted);list-style:none}

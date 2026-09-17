@@ -66,6 +66,43 @@ def _num(x):
 
 # ---- public API -------------------------------------------------------------
 
+def _series(times: list[int], s: pd.Series) -> list[dict]:
+    """A time series as [{time, value}], dropping points where the indicator
+    isn't defined yet (e.g. the first 49 bars have no SMA50) rather than
+    sending a fabricated 0/null-as-zero — the chart should show NO line there,
+    not a line that dips to zero."""
+    out = []
+    for t, v in zip(times, s):
+        n = _num(v)
+        if n is not None:
+            out.append({"time": t, "value": n})
+    return out
+
+
+def compute_indicator_series(df: pd.DataFrame, times: list[int]) -> dict:
+    """Full time-aligned indicator series for CHARTING (overlays + RSI/MACD
+    panes) — as opposed to compute_indicators()'s single latest-value snapshot
+    used by the Metrics panel and the analysis agent. `times` must be the same
+    UNIX-seconds index /research already builds for the OHLCV candles, so a
+    plotted indicator lines up with the bar it was computed from."""
+    close = df["Close"]
+    sma50, sma200 = sma(close, 50), sma(close, 200)
+    up, mid, low = bollinger(close)
+    macd_line, signal_line, hist = macd(close)
+    return {
+        "sma50": _series(times, sma50),
+        "sma200": _series(times, sma200),
+        "bollinger": {
+            "upper": _series(times, up), "middle": _series(times, mid), "lower": _series(times, low),
+        },
+        "rsi14": _series(times, rsi(close)),
+        "macd": {
+            "macd": _series(times, macd_line), "signal": _series(times, signal_line),
+            "hist": _series(times, hist),
+        },
+    }
+
+
 def compute_indicators(df: pd.DataFrame) -> dict:
     """
     Compute the latest indicator snapshot from an OHLCV DataFrame

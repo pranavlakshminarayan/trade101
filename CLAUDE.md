@@ -170,10 +170,16 @@ frontend/ src/{App,api}.jsx · components/{Welcome,Research,PriceChart,Metrics,A
   most-recent-first. Overlapping matches are deduplicated; confidence is a real "low"/"moderate"
   label from level-fit tightness, not a fixed string. Only shapes actually present are returned,
   drawn via a `lines`/`points` field in `PriceChart.jsx`.
-- `PriceChart.jsx` splits chart creation / price-series updates / pattern-overlay updates into
-  three independent effects instead of one that tore the whole chart down on any prop change —
-  the chart object persists for the component's lifetime; the view only re-fits on a genuinely
-  new dataset (new ticker/timeframe), so zoom/pan survive the 7-min auto-refresh.
+- `PriceChart.jsx` — on **`lightweight-charts` v5** (upgraded from v4.2 for multi-pane support,
+  2026-09-17). Six independent effects: chart lifecycle / price series / SMA+Bollinger overlays
+  (price pane) / RSI+MACD (each their own pane, torn down and rebuilt fresh on any toggle change
+  rather than patched in place, since panes shift index when one is removed) / pattern overlay /
+  crosshair-legend subscription — no single prop change tears the whole chart down, and the view
+  only re-fits on a genuinely new dataset (new ticker/timeframe), so zoom/pan survive the 7-min
+  auto-refresh. `services/indicators.py::compute_indicator_series()` supplies the full
+  time-aligned arrays this needs (the original `compute_indicators()` only ever returns the
+  latest snapshot — fine for the Metrics panel, useless for drawing a line) via `/research`'s
+  `indicatorSeries` field.
 - `frontend/src/api.js` holds a **session result cache** (research/analyze/ecosystem/patterns) —
   tab-switching restores from memory; `/analyze` runs at most once per ticker per session.
 - **Comparison tab**: `components/Compare.jsx` (App `view === 'compare'`, tabs in Research/Welcome)
@@ -233,7 +239,7 @@ frontend/ src/{App,api}.jsx · components/{Welcome,Research,PriceChart,Metrics,A
   difference between them: `render.yaml` (Render Blueprint, native Python runtime, **no
   Docker**) or `Dockerfile` + `.dockerignore` (multi-stage, for hosts that want a container).
   Full steps: `docs/DEPLOY.md`.
-Endpoints: `/health`, `/search?q=` (ranked, badged candidates), `/research/{ticker}?period&interval`, `/news/{ticker}` (free, deterministic feed — no key/gate needed), `/analyze/{ticker}` (AI, degrades w/o key), `POST /ask/{ticker}` (Ask-Claude chat), `/patterns/{ticker}` (High/Low-based, full-series scan), `/ecosystem/{ticker}`.
+Endpoints: `/health`, `/search?q=` (ranked, badged candidates), `/research/{ticker}?period&interval` (now also returns `indicatorSeries` — full SMA/Bollinger/RSI/MACD arrays for charting), `/news/{ticker}` (free, deterministic feed — no key/gate needed), `/analyze/{ticker}` (AI, degrades w/o key), `POST /ask/{ticker}` (Ask-Claude chat), `/patterns/{ticker}` (High/Low-based, full-series scan), `/ecosystem/{ticker}`.
 
 ## Run (two terminals)
 ```
@@ -278,9 +284,24 @@ on the host** — the gate is a no-op until that env var is set.
 
 ## Known bugs
 **Full ranked list with evidence: [`docs/AUDIT.md`](docs/AUDIT.md) (critical audit, 2026-09-16).**
-Mirrored as checkboxes in `BACKLOG.md` → "Audit — Wave 0/1/2". **Waves 0, 1, and the code half of
-Wave 2 are done** — remaining is Wave 2's deploy step (the user's own host signup, not code) and
-Wave 3 (chart indicator overlays + the UI/UX redesign), neither started. See `docs/AUDIT.md` §10.
+Mirrored as checkboxes in `BACKLOG.md` → "Audit — Wave 0/1/2/3". **Waves 0, 1, 2 (code half), and
+Wave 3's chart-overlay item (H5) are done** — remaining: Wave 2's deploy step (the user's own
+host signup, not code) and Wave 3's UI/UX redesign, which the user asked to review as a proposal
+before any of it is built. See `docs/AUDIT.md` §10.
+
+### Fixed 2026-09-17 (Audit Wave 3, first item — H5: chart indicator overlays)
+- ~~No indicators were drawn on the chart~~ — SMA/Bollinger/RSI/MACD were computed and explained
+  in prose but never plotted. Upgraded `lightweight-charts` **v4.2 → v5** (its multi-pane support
+  is the whole reason — v4 has none). Backend: new `indicators.compute_indicator_series()`
+  returns full time-aligned arrays (the existing `compute_indicators()` only ever returns the
+  LATEST snapshot value, useless for drawing a line across the chart) — wired into `/research`'s
+  new `indicatorSeries` field. Frontend: `PriceChart.jsx` overlays SMA50/SMA200 + Bollinger Bands
+  on the price pane, puts RSI and MACD each in their own pane below (RSI on a fixed 0-100 scale
+  with 30/70 overbought/oversold reference lines), and adds a crosshair-driven OHLC + change% +
+  volume legend. All four togglable from the chart header (SMA on by default; Bollinger/RSI/MACD
+  off, so the chart isn't busy for a first-time user). 3 new backend tests. Verified live: RSI's
+  hovered value (46.89) matches the Metrics panel's snapshot (46.8876) exactly, confirming the
+  two views come from the same numbers; crosshair legend confirmed via a real hover event.
 
 ### Fixed 2026-09-17 (Audit Wave 2 — cost/reliability)
 - ~~No backend cache of the analysis result — every reload spent a fresh paid call~~ (M2) —

@@ -1,28 +1,46 @@
 import { useEffect, useRef } from 'react'
-import { createChart } from 'lightweight-charts'
+import {
+  createChart, CandlestickSeries, AreaSeries, HistogramSeries, LineSeries, createSeriesMarkers,
+} from 'lightweight-charts'
 
-const PAT = '#F2A93B' // amber — stands out over green/red candles
+const PAT = '#F2A93B'   // amber — pattern overlay, stands out over green/red candles
+const SMA50_C = '#5B9BD5'
+const SMA200_C = '#C99A5A'
+const BOLL_C = 'rgba(158,124,255,0.55)'
+const RSI_C = '#8FD6FF'
+const MACD_LINE_C = '#5B9BD5'
+const MACD_SIGNAL_C = '#F2A93B'
 
-// OHLCV as candlesticks (+volume) or a directional line/area. When `showPatterns`
-// is on, overlays detected patterns: a line through the swing points, labeled
-// markers, and the neckline.
+// OHLCV as candlesticks (+volume) or a directional line/area, with optional
+// SMA/Bollinger overlays, RSI/MACD sub-panes, a crosshair OHLC+indicator
+// legend, and detected-pattern overlays. Ported to lightweight-charts v5 for
+// this (docs/AUDIT.md finding H5) — v4 has no multi-pane support, which is
+// what makes RSI/MACD sit properly below price instead of being crammed onto
+// the same axis or omitted entirely (the app used to only ever EXPLAIN these
+// indicators in prose next to a chart that never plotted them).
 //
-// Split into THREE independent effects (chart lifecycle / price data / pattern
-// overlay) instead of one effect that tore the whole chart down and rebuilt it
-// on ANY prop change. That used to mean typing in the header search — which
-// re-renders this component's parent on every keystroke — destroyed and
-// recreated the chart several times a second, and the 7-min auto-refresh reset
-// the user's zoom/pan every time (docs/AUDIT.md finding H4). Now: the chart
-// object itself is created once and lives for the component's lifetime; price
-// data updates via `setData` on the existing series; the view is only
-// re-fit when the dataset is actually a different window (new ticker/
-// timeframe), not on a same-shape refresh — so pan/zoom survive a refresh.
-export default function PriceChart({ ohlcv, type = 'candles', patterns = [], showPatterns = false }) {
+// Lifecycle is split into independent effects so no single prop change tears
+// the whole chart down (docs/AUDIT.md finding H4 — the earlier fix this
+// builds on): chart creation (mount-once) / price series / overlays /
+// indicator panes / pattern overlay / crosshair legend subscription.
+export default function PriceChart({
+  ohlcv, type = 'candles', patterns = [], showPatterns = false,
+  indicatorSeries = null, overlays = { sma: false, bollinger: false },
+  panes = { rsi: false, macd: false },
+}) {
   const containerRef = useRef(null)
+  const legendRef = useRef(null)
   const chartRef = useRef(null)
   const seriesRef = useRef({ type: null, main: null, vol: null })
+  const overlaySeriesRef = useRef([])
+  const paneSeriesRef = useRef({ rsi: null, macd: null, macdSignal: null, macdHist: null })
   const patternSeriesRef = useRef([])
+  const patternMarkersRef = useRef([])
   const fitKeyRef = useRef(null)
+  // Latest data, read imperatively by the crosshair handler so that handler
+  // doesn't need to be re-subscribed (and so re-subscribing) on every render.
+  const liveRef = useRef({ ohlcv, type, indicatorSeries })
+  liveRef.current = { ohlcv, type, indicatorSeries }
 
   // 1. Create the chart once, on mount. Never recreated by a data/prop change.
   useEffect(() => {
@@ -40,7 +58,10 @@ export default function PriceChart({ ohlcv, type = 'candles', patterns = [], sho
       chart.remove()
       chartRef.current = null
       seriesRef.current = { type: null, main: null, vol: null }
+      overlaySeriesRef.current = []
+      paneSeriesRef.current = { rsi: null, macd: null, macdSignal: null, macdHist: null }
       patternSeriesRef.current = []
+      patternMarkersRef.current = []
       fitKeyRef.current = null
     }
   }, [])
@@ -58,14 +79,14 @@ export default function PriceChart({ ohlcv, type = 'candles', patterns = [], sho
         const up = ohlcv[ohlcv.length - 1].close >= ohlcv[0].close
         const line = up ? '#00D68F' : '#F0616D'
         const top = up ? 'rgba(0,214,143,.28)' : 'rgba(240,97,109,.26)'
-        seriesRef.current.main = chart.addAreaSeries({ lineColor: line, lineWidth: 2, topColor: top, bottomColor: 'rgba(10,20,30,0)' })
+        seriesRef.current.main = chart.addSeries(AreaSeries, { lineColor: line, lineWidth: 2, topColor: top, bottomColor: 'rgba(10,20,30,0)' })
         seriesRef.current.vol = null
         chart.timeScale().applyOptions({ timeVisible: true })
       } else {
-        seriesRef.current.main = chart.addCandlestickSeries({
+        seriesRef.current.main = chart.addSeries(CandlestickSeries, {
           upColor: '#00D68F', downColor: '#F0616D', wickUpColor: '#00D68F', wickDownColor: '#F0616D', borderVisible: false,
         })
-        seriesRef.current.vol = chart.addHistogramSeries({ priceFormat: { type: 'volume' }, priceScaleId: '' })
+        seriesRef.current.vol = chart.addSeries(HistogramSeries, { priceFormat: { type: 'volume' }, priceScaleId: '' })
         seriesRef.current.vol.priceScale().applyOptions({ scaleMargins: { top: 0.82, bottom: 0 } })
         chart.timeScale().applyOptions({ timeVisible: false })
       }
@@ -91,13 +112,96 @@ export default function PriceChart({ ohlcv, type = 'candles', patterns = [], sho
     }
   }, [ohlcv, type])
 
-  // 3. Pattern overlay: fully independent of the price series — toggling or
-  // switching a pattern never touches (or rebuilds) the chart/price data.
+  // 3. Overlays (SMA50/SMA200, Bollinger) — pane 0, sharing the price scale.
+  // Independent of the price series itself: toggling an overlay never
+  // touches the candles/volume.
+  useEffect(() => {
+    const chart = chartRef.current
+    if (!chart) return
+    overlaySeriesRef.current.forEach((s) => { try { chart.removeSeries(s) } catch { /* chart/series already gone */ } })
+    overlaySeriesRef.current = []
+    if (!indicatorSeries) return
+
+    if (overlays.sma) {
+      if (indicatorSeries.sma50?.length) {
+        const s = chart.addSeries(LineSeries, { color: SMA50_C, lineWidth: 2, priceLineVisible: false, lastValueVisible: false, title: 'SMA 50' })
+        s.setData(indicatorSeries.sma50)
+        overlaySeriesRef.current.push(s)
+      }
+      if (indicatorSeries.sma200?.length) {
+        const s = chart.addSeries(LineSeries, { color: SMA200_C, lineWidth: 2, priceLineVisible: false, lastValueVisible: false, title: 'SMA 200' })
+        s.setData(indicatorSeries.sma200)
+        overlaySeriesRef.current.push(s)
+      }
+    }
+    if (overlays.bollinger && indicatorSeries.bollinger?.upper?.length) {
+      const { upper, middle, lower } = indicatorSeries.bollinger
+      const up = chart.addSeries(LineSeries, { color: BOLL_C, lineWidth: 1, priceLineVisible: false, lastValueVisible: false, title: 'Bollinger' })
+      up.setData(upper)
+      const mid = chart.addSeries(LineSeries, { color: BOLL_C, lineWidth: 1, lineStyle: 2, priceLineVisible: false, lastValueVisible: false })
+      mid.setData(middle)
+      const low = chart.addSeries(LineSeries, { color: BOLL_C, lineWidth: 1, priceLineVisible: false, lastValueVisible: false })
+      low.setData(lower)
+      overlaySeriesRef.current.push(up, mid, low)
+    }
+  }, [indicatorSeries, overlays.sma, overlays.bollinger])
+
+  // 4. Indicator panes (RSI, MACD) — each in its own pane below price. Torn
+  // down and rebuilt fresh on any toggle change (removing every pane past
+  // the main one first) rather than trying to patch individual panes in
+  // place — panes shift index when one is removed, so a full rebuild avoids
+  // a whole class of off-by-one bugs for a UI action that's rare (a toggle
+  // click) and cheap to redo.
+  useEffect(() => {
+    const chart = chartRef.current
+    if (!chart) return
+    while (chart.panes().length > 1) chart.removePane(1)
+    paneSeriesRef.current = { rsi: null, macd: null, macdSignal: null, macdHist: null }
+    if (!indicatorSeries) return
+
+    let nextPane = 1
+    if (panes.rsi && indicatorSeries.rsi14?.length) {
+      const p = nextPane++
+      const rsi = chart.addSeries(LineSeries, {
+        color: RSI_C, lineWidth: 2, priceLineVisible: false, lastValueVisible: true, title: 'RSI (14)',
+        autoscaleInfoProvider: () => ({ priceRange: { minValue: 0, maxValue: 100 } }),
+      }, p)
+      rsi.setData(indicatorSeries.rsi14)
+      rsi.createPriceLine({ price: 70, color: '#F0616D', lineWidth: 1, lineStyle: 2, axisLabelVisible: true, title: 'overbought' })
+      rsi.createPriceLine({ price: 30, color: '#00D68F', lineWidth: 1, lineStyle: 2, axisLabelVisible: true, title: 'oversold' })
+      chart.panes()[p]?.setStretchFactor(0.28)
+      paneSeriesRef.current.rsi = rsi
+    }
+    if (panes.macd && indicatorSeries.macd?.macd?.length) {
+      const p = nextPane++
+      // `title` renders its own persistent axis label independent of
+      // lastValueVisible — set on only ONE series per pane (else every
+      // series' label stacks up and overlaps, as MACD's hist+line did here).
+      const hist = chart.addSeries(HistogramSeries, { priceLineVisible: false, lastValueVisible: false }, p)
+      hist.setData(indicatorSeries.macd.hist.map((pt) => ({
+        ...pt, color: pt.value >= 0 ? 'rgba(0,214,143,.55)' : 'rgba(240,97,109,.55)',
+      })))
+      const macdLine = chart.addSeries(LineSeries, { color: MACD_LINE_C, lineWidth: 2, priceLineVisible: false, lastValueVisible: true, title: 'MACD (12,26,9)' }, p)
+      macdLine.setData(indicatorSeries.macd.macd)
+      const signal = chart.addSeries(LineSeries, { color: MACD_SIGNAL_C, lineWidth: 1, priceLineVisible: false, lastValueVisible: false }, p)
+      signal.setData(indicatorSeries.macd.signal)
+      chart.panes()[p]?.setStretchFactor(0.28)
+      paneSeriesRef.current.macd = macdLine
+      paneSeriesRef.current.macdSignal = signal
+      paneSeriesRef.current.macdHist = hist
+    }
+    chart.panes()[0]?.setStretchFactor(1)
+  }, [indicatorSeries, panes.rsi, panes.macd])
+
+  // 5. Pattern overlay: fully independent of the price series/panes above —
+  // toggling or switching a pattern never touches the chart/price data.
   useEffect(() => {
     const chart = chartRef.current
     if (!chart) return
     patternSeriesRef.current.forEach((s) => { try { chart.removeSeries(s) } catch { /* already gone with the chart */ } })
     patternSeriesRef.current = []
+    patternMarkersRef.current.forEach((m) => { try { m.setMarkers([]) } catch { /* series already removed */ } })
+    patternMarkersRef.current = []
 
     if (!showPatterns || !patterns?.length) return
     patterns.forEach((pat) => {
@@ -106,34 +210,72 @@ export default function PriceChart({ ohlcv, type = 'candles', patterns = [], sho
       // shapes connect their swing `points` instead.
       if (pat.lines?.length) {
         pat.lines.forEach((ln) => {
-          const s = chart.addLineSeries({ color: PAT, lineWidth: 2, lastValueVisible: false, priceLineVisible: false, crosshairMarkerVisible: false })
+          const s = chart.addSeries(LineSeries, { color: PAT, lineWidth: 2, lastValueVisible: false, priceLineVisible: false, crosshairMarkerVisible: false })
           s.setData(ln.map((p) => ({ time: p.time, value: p.price })).sort((a, b) => a.time - b.time))
           patternSeriesRef.current.push(s)
         })
       } else if (pts.length) {
-        const ls = chart.addLineSeries({ color: PAT, lineWidth: 2, lastValueVisible: false, priceLineVisible: false, crosshairMarkerVisible: false })
+        const ls = chart.addSeries(LineSeries, { color: PAT, lineWidth: 2, lastValueVisible: false, priceLineVisible: false, crosshairMarkerVisible: false })
         ls.setData(pts)
         patternSeriesRef.current.push(ls)
       }
       const labelled = (pat.points || []).filter((p) => p.label)
       if (labelled.length) {
-        const marker = chart.addLineSeries({ color: 'rgba(0,0,0,0)', lastValueVisible: false, priceLineVisible: false, crosshairMarkerVisible: false })
+        const marker = chart.addSeries(LineSeries, { color: 'rgba(0,0,0,0)', lastValueVisible: false, priceLineVisible: false, crosshairMarkerVisible: false })
         marker.setData(labelled.map((p) => ({ time: p.time, value: p.price })).sort((a, b) => a.time - b.time))
-        marker.setMarkers(
+        const markersApi = createSeriesMarkers(marker,
           labelled.slice().sort((a, b) => a.time - b.time).map((p) => ({
             time: p.time, position: pat.direction === 'bearish' ? 'aboveBar' : 'belowBar',
             color: PAT, shape: 'circle', text: p.label,
-          }))
-        )
+          })))
         patternSeriesRef.current.push(marker)
+        patternMarkersRef.current.push(markersApi)
       }
       if (pat.neckline?.length === 2) {
-        const nl = chart.addLineSeries({ color: PAT, lineWidth: 1, lineStyle: 2, lastValueVisible: false, priceLineVisible: false, crosshairMarkerVisible: false })
+        const nl = chart.addSeries(LineSeries, { color: PAT, lineWidth: 1, lineStyle: 2, lastValueVisible: false, priceLineVisible: false, crosshairMarkerVisible: false })
         nl.setData(pat.neckline.map((p) => ({ time: p.time, value: p.price })).sort((a, b) => a.time - b.time))
         patternSeriesRef.current.push(nl)
       }
     })
   }, [patterns, showPatterns])
 
-  return <div className="chartwrap" ref={containerRef} />
+  // 6. Crosshair legend — subscribed once on chart creation; reads the LATEST
+  // data via `liveRef` so it never needs to be torn down/re-subscribed when
+  // props change (that would risk missing events during the swap).
+  useEffect(() => {
+    const chart = chartRef.current
+    if (!chart) return
+    const handler = (param) => {
+      const el = legendRef.current
+      if (!el) return
+      const { ohlcv: bars, type: t } = liveRef.current
+      if (!param.time || !bars?.length) { el.innerHTML = ''; return }
+      const bar = bars.find((b) => b.time === param.time)
+      if (!bar) { el.innerHTML = ''; return }
+      const chg = bar.close - bar.open
+      const chgPct = bar.open ? (chg / bar.open) * 100 : 0
+      const cls = chg > 0 ? 'up' : chg < 0 ? 'down' : 'flat'
+      const parts = [`<b>O</b> ${bar.open.toFixed(2)}`, `<b>H</b> ${bar.high.toFixed(2)}`,
+        `<b>L</b> ${bar.low.toFixed(2)}`, `<b>C</b> ${bar.close.toFixed(2)}`,
+        `<span class="chartlegend-${cls}">${chg >= 0 ? '+' : ''}${chgPct.toFixed(2)}%</span>`]
+      if (t !== 'line') parts.push(`<b>Vol</b> ${(bar.volume / 1e6).toFixed(2)}M`)
+      el.innerHTML = parts.join('  ·  ')
+    }
+    chart.subscribeCrosshairMove(handler)
+    return () => { try { chart.unsubscribeCrosshairMove(handler) } catch { /* chart already gone */ } }
+  }, [])
+
+  // Extra vertical room per active indicator pane, so RSI/MACD don't just
+  // steal height from the price pane — each pane still gets a fixed
+  // proportion of the total (see setStretchFactor above), but the total
+  // itself grows to fit them.
+  const paneCount = (panes.rsi ? 1 : 0) + (panes.macd ? 1 : 0)
+  const height = 340 + paneCount * 110
+
+  return (
+    <div className="chartwrap-outer">
+      <div className="chartlegend" ref={legendRef} />
+      <div className="chartwrap" ref={containerRef} style={{ height }} />
+    </div>
+  )
 }

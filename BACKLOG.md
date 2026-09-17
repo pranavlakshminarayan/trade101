@@ -53,10 +53,19 @@ A running list so we don't lose ideas. Add freely; we pull from here after the M
   rewritten into three independent effects (chart lifecycle / price data / pattern overlay);
   `Research.jsx` memoizes the arrays passed in. View only re-fits on a genuinely new dataset, so
   zoom/pan survive the 7-min auto-refresh. Verified live.
-- [ ] **H5 — No indicators are drawn on the chart.** SMA/Bollinger/RSI/MACD are computed and
-  explained but never plotted. Upgrade `lightweight-charts` v4.2 → **v5** for sub-panes, add
-  overlays + a crosshair OHLC legend. **Deferred to Wave 3** (UI rebuild) per `docs/AUDIT.md`'s
-  original plan — it's a design/layout change, not a bugfix, and overlaps the redesign pass.
+- [x] **H5 — No indicators were drawn on the chart.** Fixed 2026-09-17 (Wave 3, first item —
+  the UI/UX redesign proposal itself is separate and still pending review). Upgraded
+  `lightweight-charts` v4.2 → **v5** (its multi-pane support is the whole point — v4 has none).
+  Backend: `indicators.compute_indicator_series()` returns full time-aligned SMA/Bollinger/RSI/
+  MACD arrays (the existing `compute_indicators()` only ever returned the latest snapshot value,
+  useless for plotting a line); wired into `/research`'s new `indicatorSeries` field. Frontend:
+  `PriceChart.jsx` overlays SMA50/SMA200 + Bollinger Bands on the price pane, RSI + MACD each in
+  their own pane below (RSI with 30/70 overbought/oversold reference lines, fixed 0-100 scale),
+  and a crosshair-driven OHLC + change% + volume legend. All four togglable from the chart header
+  (SMA on by default, others off so the chart isn't busy for a first-time user). 3 new backend
+  tests (`test_indicators.py`). Verified live: SMA/Bollinger overlays render correctly on price; RSI's live value
+  (46.89) matches the Metrics panel's snapshot (46.8876) exactly; crosshair legend confirmed via
+  a real hover event.
 - [x] **H6 — Pattern detection was structurally limited.** Fixed: `services/patterns.py`
   rewritten — full-series scan (not just the last 3 swings), all non-overlapping matches
   returned, detection on High/Low (not Close), double top/bottom no longer requires an unrelated

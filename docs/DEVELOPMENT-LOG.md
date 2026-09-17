@@ -808,3 +808,73 @@ Backend: 65/65 tests passing (was 45 before the ecosystem-panel pass began). Fro
 clean throughout. **Remaining audit work:** Wave 3 — chart indicator overlays (a
 `lightweight-charts` v5 upgrade) and the UI/UX redesign the user asked to review before it's
 built — neither started.
+
+---
+
+## Audit Wave 3, first item: chart indicator overlays (2026-09-17)
+
+The user asked to start Wave 3, then clarified it's two genuinely different pieces: the chart
+overlays (H5 — concrete, buildable directly) and the UI/UX redesign (which the user explicitly
+wants to review as a proposal before any code is touched, from the very first message of this
+whole engagement). Built H5 now; the redesign proposal is separate, still pending.
+
+**The gap this closes.** The app computed SMA50/SMA200/Bollinger Bands/RSI/MACD and *explained*
+them at length in the Metrics panel's lessons — but never plotted a single one. The chart showed
+price and nothing else. Two structural reasons this hadn't been fixed already: (1)
+`lightweight-charts` v4.2 has no multi-pane support, so there was nowhere sensible to put RSI or
+MACD without cramming them onto the price axis; (2) even with panes available, the backend's
+`compute_indicators()` only ever returns the LATEST snapshot value of each indicator — the single
+number the Metrics panel needs — never a time series, so there was no data to draw a line from in
+the first place.
+
+**What shipped.** Upgraded to `lightweight-charts` **v5.2.1** (the current stable; checked v5's
+actual exported API directly against the installed package rather than trusting memory of prior
+versions — `chart.addSeries(SeriesTypeConstructor, options, paneIndex)` replaces v4's
+`addCandlestickSeries()`/`addLineSeries()`/etc., and `createSeriesMarkers(series, markers)`
+replaces `series.setMarkers()`). Added `indicators.compute_indicator_series()`, which reuses the
+SAME primitive functions (`sma`, `rsi`, `macd`, `bollinger`) already used for the snapshot — just
+without collapsing to `.iloc[-1]` — so the two views can never drift apart (verified with a test
+asserting the series' last point equals the snapshot's value, for every indicator). Points where
+a lookback isn't available yet (e.g. no SMA50 in the first 49 bars) are OMITTED entirely, not
+sent as a fabricated zero — the "numbers are exact, never invented" rule extended to a new shape
+of output. Wired into `/research`'s new `indicatorSeries` field.
+
+`PriceChart.jsx` grew from three effects (chart lifecycle / price series / pattern overlay, from
+the earlier H4 fix) to six: the same three, plus SMA+Bollinger overlays sharing the price pane,
+RSI+MACD each in their own pane below (RSI pinned to a 0-100 scale via `autoscaleInfoProvider`,
+with 30/70 overbought/oversold reference lines via `createPriceLine` — both discovered by reading
+v5's own example comments in its type definitions rather than guessing), and a crosshair-move
+subscription driving a small OHLC + change% + volume legend rendered as absolutely-positioned
+HTML over the canvas (updated imperatively via a ref, not React state, so it doesn't re-render on
+every mouse pixel). Indicator panes are deliberately torn down and rebuilt from scratch on any
+toggle change rather than patched in place — panes shift index when one is removed, and a full
+rebuild sidesteps that whole class of off-by-one bug for a UI action (a toggle click) that's rare
+and cheap to redo. All four (SMA, Bollinger, RSI, MACD) are togglable from the chart header — SMA
+on by default (the most commonly wanted, and light enough not to clutter), the rest off so a
+first-time user doesn't meet a busy chart.
+
+**Mistakes/course-corrections:**
+- Vite's dependency pre-bundle cache (`node_modules/.vite/`) was stale from before the
+  `lightweight-charts` v5 install, so the dev server kept serving the OLD v4 bundle and throwing
+  `does not provide an export named 'AreaSeries'` after the upgrade — a standard Vite gotcha
+  after a mid-session dependency bump, not a code bug. Fixed by clearing `.vite` and restarting
+  the dev server; worth remembering if a future dependency upgrade produces the same error.
+- First pass gave both the MACD line and its histogram a `title` option (for the price-axis
+  label). Discovered live that `title` renders its OWN persistent label independent of
+  `lastValueVisible` — so both labels stacked and overlapped instead of showing one. Fixed by
+  setting `title` on exactly one series per pane's indicator group.
+- Verification hit a genuine browser-automation tooling snag (JS-driven `window.scrollTo` and,
+  separately, the native scroll gesture both produced screenshots that didn't reflect the actual
+  scroll position on this canvas-heavy page) — confirmed the underlying feature was correct via
+  DOM inspection instead (element heights, canvas counts, and the crosshair legend's actual
+  `innerHTML` after a real hover event) rather than fighting the screenshot tool or, worse,
+  assuming a visual bug existed without checking further. Every indicator (SMA, Bollinger, RSI,
+  MACD, the legend) was still confirmed against real rendered output, just via DOM reads instead
+  of a screenshot for the final re-check.
+
+3 new backend tests (`test_indicators.py`). 68/68 backend tests passing. Frontend build clean.
+Verified live: RSI's hovered value (46.89) matches the Metrics panel's snapshot (46.8876)
+exactly; SMA/Bollinger overlays and the RSI/MACD panes all confirmed rendering with real NVDA
+data; crosshair legend confirmed via a real hover event, not a simulated one.
+
+**Remaining Wave 3 work:** the UI/UX redesign — still a proposal to review, not started.

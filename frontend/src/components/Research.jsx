@@ -42,6 +42,13 @@ export default function Research({ data, onBack, onSearch, onNavigate }) {
   const [tfLoading, setTfLoading] = useState(false)
   const [showPatterns, setShowPatterns] = useState(false)
   const [patData, setPatData] = useState({})
+  // Chart indicator overlays/panes (docs/AUDIT.md H5). SMA on by default — the
+  // most commonly wanted overlay and light enough not to clutter the chart;
+  // Bollinger/RSI/MACD are togglable but off by default so the chart isn't
+  // busy the first time a beginner opens it.
+  const [overlays, setOverlays] = useState({ sma: true, bollinger: false })
+  const [showRsi, setShowRsi] = useState(false)
+  const [showMacd, setShowMacd] = useState(false)
   const [patSel, setPatSel] = useState(0)
   const [updatedAt, setUpdatedAt] = useState(new Date())
   const [q, setQ] = useState('')
@@ -90,7 +97,7 @@ export default function Research({ data, onBack, onSearch, onNavigate }) {
     let alive = true
     setTfLoading(true)
     research(ticker, TF[timeframe])
-      .then((r) => { if (alive) setTfData((c) => ({ ...c, [timeframe]: r.ohlcv })) })
+      .then((r) => { if (alive) setTfData((c) => ({ ...c, [timeframe]: { ohlcv: r.ohlcv, indicatorSeries: r.indicatorSeries } })) })
       .catch(() => {}).finally(() => { if (alive) setTfLoading(false) })
     return () => { alive = false }
   }, [timeframe, ticker, tfData])
@@ -111,7 +118,10 @@ export default function Research({ data, onBack, onSearch, onNavigate }) {
         const fresh = await research(data.ticker, { fresh: true })
         setLive(fresh); setUpdatedAt(new Date())
         const tf = tfRef.current
-        if (tf !== '1Y') { const r = await research(data.ticker, { ...TF[tf], fresh: true }); setTfData((c) => ({ ...c, [tf]: r.ohlcv })) }
+        if (tf !== '1Y') {
+          const r = await research(data.ticker, { ...TF[tf], fresh: true })
+          setTfData((c) => ({ ...c, [tf]: { ohlcv: r.ohlcv, indicatorSeries: r.indicatorSeries } }))
+        }
       } catch { /* keep last good */ }
     }, REFRESH_MS)
     return () => clearInterval(id)
@@ -133,12 +143,13 @@ export default function Research({ data, onBack, onSearch, onNavigate }) {
     return () => window.removeEventListener('resize', onResize)
   }, [])
 
-  const { quote, indicators, ohlcv, meta } = live
+  const { quote, indicators, ohlcv, meta, indicatorSeries: liveIndicatorSeries } = live
   const sym = currencySymbol(quote.currency)
   const sources = ai?.available ? (ai.sources || []) : []
   const lean = ai?.available ? ai.momentum?.lean : null
 
-  const rawTf = timeframe === '1Y' ? ohlcv : (tfData[timeframe] || [])
+  const rawTf = timeframe === '1Y' ? ohlcv : (tfData[timeframe]?.ohlcv || [])
+  const rawIndicatorSeries = timeframe === '1Y' ? liveIndicatorSeries : (tfData[timeframe]?.indicatorSeries || null)
   const sl = TF[timeframe].slice
   // Memoized: Research re-renders on every keystroke in the header search box
   // (the `q` state lives here). Without this, .slice() below returned a fresh
@@ -146,6 +157,12 @@ export default function Research({ data, onBack, onSearch, onNavigate }) {
   // data changed" and rebuilt the whole chart accordingly (docs/AUDIT.md H4).
   // eslint-disable-next-line react-hooks/exhaustive-deps
   const chartOhlcv = useMemo(() => (sl ? rawTf.slice(-sl) : rawTf), [rawTf, sl])
+  // Indicator points are timestamped absolutely, so slicing the OHLCV window
+  // doesn't require slicing these too — lightweight-charts only draws the
+  // points that fall inside the chart's own visible time range.
+  const chartIndicatorSeries = rawIndicatorSeries
+  const overlaysActive = useMemo(() => ({ sma: overlays.sma, bollinger: overlays.bollinger }), [overlays.sma, overlays.bollinger])
+  const panesActive = useMemo(() => ({ rsi: showRsi, macd: showMacd }), [showRsi, showMacd])
   const chartLoading = timeframe !== '1Y' && !tfData[timeframe] && tfLoading
 
   const pats = patData[timeframe] || []
@@ -184,9 +201,16 @@ export default function Research({ data, onBack, onSearch, onNavigate }) {
         </div>
         <button className={'patbtn' + (showPatterns ? ' on' : '')} onClick={() => setShowPatterns((s) => !s)}>🔍 Patterns{showPatterns ? ' ✓' : ''}</button>
       </div>
+      <div className="chart-toggle chart-indtoggle">
+        <button className={overlays.sma ? 'on' : ''} onClick={() => setOverlays((o) => ({ ...o, sma: !o.sma }))} title="50/200-day simple moving averages">SMA</button>
+        <button className={overlays.bollinger ? 'on' : ''} onClick={() => setOverlays((o) => ({ ...o, bollinger: !o.bollinger }))} title="Bollinger Bands (20, 2)">Bollinger</button>
+        <button className={showRsi ? 'on' : ''} onClick={() => setShowRsi((v) => !v)} title="RSI in its own pane below price">RSI</button>
+        <button className={showMacd ? 'on' : ''} onClick={() => setShowMacd((v) => !v)} title="MACD in its own pane below price">MACD</button>
+      </div>
       {chartLoading || !chartOhlcv.length
         ? <div className="chartwrap placeholder" style={{ display: 'grid', placeItems: 'center' }}>Loading {timeframe}…</div>
-        : <PriceChart ohlcv={chartOhlcv} type={chartType} patterns={chartPatterns} showPatterns={showPatterns} />}
+        : <PriceChart ohlcv={chartOhlcv} type={chartType} patterns={chartPatterns} showPatterns={showPatterns}
+                      indicatorSeries={chartIndicatorSeries} overlays={overlaysActive} panes={panesActive} />}
       <div className="note">{timeframe} · {TF[timeframe].interval} bars · updated {updatedAt.toLocaleTimeString()} · auto-refreshes every 7 min · {meta.note}</div>
       {showPatterns && (
         <div className="patterns-panel">

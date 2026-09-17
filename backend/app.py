@@ -62,22 +62,29 @@ def research(ticker: str, period: str = "1y", interval: str = "1d"):
     ind = indicators.compute_indicators(hist)
 
     # UNIX seconds so both daily and intraday intervals render correctly.
+    times = [int(idx.timestamp()) for idx in hist.index]
     ohlcv = [
         {
-            "time": int(idx.timestamp()),
+            "time": t,
             "open": round(float(row.Open), 2),
             "high": round(float(row.High), 2),
             "low": round(float(row.Low), 2),
             "close": round(float(row.Close), 2),
             "volume": int(row.Volume),
         }
-        for idx, row in hist.iterrows()
+        for t, (_, row) in zip(times, hist.iterrows())
     ]
+    # Full time-aligned series (not just the latest snapshot in `indicators`)
+    # so the chart can actually PLOT SMA/Bollinger/RSI/MACD instead of only
+    # explaining them in prose next to a chart that never shows them
+    # (docs/AUDIT.md finding H5).
+    ind_series = indicators.compute_indicator_series(hist, times)
 
     return {
         "ticker": quote["symbol"],
         "quote": quote,
         "indicators": ind,
+        "indicatorSeries": ind_series,
         "ohlcv": ohlcv,
         "meta": {
             "source": "Yahoo Finance",

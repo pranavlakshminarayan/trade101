@@ -86,3 +86,50 @@ def test_short_history_returns_none_not_fabricated():
     assert out["above_sma200"] is None
     assert out["sma50"] is not None
     assert isinstance(out["above_sma50"], bool)  # SMA50 IS available at 100 rows
+
+
+# ---- compute_indicator_series (docs/AUDIT.md H5 — chart overlay data) ------
+
+def test_indicator_series_is_time_aligned_and_omits_undefined_points():
+    df = _synthetic_ohlcv(n=260)
+    times = list(range(len(df)))  # fake UNIX seconds, one per bar
+    series = ind.compute_indicator_series(df, times)
+
+    # SMA50 needs 50 bars of lookback -> the first 49 points must be OMITTED,
+    # never sent as a fabricated 0 or null-as-zero that would draw a line
+    # dipping to the bottom of the chart.
+    assert len(series["sma50"]) == 260 - 49
+    assert series["sma50"][0]["time"] == times[49]
+
+    # SMA200 needs 200 bars -> first defined point is bar index 199.
+    assert len(series["sma200"]) == 260 - 199
+    assert series["sma200"][0]["time"] == times[199]
+
+    # Every point is a real {time, value} pair with a finite number.
+    for pt in series["rsi14"][:5]:
+        assert set(pt.keys()) == {"time", "value"}
+        assert isinstance(pt["value"], float)
+
+
+def test_indicator_series_matches_the_latest_snapshot():
+    # compute_indicator_series and compute_indicators must agree — they're
+    # two views of the SAME numbers, not two separate calculations that could
+    # silently drift apart.
+    df = _synthetic_ohlcv(n=260)
+    times = list(range(len(df)))
+    snapshot = ind.compute_indicators(df)
+    series = ind.compute_indicator_series(df, times)
+
+    assert series["sma50"][-1]["value"] == snapshot["sma50"]
+    assert series["sma200"][-1]["value"] == snapshot["sma200"]
+    assert series["rsi14"][-1]["value"] == snapshot["rsi14"]
+    assert series["macd"]["macd"][-1]["value"] == snapshot["macd"]["macd"]
+    assert series["bollinger"]["upper"][-1]["value"] == snapshot["bollinger"]["upper"]
+
+
+def test_indicator_series_on_short_history_is_empty_not_fabricated():
+    df = _synthetic_ohlcv(n=30)  # too short for SMA50/SMA200
+    times = list(range(len(df)))
+    series = ind.compute_indicator_series(df, times)
+    assert series["sma50"] == []
+    assert series["sma200"] == []
