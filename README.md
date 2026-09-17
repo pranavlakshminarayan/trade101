@@ -4,6 +4,8 @@ A personal stock-research **and learning** web app. Type a **company name** (any
 
 > **It never tells you to buy or sell.** Numbers are exact (deterministic code); every AI opinion is source-backed. It's a data-analytics + learning tool, not a signal generator. Data is delayed ~15 min.
 
+**🔗 Live: [trade-craft-qdsw.onrender.com](https://trade-craft-qdsw.onrender.com)** — free tier, sleeps after ~15 min idle (first load after a nap takes ~30-60s to wake up). Bring your own Anthropic key for the AI features; everything else is free with no key.
+
 ![Research view — chart, indicators, AI momentum read, news, ecosystem, fundamentals](docs/screenshots/research.png)
 
 ## Features

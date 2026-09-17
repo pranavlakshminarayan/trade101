@@ -3,10 +3,10 @@
 > **Brand: Trade Craft** (renamed from "Trade101" on 2026-09-15). The GitHub repo, local
 > folder, and internal package names stay `trade101` — only the user-facing brand + logo changed.
 > Theme is deep navy with cream/near-white text (`frontend/src/styles.css` `:root`).
-> **Repo is PRIVATE** (set 2026-09-15). Deploy is **single-service** — FastAPI serves the built
-> React app (`app.py` mounts `frontend/dist`). Two deploy paths, both free, no code changes
-> either way: `render.yaml` (**no Docker** — Render native Python runtime, recommended) or
-> `Dockerfile` (for hosts that want a container). See `docs/DEPLOY.md`.
+> **Repo is PRIVATE** (set 2026-09-15). **🔗 LIVE (2026-09-17): https://trade-craft-qdsw.onrender.com**
+> — Render free tier, single-service (FastAPI serves the built React app, `app.py` mounts
+> `frontend/dist`), deployed via `render.yaml` (no Docker). Free-tier idle-sleep applies (~15 min
+> idle → sleeps, ~30-60s cold-start on next hit). See `docs/DEPLOY.md`.
 >
 > **✅ BYOK — bring-your-own-key (2026-09-17), replaces the old shared-token/daily-cap gate
 > entirely.** Every visitor pastes their OWN Anthropic API key into a first-run gate
@@ -298,11 +298,11 @@ pinned below v3 to stay compatible with the project's Vite 5; Vitest 5 requires 
 **App-link rule (hard rule):** whenever you run/build the app for the user to check, make sure
 both servers are up and **return the local link `http://127.0.0.1:5173`** in the reply — Pranav
 checks it on this machine and reports back what works/breaks so we fix issues one by one.
-The app is **local-only for now**; a hosted deploy is config-ready (`docs/DEPLOY.md` — Render,
-either `render.yaml` no-Docker or `Dockerfile`) but not yet live, since going live needs the
-user's own host-account signup. **Once deployed, the link is safe to share immediately** — BYOK
-(2026-09-17) means every visitor's AI usage is billed to their own Anthropic key, not the
-owner's, so there's no pre-share gate to configure any more.
+**Live and deployed (2026-09-17): https://trade-craft-qdsw.onrender.com** — Render free tier
+(`render.yaml`, no Docker), verified via `/health` and a live page load. Free-tier idle-sleep
+applies (sleeps after ~15 min with no traffic, ~30-60s cold-start on the next hit — not a bug).
+Safe to share as-is — BYOK (2026-09-17) means every visitor's AI usage is billed to their own
+Anthropic key, not the owner's, so there's no pre-share gate to configure.
 
 ## Config / conventions
 - `.env` in project root (git-ignored). `TRADE101_ANALYSIS_KEY` (Claude — **local-dev-only
@@ -334,9 +334,8 @@ owner's, so there's no pre-share gate to configure any more.
 ## Known bugs
 **Full ranked list with evidence: [`docs/AUDIT.md`](docs/AUDIT.md) (critical audit, 2026-09-16).**
 Mirrored as checkboxes in `BACKLOG.md` → "Audit — Wave 0/1/2/3/4". **All waves (0 through 4) are
-done.** Remaining: Wave 2's deploy step (the user's own host signup, not code) — now lower-stakes
-than before, since BYOK (below) means the deploy is safe to share the moment it's live, with
-nothing to configure first. See `docs/AUDIT.md` §10.
+done, including the deploy step** — live at https://trade-craft-qdsw.onrender.com
+(2026-09-17). See `docs/AUDIT.md` §10.
 
 ### Added 2026-09-17 — README rewrite + real screenshots
 `README.md` was stale (missing Comparison/Watchlist/Practice Lab/Glossary/Ask TC-Buddy/

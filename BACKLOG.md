@@ -90,7 +90,7 @@ A running list so we don't lose ideas. Add freely; we pull from here after the M
 - [x] **H8 — Currency symbols covered only INR + USD.** Already fixed by the Phase 3 merge
   (`lib/currency.js`) before this wave started — confirmed still in place.
 
-## Audit — Wave 2: cost/reliability, then deploy — code half ✅ DONE 2026-09-17
+## Audit — Wave 2: cost/reliability, then deploy — ✅ FULLY DONE 2026-09-17
 
 - [x] **M2 — No backend cache of the analysis result.** Fixed: `orchestrator.analyze()` now
   caches its finished result for 20 min per ticker; a raised exception is never cached (retried
@@ -99,10 +99,9 @@ A running list so we don't lose ideas. Add freely; we pull from here after the M
 - [x] **M11 — No timeout on the Anthropic client.** Fixed: `agents/llm.py` sets `timeout=` on
   client construction (90s analysis, 45s chat) — a hung request now degrades gracefully instead
   of occupying a worker indefinitely. 3 new tests.
-- [ ] **Deploy to Render**, then share the link. **This step is the user's own action** (host
-  account signup) — not something that can be done from inside a coding session. No env var
-  needs setting first any more — BYOK (2026-09-17, see below) means the link is safe to share
-  the moment it's live.
+- [x] **Deploy to Render.** Live: https://trade-craft-qdsw.onrender.com (2026-09-17). Verified
+  via `/health` (`{"status":"ok",...}`) and a real page load showing the BYOK key gate. Free-tier
+  idle-sleep applies (~15 min idle → sleeps, ~30-60s cold-start on next hit).
 
 ## Audit — Wave 3: UI/UX redesign — ✅ DONE 2026-09-17, merged to `master` (commit `897514c`)
 
@@ -342,8 +341,8 @@ planned.
   Both documented in `docs/DEPLOY.md`. Native build verified locally (fresh `npm install && npm
   run build` succeeds; backend serves the rebuilt `dist/`).
 - [x] GitHub repo set **private**.
-- [ ] Go live: connect the repo to a host (Render/Fly, needs Pranav's account) → get the URL →
-  add it to the repo About/README. (Deferred host signup is the user's step.)
+- [x] Go live: deployed to Render — https://trade-craft-qdsw.onrender.com (2026-09-17). Added
+  to README.
 
 ## ✅ Pre-share checklist — DONE 2026-09-17, superseded by BYOK
 

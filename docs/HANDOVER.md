@@ -1227,3 +1227,35 @@ committed in focused, single-purpose commits and pushed to `origin/master` as it
   before, since BYOK means the link is safe to share the moment it's live, with nothing to
   configure first. See `CLAUDE.md`'s "Known bugs" intro and `docs/AUDIT.md` §10 for the current
   authoritative checklist.
+
+## 23. Deployed live — https://trade-craft-qdsw.onrender.com — 2026-09-17
+
+New session, same day, continuing from §22. The user completed the Render signup and Blueprint
+deploy themselves (following `docs/DEPLOY.md`'s Option A) and sent back the resulting URL, unsure
+whether it had actually finished successfully. Rather than take the URL at face value, verified it
+directly: navigated the browser pane to the URL (page title "Trade Craft," page text showing the
+BYOK key-entry gate exactly as `ApiKeyGate.jsx` renders it — confirming the built frontend is
+genuinely being served, not a placeholder or a build error page) and separately hit `/health`
+(`{"status":"ok","service":"trade101","version":"0.1.0"}`, confirming the FastAPI backend is
+actually running behind it, not just a static shell). Both checks passing together is what
+confirms a real, working single-service deploy — either one alone (page loads but API is down, or
+API responds but the frontend build failed) would have looked deceptively fine from a glance at
+just the homepage.
+
+Also answered a housekeeping question the user asked alongside this: yes, the Render service can
+be deleted at any time with no effect on the GitHub repo or its code — Render dashboard → the
+service → Settings → Delete Service. Worth remembering this was asked and answered plainly, in
+case a future session needs to reference whether deletion was ever a live concern.
+
+**Docs updated to reflect the now-live deploy** (this was previously described as pending
+throughout `CLAUDE.md`/`BACKLOG.md`, since it explicitly required the user's own host-account
+step — see §22.5 above): `README.md` gained a live-link line near the top; `CLAUDE.md`'s header
+callout, Status paragraph, and "Known bugs" intro all replaced "local-only for now" /
+"user's own host signup, not code" language with the actual live URL and verification method;
+`BACKLOG.md` checked off both remaining deploy checkboxes (Wave 2's deploy item and the older
+"Go live" line under Phase 3). This closes out the very last open item from the Wave 0-4 audit —
+**every audit wave, including its deploy step, is now done**, not just code-complete.
+
+**Mistakes/course-corrections:** none — the only judgment call was verifying the URL with an
+actual page load + a real `/health` request rather than trusting the URL string alone, which is
+the right default whenever a user reports "I did the thing but I'm not sure it worked."
