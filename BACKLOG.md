@@ -142,7 +142,17 @@ From `docs/AUDIT.md` §10 item 14-17. Working through in order per the audit's o
   same kind of data Finnhub returns. 5 new backend tests. Verified live: RELIANCE.NS now shows
   a real 5-node graph (HDFCBANK/TCS/ICICIBANK/SBIN/LT) with the honest caveat.
 - [ ] **M3 — sharper evidence matching.** `services/evidence.py`'s relevance filter is bare token
-  matching (e.g. "Apple cider" would match AAPL) — tighten it.
+  matching (e.g. "Apple cider" would match AAPL) — tighten it. (in progress)
+- [x] **Bonus fix (user-reported mid-wave): trendline patterns missed still-forming shapes.**
+  `services/patterns.py::_trendlines()` only ever fit ONE window — the last 4 confirmed peaks +
+  last 4 confirmed troughs — which for a pattern still actively forming at the very end of the
+  series (no bars after it yet to confirm a local extremum there) meant NO fit was ever
+  attempted through it at all. Verified live: a clearly visible falling wedge in NKE's final
+  ~15 bars on the 1D chart wasn't detected. Fixed with two changes: (1) try progressively
+  smaller/more-recent extrema windows first instead of only the largest one, and (2) when no
+  extrema-based window matches, fall back to fitting resistance/support directly through every
+  raw bar in a trailing window (no extrema-confirmation requirement) — same fit logic, just not
+  gated on argrelextrema having already confirmed a swing point. 1 new regression test.
 - [ ] **M10 — frontend tests + symbol-resolution tests.** Zero frontend tests exist; backend
   tests don't cover symbol resolution at all.
 - [ ] **Glossary + watchlist notes.** A beginner meeting "beta" or "neckline" in prose has

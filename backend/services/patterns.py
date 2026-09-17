@@ -213,20 +213,13 @@ def _fit(idxs, vals):
     return float(m), float(b)
 
 
-def _trendlines(highs, lows, times, peaks, troughs, flat) -> list[dict]:
-    """Triangles / wedges / channels from fitted support & resistance lines —
-    resistance through the HIGHS, support through the LOWS (previously both
-    were fit on Close, which touches neither rail precisely)."""
-    n = len(highs)
-    hp = peaks[-4:] if len(peaks) >= 2 else []
-    lp = troughs[-4:] if len(troughs) >= 2 else []
-    if len(hp) < 2 or len(lp) < 2:
-        return []
-
+def _fit_trendline_window(highs, lows, times, hp, lp, n, flat) -> dict | None:
+    """Try fitting one triangle/wedge/channel to this specific (hp, lp) window
+    of peak/trough indices. None if the lines don't form a clean shape."""
     x0 = min(hp[0], lp[0])
     x1 = max(hp[-1], lp[-1])
-    if x1 - x0 < max(10, n * 0.15):   # window too short to be meaningful
-        return []
+    if x1 - x0 < max(8, n * 0.08):   # window too short to be meaningful
+        return None
 
     mr, br = _fit(hp, highs)   # resistance (through the highs)
     ms, bs = _fit(lp, lows)    # support (through the lows)
@@ -236,7 +229,7 @@ def _trendlines(highs, lows, times, peaks, troughs, flat) -> list[dict]:
 
     gap0, gap1 = res0 - sup0, res1 - sup1
     if gap1 <= 0 or gap0 <= 0:        # crossed / inverted lines → not a clean shape
-        return []
+        return None
 
     frac_r = (res1 - res0) / avg      # fractional move of each line across window
     frac_s = (sup1 - sup0) / avg
@@ -264,7 +257,7 @@ def _trendlines(highs, lows, times, peaks, troughs, flat) -> list[dict]:
             name, direction = "Descending Channel", "bearish"
 
     if not name:
-        return []
+        return None
 
     # Confidence from how well the touches actually sit on their fitted line.
     r_err = max(abs(highs[i] - (mr * i + br)) / avg for i in hp)
@@ -279,8 +272,55 @@ def _trendlines(highs, lows, times, peaks, troughs, flat) -> list[dict]:
     ]
     idxs = sorted(set(hp) | set(lp))
     labels = ["" for _ in idxs]
-    p = _mk(name, direction, idxs, labels, highs, times, confidence, lines=lines)
-    return [p]
+    return _mk(name, direction, idxs, labels, highs, times, confidence, lines=lines)
+
+
+def _trendlines(highs, lows, times, peaks, troughs, flat) -> list[dict]:
+    """Triangles / wedges / channels from fitted support & resistance lines —
+    resistance through the HIGHS, support through the LOWS (previously both
+    were fit on Close, which touches neither rail precisely).
+
+    Tries the most recent (smallest) window of peaks/troughs FIRST, widening
+    only if that finds nothing. Fixed from a real bug (user-reported: a
+    clearly visible falling wedge on NKE's 1D chart wasn't detected) — the
+    original version only ever fit ONE window, the last 4 peaks + last 4
+    troughs, which on a volatile day can span nearly the whole session and
+    average a real, tight recent wedge into a flat, undetectable line. This
+    mirrors `_reversals()`'s existing full-series-scan approach, just for
+    trendline shapes instead of swing-point shapes."""
+    n = len(highs)
+    if len(peaks) < 2 or len(troughs) < 2:
+        return []
+
+    max_k = min(max(len(peaks), len(troughs)), 6)
+    for k in range(2, max_k + 1):
+        hp = peaks[-k:]
+        lp = troughs[-k:]
+        if len(hp) < 2 or len(lp) < 2:
+            continue
+        match = _fit_trendline_window(highs, lows, times, hp, lp, n, flat)
+        if match:
+            return [match]
+
+    # Still-forming patterns near the very end of the series have no chance
+    # of showing up above: argrelextrema needs `order` bars on BOTH sides to
+    # confirm a local peak/trough, so a shape still actively developing in
+    # the last few bars has no confirmed extrema to fit through at all
+    # (user-reported: a visually obvious falling wedge on NKE's 1D chart, in
+    # its final ~15 bars, wasn't detected — that window contained zero
+    # confirmed peaks/troughs). Fall back to fitting resistance/support
+    # directly through EVERY bar in a trailing window (no extrema
+    # requirement) — a straightforward regression trendline, same as the
+    # extrema-based fit but over raw recent bars instead of confirmed swings.
+    for frac in (0.18, 0.24, 0.32, 0.4):
+        width = max(10, int(n * frac))
+        if width >= n:
+            continue
+        idxs = list(range(n - width, n))
+        match = _fit_trendline_window(highs, lows, times, idxs, idxs, n, flat)
+        if match:
+            return [match]
+    return []
 
 
 def detect(highs: list[float], lows: list[float], times: list[int]) -> list[dict]:

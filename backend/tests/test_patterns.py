@@ -82,6 +82,30 @@ def test_ascending_triangle_detected():
     assert tri["confidence"] in ("low", "moderate")
 
 
+def test_still_forming_wedge_at_the_very_end_of_the_series_is_detected():
+    # Regression, user-reported on a real NKE 1D chart: a falling wedge in
+    # the FINAL ~15 bars wasn't detected at all. Root cause: argrelextrema
+    # needs `order` bars on BOTH sides to confirm a local peak/trough, so a
+    # shape still actively forming right at the tail of the series has NO
+    # confirmed extrema to fit a trendline through — the old code only ever
+    # tried fitting through confirmed peaks/troughs. Build exactly that: flat
+    # noise, then a converging decline that ends the moment the series ends
+    # (no bars after it to confirm anything).
+    rng = np.random.default_rng(7)
+    base_h = 100 + rng.normal(0, 0.3, 45)
+    base_l = base_h - 1.0
+    tail_h = np.linspace(110, 100, 15)   # resistance: falls fast
+    tail_l = np.linspace(95, 92, 15)     # support: falls slower -> converging
+    highs = np.concatenate([base_h, tail_h])
+    lows = np.concatenate([base_l, tail_l])
+    times = list(range(len(highs)))
+    pats = patterns.detect(highs.tolist(), lows.tolist(), times)
+    wedge = next((p for p in pats if p["name"] == "Falling Wedge"), None)
+    assert wedge is not None, "a wedge still forming at the tail must still be found"
+    assert wedge["direction"] == "bullish"
+    assert wedge["lines"] and len(wedge["lines"]) == 2
+
+
 def test_descending_channel_detected():
     # parallel falling rails
     x = _zig([120, 128, 112, 120, 104, 112, 96, 104, 90])
