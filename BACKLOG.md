@@ -141,8 +141,14 @@ From `docs/AUDIT.md` §10 item 14-17. Working through in order per the audit's o
   together)... not necessarily direct competitors") so it's never presented as if it were the
   same kind of data Finnhub returns. 5 new backend tests. Verified live: RELIANCE.NS now shows
   a real 5-node graph (HDFCBANK/TCS/ICICIBANK/SBIN/LT) with the honest caveat.
-- [ ] **M3 — sharper evidence matching.** `services/evidence.py`'s relevance filter is bare token
-  matching (e.g. "Apple cider" would match AAPL) — tighten it. (in progress)
+- [x] **M3 — sharper evidence matching.** Done 2026-09-17. `services/evidence.py::classify()`
+  no longer trusts a bare common-English-word match alone (e.g. "Apple cider vinegar" no longer
+  matches Apple Inc. on the word "apple"). A small curated `_AMBIGUOUS_NAME_WORDS` set flags
+  company names that double as ordinary words; for those, a match now requires a secondary
+  corroborating signal (the ticker itself, or ordinary market/business vocabulary nearby via
+  `_FINANCE_CONTEXT`) before being classified "company". Non-ambiguous names (the vast majority
+  — Nvidia, Reliance, Toshiba, ...) are completely unaffected, so recall isn't hurt on the common
+  case. 4 new tests.
 - [x] **Bonus fix (user-reported mid-wave): trendline patterns missed still-forming shapes.**
   `services/patterns.py::_trendlines()` only ever fit ONE window — the last 4 confirmed peaks +
   last 4 confirmed troughs — which for a pattern still actively forming at the very end of the

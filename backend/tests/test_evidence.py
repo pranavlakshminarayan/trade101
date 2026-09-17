@@ -62,3 +62,36 @@ def test_ticker_suffix_stripped_for_matching():
     art = [{"headline": "Nintendo posts record Switch sales", "summary": ""}]
     kept, report = evidence.filter_news(art, name="Nintendo Co Ltd", ticker="7974.T")
     assert report["has_company_news"] is True
+
+
+# --- docs/AUDIT.md M3: "Apple cider" would match AAPL on the bare word
+# "apple" alone — a company name that's also an ordinary English word needs
+# a secondary corroborating signal before being trusted. ---
+
+def test_ambiguous_common_word_without_finance_context_is_not_company():
+    art = {"headline": "Apple cider vinegar: health benefits explained",
+           "summary": "A guide to the fermented drink's uses."}
+    cat = evidence.classify(art, name="Apple Inc.", ticker="AAPL")
+    assert cat != "company"
+
+
+def test_ambiguous_common_word_with_finance_context_is_company():
+    art = {"headline": "Apple stock rises after strong earnings beat",
+           "summary": "Shares climbed in after-hours trading."}
+    cat = evidence.classify(art, name="Apple Inc.", ticker="AAPL")
+    assert cat == "company"
+
+
+def test_ambiguous_common_word_with_ticker_mention_is_company():
+    art = {"headline": "AAPL surges 5% on Thursday", "summary": ""}
+    cat = evidence.classify(art, name="Apple Inc.", ticker="AAPL")
+    assert cat == "company"
+
+
+def test_non_ambiguous_name_unaffected_by_the_disambiguation_check():
+    # "Nvidia" isn't an ordinary English word, so the ambiguity check must
+    # not require finance-context corroboration for it — that would hurt
+    # recall on the common case for no reason.
+    art = {"headline": "Nvidia unveils new Blackwell GPU", "summary": "No market jargon here."}
+    cat = evidence.classify(art, name="NVIDIA Corporation", ticker="NVDA")
+    assert cat == "company"

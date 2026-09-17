@@ -32,6 +32,26 @@ _STOP = {
 
 _WORD_RE = re.compile(r"[a-z0-9]+")
 
+# Company names that are also ordinary English words/common nouns — a bare
+# token match on these is weak evidence (docs/AUDIT.md M3: "Apple cider"
+# would match AAPL on the word "apple" alone). Not exhaustive; extend as new
+# false positives are found. Multi-word or invented/rare-word names (Nvidia,
+# Qualcomm, Reliance...) don't need this — the ambiguity is specific to
+# single common-word names.
+_AMBIGUOUS_NAME_WORDS = {
+    "apple", "target", "block", "chime", "square", "shell", "oracle", "meta",
+    "match", "gap", "chase", "duke", "constellation", "generac",
+}
+# A secondary signal that corroborates an otherwise-ambiguous common-word
+# match: ordinary market/business vocabulary that a fruit-cider article
+# wouldn't plausibly contain alongside "apple".
+_FINANCE_CONTEXT = {
+    "stock", "stocks", "shares", "nasdaq", "nyse", "ticker", "earnings",
+    "ceo", "ipo", "investor", "investors", "market", "markets", "quarterly",
+    "revenue", "profit", "dividend", "analyst", "analysts", "trading",
+    "trade", "sec", "filing", "guidance", "forecast",
+}
+
 
 def _tokens(text: str) -> set[str]:
     return set(_WORD_RE.findall((text or "").lower()))
@@ -60,9 +80,20 @@ def classify(article: dict, *, name: str | None, ticker: str,
 
     name_terms = _name_terms(name)
     tkr = _base_ticker(ticker)
-    # Company: any distinctive name word, or the ticker, appears.
-    if (name_terms and name_terms & hay) or (tkr and len(tkr) > 1 and tkr in hay):
-        return "company"
+    matched_name_terms = name_terms & hay
+    ticker_hit = bool(tkr and len(tkr) > 1 and tkr in hay)
+    # Company: any distinctive name word, or the ticker, appears — UNLESS
+    # every matched name word is also an ordinary English word the company
+    # name happens to share (docs/AUDIT.md M3: "Apple cider" would otherwise
+    # match Apple Inc. on the bare word "apple"). In that case, require a
+    # secondary corroborating signal — the ticker itself, or ordinary
+    # market/business vocabulary nearby — before trusting the match. This
+    # keeps recall intact for the common case (most company names aren't
+    # dictionary words) while fixing the specific false-positive class.
+    if matched_name_terms or ticker_hit:
+        ambiguous_only = bool(matched_name_terms) and matched_name_terms <= _AMBIGUOUS_NAME_WORDS
+        if not ambiguous_only or ticker_hit or (hay & _FINANCE_CONTEXT):
+            return "company"
 
     peer_terms: set[str] = set()
     for p in peers or []:
