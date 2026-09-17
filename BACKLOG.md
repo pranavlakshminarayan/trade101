@@ -159,8 +159,16 @@ From `docs/AUDIT.md` §10 item 14-17. Working through in order per the audit's o
   extrema-based window matches, fall back to fitting resistance/support directly through every
   raw bar in a trailing window (no extrema-confirmation requirement) — same fit logic, just not
   gated on argrelextrema having already confirmed a swing point. 1 new regression test.
-- [ ] **M10 — frontend tests + symbol-resolution tests.** Zero frontend tests exist; backend
-  tests don't cover symbol resolution at all.
+- [x] **M10 — frontend tests + symbol-resolution tests.** Done 2026-09-17. Backend
+  symbol-resolution tests already existed (`tests/test_search.py`, from Wave 1's H2 fix) — the
+  real gap was frontend tests: **zero existed**. Set up Vitest + Testing Library (Vitest v2, to
+  stay compatible with the project's Vite 5 — Vitest 5 requires Vite 6+). `npm test` (or `npm run
+  test`) runs the suite. 53 tests across: `lib/currency.js`, `lib/history.js`, `lib/watchlist.js`,
+  `lib/practiceLab.js` (buy/sell math — cost basis, P&L, insufficient-cash/oversell rejection),
+  `lessons.js` (metric formatting + the C2 null-vs-false guardrail), `App.jsx`'s `looksLikeTicker`/
+  `routeHash`/`parseRoute` (extracted to module scope + exported so they're directly testable —
+  the H1 disambiguation-skip logic, previously untested anywhere), and one component test
+  (`Metrics.jsx`, via Testing Library) to prove the render/interaction path works end to end.
 - [ ] **Glossary + watchlist notes.** A beginner meeting "beta" or "neckline" in prose has
   nowhere to look it up; the watchlist has no field to record why a user is tracking a stock.
 

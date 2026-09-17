@@ -182,7 +182,12 @@ frontend/ src/{App,api}.jsx · components/{Welcome,Research,PriceChart,Metrics,A
   threshold tuned for daily/yearly swings never fired on intraday timeframes. Results are sorted
   most-recent-first. Overlapping matches are deduplicated; confidence is a real "low"/"moderate"
   label from level-fit tightness, not a fixed string. Only shapes actually present are returned,
-  drawn via a `lines`/`points` field in `PriceChart.jsx`.
+  drawn via a `lines`/`points` field in `PriceChart.jsx`. **Reference sources for the pattern
+  definitions/explanations** (`EXPL` dict) — supplied by the user 2026-09-17 to verify a
+  classification against (e.g. wedge vs. channel), and worth checking against for any future
+  pattern-definition question: [Fidelity — Identifying Chart Patterns (PDF)](https://www.fidelity.com/bin-public/060_www_fidelity_com/documents/learning-center/Idenitfying-Chart-Patterns.pdf),
+  [strike.money — Chart Patterns](https://www.strike.money/technical-analysis/chart-patterns).
+  No PDFs or reference docs live IN this repo — these are external, not local files.
 - `PriceChart.jsx` — on **`lightweight-charts` v5** (upgraded from v4.2 for multi-pane support,
   2026-09-17). Six independent effects: chart lifecycle / price series / SMA+Bollinger overlays
   (price pane) / RSI+MACD (each their own pane, torn down and rebuilt fresh on any toggle change
@@ -269,7 +274,9 @@ Endpoints: `/health`, `/search?q=` (ranked, badged candidates), `/research/{tick
 # Vite only reads .env.local at startup, so restart this after changing that file.
 npm run dev            # PowerShell blocks npm → use npm.cmd run dev, or Set-ExecutionPolicy -Scope CurrentUser RemoteSigned
 ```
-Open http://127.0.0.1:5173. Tests: `cd backend && .venv/Scripts/python.exe -m pytest -q`.
+Open http://127.0.0.1:5173. Backend tests: `cd backend && .venv/Scripts/python.exe -m pytest -q`.
+Frontend tests (added 2026-09-17, Wave 4 M10): `cd frontend && npm.cmd run test` (Vitest v2 —
+pinned below v3 to stay compatible with the project's Vite 5; Vitest 5 requires Vite 6+).
 
 **App-link rule (hard rule):** whenever you run/build the app for the user to check, make sure
 both servers are up and **return the local link `http://127.0.0.1:5173`** in the reply — Pranav

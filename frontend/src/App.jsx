@@ -14,16 +14,27 @@ captureTokenFromUrl()
 // walks through every search *and* every tab switch, like a normal site —
 // not just ticker searches. Tickers keep the existing #TICKER shareable-link
 // shape; tab views get their own #/name so the two never collide.
-function routeHash({ view, ticker }) {
+export function routeHash({ view, ticker }) {
   if (ticker) return '#' + encodeURIComponent(ticker)
   if (view && view !== 'home') return '#/' + view
   return '#'
 }
-function parseRoute() {
+export function parseRoute() {
   const h = decodeURIComponent(window.location.hash.replace('#', '')).trim()
   if (h.startsWith('/')) return { view: h.slice(1) || 'home', ticker: null }
   if (h) return { view: 'home', ticker: h }
   return { view: 'home', ticker: null }
+}
+
+// A query "looks like a ticker" (not a company name) only when it's exactly
+// how a person types a symbol on purpose: no spaces, no lowercase letters.
+// "AAPL" and "7974.T" pass; "Sony", "sony", "Toyota Motor" don't — even
+// though Sony's own ticker happens to BE the word "SONY" (docs/AUDIT.md H1 —
+// this is the fix that stops the disambiguation picker being silently
+// skipped on a name/ticker collision). Module-level and exported so it's
+// directly testable without rendering the component.
+export function looksLikeTicker(s) {
+  return !/\s/.test(s) && s === s.toUpperCase() && /[A-Z]/.test(s)
 }
 
 export default function App() {
@@ -69,12 +80,6 @@ export default function App() {
     return () => window.removeEventListener('popstate', onPop)
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [])
-
-  // A query "looks like a ticker" (not a company name) only when it's exactly
-  // how a person types a symbol on purpose: no spaces, no lowercase letters.
-  // "AAPL" and "7974.T" pass; "Sony", "sony", "Toyota Motor" don't — even
-  // though Sony's own ticker happens to BE the word "SONY".
-  const looksLikeTicker = (s) => !/\s/.test(s) && s === s.toUpperCase() && /[A-Z]/.test(s)
 
   // Plain-language explanation for a non-primary listing badge, shown as a
   // tooltip in the disambiguation picker — teaches the "why", not just the tag.
