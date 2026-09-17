@@ -337,6 +337,19 @@ Mirrored as checkboxes in `BACKLOG.md` → "Audit — Wave 0/1/2/3/4". **All wav
 done, including the deploy step** — live at https://trade-craft-qdsw.onrender.com
 (2026-09-17). See `docs/AUDIT.md` §10.
 
+### Fixed 2026-09-17 — ecosystem graph showed bare tickers instead of names for non-US listings
+**User-reported, live on Render**: searching Samsung on the Korean market (`005930.KS`) showed the
+peer graph as a ring of raw numeric codes (`000660…`, `005380…`, `035420…`) with the searched
+stock itself labeled `005930…` at the center — the resolved company name (`peerNames`, already
+fetched via yfinance for exactly this purpose) sat unused in a hover-only `<title>` tooltip. Fine
+for a US ticker (`AAPL`/`MSFT` read fine on their own) but useless for most non-US listings, whose
+tickers are opaque numeric codes. `EcoGraph` (`Ecosystem.jsx`) now prefers the resolved name for
+BOTH the peer nodes and the center node (a new `centerName` prop, threaded from `Research.jsx`'s
+`quote.name`), falling back to the ticker only when no name was resolved; the tooltip flips to
+show `TICKER — Full Name` so the ticker is still one hover away. Verified live on 005930.KS: the
+graph now reads "Samsung" (center), "SK hynix", "SAMSUNG", "NAVER", etc. instead of numeric codes.
+57 frontend tests pass, build clean.
+
 ### Fixed 2026-09-17 — no timeout anywhere on yfinance calls, hung the UI forever on a slow/thin ticker
 **User-reported on the LIVE deployed link** (first bug caught post-deploy): searching "SK hynix"
 (a brand-new NASDAQ listing, `SKHY`, alongside the mature `000660.KS` Korean listing) left the

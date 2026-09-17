@@ -174,7 +174,7 @@ export default function Research({ data, onBack, onSearch, onNavigate, onHome })
   const blocks = {
     metrics: <Metrics indicators={indicators} ticker={ticker} />,
     news: <NewsPanel newsData={newsData} newsLoading={newsLoading} ai={ai} aiLoading={aiLoading} ticker={ticker} />,
-    ecosystem: <Ecosystem ticker={ticker} onSearch={onSearch} />,
+    ecosystem: <Ecosystem ticker={ticker} name={quote.name} onSearch={onSearch} />,
     references: (
       <div className="card">
         <div className="lbl"><PaperclipIcon className="icon" /> References — every source used</div>

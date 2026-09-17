@@ -37,15 +37,32 @@ const num = (v, digits = 2) => (v == null ? '—' : v.toFixed(digits))
 
 // Radial node graph: the company at the centre, peers on a ring around it,
 // each clickable to research. Richer than a flat chip list — shows the company
-// sitting in a web of related names. Each node carries a native <title> (a
-// real browser tooltip, no extra markup needed) showing the full company
-// name on hover — the always-visible label stays the ticker, since the full
-// name rarely fits in a 19px-radius circle.
-function EcoGraph({ ticker, peers, peerNames, onSearch }) {
+// sitting in a web of related names.
+//
+// Bug (user-reported 2026-09-17): the always-visible label was the bare
+// ticker, with the resolved company name shown only on hover. Fine for a US
+// stock (AAPL, MSFT read fine on their own) but useless for most non-US
+// listings, whose tickers are opaque numeric codes (Samsung is "005930",
+// not a name a human recognizes at a glance) — the resolved name sat unused
+// in a tooltip while the graph showed nothing but numbers. Now the label
+// prefers the resolved name (peerNames for peers, `centerName` for the
+// searched stock itself) and falls back to the ticker only when no name was
+// resolved; the tooltip flips to show BOTH ("TICKER — Full Name") so the
+// ticker is still one hover away for confirmation.
+function EcoGraph({ ticker, centerName, peers, peerNames, onSearch }) {
   const cx = 160, cy = 108, rx = 122, ry = 80
   const nodes = peers.slice(0, 8)
-  const short = (s) => (s.length > 7 ? s.slice(0, 6) + '…' : s)
-  const nameFor = (p) => peerNames?.[p] || p
+  const short = (s) => (s.length > 9 ? s.slice(0, 8) + '…' : s)
+  // Prefer the resolved name's first word/two (reads better truncated than a
+  // full "Samsung Electronics Co., Ltd." would) — fall back to the ticker.
+  const labelFor = (p) => {
+    const name = peerNames?.[p]
+    if (!name) return p
+    const words = name.replace(/,.*$/, '').split(' ')
+    return words.length > 1 && (words[0] + ' ' + words[1]).length <= 9
+      ? words[0] + ' ' + words[1] : words[0]
+  }
+  const titleFor = (p) => peerNames?.[p] ? `${p} — ${peerNames[p]}` : p
   const go = (p) => onSearch(p)
   return (
     <svg className="ecograph" viewBox="0 0 320 216" role="img" aria-label={`${ticker} peer graph`}>
@@ -59,23 +76,24 @@ function EcoGraph({ ticker, peers, peerNames, onSearch }) {
         const x = cx + rx * Math.cos(a), y = cy + ry * Math.sin(a)
         return (
           <g key={p} className="eco-node" onClick={() => go(p)}
-             role="button" tabIndex={0} aria-label={`Research ${nameFor(p)}`}
+             role="button" tabIndex={0} aria-label={`Research ${peerNames?.[p] || p}`}
              onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); go(p) } }}>
-            <title>{nameFor(p)}</title>
+            <title>{titleFor(p)}</title>
             <circle cx={x} cy={y} r="19" />
-            <text x={x} y={y + 3.5} textAnchor="middle">{short(p)}</text>
+            <text x={x} y={y + 3.5} textAnchor="middle">{short(labelFor(p))}</text>
           </g>
         )
       })}
       <g className="eco-center">
         <circle cx={cx} cy={cy} r="30" />
-        <text x={cx} y={cy + 4} textAnchor="middle">{short(ticker)}</text>
+        <title>{centerName ? `${ticker} — ${centerName}` : ticker}</title>
+        <text x={cx} y={cy + 4} textAnchor="middle">{short(centerName ? centerName.replace(/,.*$/, '').split(' ')[0] : ticker)}</text>
       </g>
     </svg>
   )
 }
 
-export default function Ecosystem({ ticker, onSearch }) {
+export default function Ecosystem({ ticker, name, onSearch }) {
   const [eco, setEco] = useState(null)
   const [loading, setLoading] = useState(true)
 
@@ -118,7 +136,7 @@ export default function Ecosystem({ ticker, onSearch }) {
                   ? 'Related companies (commonly viewed together by other investors) — tap a node to research'
                   : 'Peers / ecosystem — tap a node to research'}
               </div>
-              <EcoGraph ticker={ticker} peers={eco.peers} peerNames={eco.peerNames} onSearch={onSearch} />
+              <EcoGraph ticker={ticker} centerName={name} peers={eco.peers} peerNames={eco.peerNames} onSearch={onSearch} />
               {eco.peersSource === 'yahoo' && (
                 <div className="faint" style={{ fontSize: 11, marginTop: 4 }}>
                   Same-industry peer data isn't available for this listing, so these are shown
