@@ -17,11 +17,13 @@ protocol). It is the narrative "how we got here" companion to:
 
 **Order of the log:** Phase 0 → 1 → 1 flaw pass → 1.5 → 2 → Rebrand → 3.
 
-Local app in development: **http://127.0.0.1:5173** (Vite dev) or **http://127.0.0.1:8000** (the
-backend now also serves the production build). A hosted shareable URL is deploy-ready
-(`docs/DEPLOY.md`); going live is the user's one host-signup step. The pre-share endpoint-guard
-fix is done in code — the only remaining gate on actually *sharing* the resulting URL is the
-user setting `TRADE101_ACCESS_TOKEN` on the host once deployed.
+Local app in development: **http://127.0.0.1:5173** (Vite dev); the backend's dev port varies on
+this machine (check `frontend/.env.local` — see `CLAUDE.md` Gotchas for why). A hosted shareable
+URL is deploy-ready (`docs/DEPLOY.md`); going live is the user's one host-signup step. As of
+2026-09-17 the app is **BYOK** (bring-your-own-key) — every visitor supplies their own Anthropic
+key from the browser, so there is no pre-share gate or env var to configure before sharing the
+URL at all (the old `TRADE101_ACCESS_TOKEN` model this paragraph used to describe was replaced
+outright, not extended — see the "BYOK" entry near the end of this log).
 
 ---
 
@@ -926,3 +928,199 @@ clean (this was a backend-only fix). Verified live on NVDA: SMA200 now spans the
 window on every one of the five timeframes, confirmed via both the API response directly and a
 screenshot of the 5D view (previously showing no gold SMA200 line at all, now showing one across
 the entire chart).
+
+---
+
+## Wave 3 — the UI/UX redesign, built and merged (2026-09-17)
+
+**The setup.** §20 above left Wave 3's redesign as a proposal the user had asked to review before
+anything was built — H5 (chart overlays) had already shipped separately. This entry is that
+redesign actually getting built, reviewed live across two feedback rounds, and merged.
+
+**Direction, negotiated before writing code.** The audit's original sketch (`docs/AUDIT.md` §8)
+proposed a rigid three-zone grid layout and a full icon-language swap. The user pushed back on
+both, for good reasons: a fixed three-zone grid would leave dead space on whichever side had less
+content (the actual complaint about the old masonry layout was that PANELS MOVED BETWEEN COLUMNS
+unpredictably as data streamed in — not that a multi-column layout itself was the problem), and
+the emoji-to-icon swap needed to keep the SAME symbols the user had deliberately chosen (search
+magnifying glass, watch star, etc.) — only the rendering technology needed to change, not the
+meanings. Both corrections shaped the actual build: a fixed two-zone layout with deterministic
+(not height-balanced) panel→column assignment, and an SVG icon set that's a 1:1 swap for every
+emoji already in use.
+
+**What shipped, round 1.** Fixed layout (spine: chart → AI read → metrics; side: news →
+ecosystem → references — order changed again in round 2, see below); `components/Icons.jsx`
+(new SVG icon set); a redesigned evidence "receipts" panel (bordered, color-coded cards
+replacing a plain `<ul>`); a mobile media query for the Welcome rail; ~8 dead CSS rulesets
+removed after confirming via grep they were genuinely unreferenced. Also renamed the Ask-Claude
+widget to **Ask TC-Buddy** with a candlestick icon, a small separate request folded into the
+same wave.
+
+**Round 2 — seven concrete notes from the user on the live build.** Metrics/AI-read order
+swapped (metrics moved above the AI read — the indicators being learned belong right under the
+chart, not buried below the narrative); pattern overlay color changed from amber to violet
+(amber now means "watch star" and only that); logo made clickable (home navigation, was a static
+`<div>`); and three REAL bugs the user's testing surfaced that weren't cosmetic at all:
+- **Chart autofit** — `fitContent()` was gated behind a redundant `isFirstFit` check that made it
+  fire only once, ever, on the chart's very-first load. Every subsequent timeframe switch left
+  the view at whatever range it last had.
+- **Frontend cache with no expiry (docs/AUDIT.md M1)** — found while chasing what looked like a
+  stale-data report; fixed as a side effect of that investigation, not the original target.
+- **News recency window too narrow for thin/foreign listings** — the relevance filter was
+  correctly rejecting noise, but a 30-day cutoff was ALSO discarding real coverage that was
+  simply a few months old, which is common for secondary/foreign listings. Widened to 90 days
+  for the supplement path specifically.
+
+**Mistakes/course-corrections — the pattern-scan revert.** Round 2 also included an attempt to
+fix "patterns reading stale price action" by restricting the intraday pattern SCAN to the
+trailing 2 hours. This was WRONG, and the user caught it immediately in round 3 (see the Wave 4
+entry below): the fix excluded both genuinely recent patterns (which sometimes need more than 2
+hours of bars to form) and older-but-still-relevant ones, when what the user actually wanted was
+recency PRIORITIZED, not older data EXCLUDED. Reverted the same day back to the full-series scan
+relying on `patterns.detect`'s existing most-recent-first sort. **The generalizable lesson,
+recorded because it repeated:** "make X more recent" is ambiguous between "surface recent X
+first" and "hide anything that isn't recent" — these are very different implementations, and the
+wrong one looks superficially reasonable until tested against a real case.
+
+**Also, twice, an infrastructure detour.** Port 8001 (following port 8000 before it) developed a
+stuck orphaned LISTENING socket mid-session, and separately `uvicorn --reload`'s file watcher
+proved unreliable on this machine (silently serving stale code across several edits). Both
+consumed real debugging time before being correctly diagnosed as infrastructure, not application
+bugs — see `CLAUDE.md` Gotchas for the operational detail; noted here because chasing them
+delayed spotting that the SMA200-mismatch bug (Wave 4 entry, below) was a real code bug and not
+just stale server state, for longer than it should have.
+
+All 71 backend tests passing throughout; committed as `897514c`, pushed to `origin/master` after
+the user's explicit approval ("execute the next wave" — read, correctly, as sign-off on
+everything reviewed so far, confirmed before the push itself).
+
+---
+
+## Wave 4 — depth: fundamentals, sharper evidence matching, frontend tests, glossary (2026-09-17)
+
+Executed in the order `docs/AUDIT.md` §10 laid out (M5 → M3 → M10 → glossary/watchlist notes),
+interleaved with two more rounds of user-reported bugs found by testing against real, harder
+cases rather than the usual AAPL/NVDA smoke tests.
+
+**M5 — fundamentals.** `services/company.py::_fundamentals()`: P/E, EPS, revenue growth, profit
+margin, dividend yield, debt/equity, next earnings date — all read straight from yfinance's
+`.info`/`.calendar`, nothing computed. The one non-obvious finding here: `dividendYield` and
+`debtToEquity` are ALREADY percentage figures in yfinance's own convention, unlike
+`revenueGrowth`/`profitMargins` which are fractions — verified empirically against AAPL rather
+than assumed, since getting this wrong would have silently misrepresented every dividend yield
+in the app by 100x.
+
+**Non-US peers — found by the user testing Reliance Industries, not part of the Wave 4 plan.**
+The Ecosystem tab showed nothing for RELIANCE.NS because Finnhub's free peers endpoint is
+US-listed only — a known, documented gap the project had deferred to "the paid Firecrawl/Exa
+tier, post-deploy" since Phase 3. Before accepting that deferral again, checked whether a free
+alternative actually existed and found one: Yahoo Finance's own public "people also watch"
+endpoint, keyless, works for any market. Used as a fallback, but deliberately NOT presented as
+the same kind of data Finnhub returns — it's co-viewed-by-other-investors, not same-industry
+competitors, and the UI labels it differently (`peersSource` field) so the distinction is honest
+rather than papered over. **Mistake avoided, worth naming:** the easy path here would have been
+to just relabel the old deferral as still-deferred without re-checking whether it was still
+true — it wasn't.
+
+**Trendline pattern detector missing still-forming shapes — found by the user on a real NKE
+chart, not a synthetic test case.** A visually obvious falling wedge in the last ~15 bars of
+NKE's 1D chart wasn't detected at all. Root cause: `_trendlines()` only ever fit ONE window — the
+last 4 CONFIRMED peaks/troughs — and `argrelextrema` (the extrema-finding function) structurally
+cannot confirm an extremum without bars on both sides of it, so a shape still forming at the very
+tail of the series has zero confirmed extrema to fit a line through. Fixed two ways: try
+progressively smaller/more-recent extrema windows before falling back to the widest one, and — for
+the still-forming case specifically — fit directly through raw bars in a trailing window when no
+extrema-based fit works at all. The user then asked to verify the wedge-vs-channel classification
+itself against a source they supplied (a technical-analysis site) rather than trusting the app's
+own read; the definitions matched exactly what the code already implemented, so this was a
+genuine confirmation, not a hidden second bug — but the ad-hoc multi-width comparison used to
+answer that question was presented in a misleading way in conversation (as if the LIVE app were
+ambiguous between the two labels, when the live code path actually returns one consistent
+answer) — corrected in the same conversation once caught.
+
+**M3 — sharper evidence matching.** `services/evidence.py`'s relevance filter previously trusted
+any bare match on a distinctive company-name word, which meant "Apple cider vinegar" would
+classify as Apple-Inc-relevant on the word "apple" alone. Fixed with a curated set of company
+names that double as ordinary English words, requiring a secondary corroborating signal (the
+ticker itself, or ordinary market/business vocabulary) before trusting those specific matches —
+deliberately narrow so it doesn't cost recall on the common case (most company names aren't
+dictionary words).
+
+**M10 — frontend tests.** Zero existed before this. Set up Vitest v2 (pinned below v3 to match
+the project's Vite 5) + Testing Library; 53 tests across the pure-logic libs (currency, history,
+watchlist, practice-lab trade math, lessons) plus `App.jsx`'s ticker-disambiguation logic,
+extracted from an inline component closure to a module-level exported function specifically so
+it could be tested in isolation — a small refactor done in service of testability, not a
+drive-by cleanup.
+
+**Glossary + watchlist notes.** The last item on the Wave 4 list; a new searchable reference page
+and a one-line study-note field per watchlist entry. Lower-risk, additive work — no notable
+mistakes.
+
+84 backend tests / 57 frontend tests passing by the end of this wave. All of it committed in
+several focused pushes (one per fix, not one giant wave-end commit) and pushed to `origin/master`
+as it landed, matching the pattern the user had already approved for Wave 3.
+
+---
+
+## BYOK, a real Comparison-tab bug, and a README rewrite (2026-09-17, later the same day)
+
+**The pivot.** The user revealed the actual deployment goal for the first time in this
+conversation: a genuinely OPEN, publicly-shareable link — not "a few friends with an invite
+token," which is what the existing `TRADE101_ACCESS_TOKEN` + daily-cap system (built 2026-09-15)
+was designed for. Given that goal, a shared-token model was never going to be the right shape,
+no matter how the cap was tuned — the user explicitly said they didn't want to risk it at all.
+The conversation worked through the redesign as a discussion before building anything: Netlify
+was raised and rejected as a host (it can't run this app's persistent FastAPI process without
+real rearchitecting — a static-site/serverless platform, fundamentally not this app's shape);
+BYOK (bring-your-own-key) was proposed, clarified (the user's "password system" framing was
+actually describing BYOK, not a second auth factor — the API key itself is the only credential),
+and confirmed to fully replace the existing gate rather than sit alongside it.
+
+**What shipped.** `components/ApiKeyGate.jsx` — a first-run, whole-app gate; a visitor's own
+Anthropic key (and optional display name) saved permanently in THEIR browser, sent as
+`X-Anthropic-Key` only on the two AI endpoints. Backend: the header threads through
+`orchestrator` → `analysis.py`/`chat.py` → `llm.py`, which uses it as the literal API key for
+that call. `services/access.py` and `lib/access.js` (the old model) were deleted outright, not
+kept alongside the new one — replaced by `tests/test_byok.py`. `TRADE101_ANALYSIS_KEY` survives
+only as an explicitly-documented local-dev fallback. Verified end-to-end with a deliberately
+invalid key: it reached the real Anthropic API, was genuinely rejected, and degraded to a plain
+"that key was rejected" message instead of a raw SDK error — a small addition
+(`app.py::_ai_error_reason()`) prompted by actually testing the failure path, not just the
+happy path.
+
+**A real security check, prompted by the user, resolved cleanly.** Mid-conversation the user
+asked to "remove my password from the GitHub repo" — a serious claim if true. Rather than assume
+either way, searched the full git history and every tracked file for committed secrets before
+responding: none found, `.env` had never been committed, and the closest thing to a "password"
+this app ever had (`TRADE101_ACCESS_TOKEN`) was already being removed in this same session as
+part of the redesign above. Reported the finding plainly and asked the user to clarify what they
+had actually seen, rather than either dismissing the concern or performing an unnecessary
+history-rewrite.
+
+**A real bug, found by testing the new feature rather than assuming it worked.** While manually
+exercising the Comparison tab to verify BYOK end-to-end, hit a hard crash:
+`chart.addLineSeries is not a function`. Root cause: `ComparisonChart.jsx` was never migrated
+when the rest of the app moved to **lightweight-charts v5** for the H5 overlay work earlier this
+same day — `PriceChart.jsx` was correctly migrated at the time, `ComparisonChart.jsx` was missed
+because Comparison hadn't been exercised again since. **Mistake/course-correction, in the
+debugging itself:** the first reproduction attempt used a rapid, automated browser script that
+typed into both comparison fields in quick succession; it ALSO produced a crash, but from a
+different cause (a stale DOM reference from clicking too fast) — which briefly looked like
+confirmation of a deeper problem before checking it manually and separating "real product bug"
+from "test-script artifact." The real bug was confirmed by reproducing it through normal,
+deliberate manual interaction, not by trusting the first automated failure at face value. Swept
+the rest of the frontend for other leftover v4 chart-series calls afterward; none found.
+
+**README rewrite + real screenshots.** The user separately asked to add screenshots to make the
+repo look better. `README.md` had drifted significantly out of date — missing Comparison,
+Watchlist, Practice Lab, Glossary, Ask TC-Buddy, and fundamentals entirely, and still describing
+the just-removed shared-token model. Rewrote it to match current reality, and captured six real
+screenshots from the actually-running app (not mockups) using a temporary `puppeteer-core`
+script pointed at the machine's existing Edge browser — installed with `--no-save` and
+uninstalled again afterward, so it left no trace in `package.json`. Capturing the screenshots is
+what surfaced the Comparison-tab crash above; a deliberately unplanned but valuable side effect
+of trying to show the real app rather than describe it.
+
+87 backend tests / 57 frontend tests passing at the end of this entry. Everything committed in
+focused, single-purpose commits and pushed to `origin/master` as it landed.
