@@ -764,3 +764,47 @@ is supposed to work on. Fixed by deriving tolerances from each series' own volat
 (`patterns.py::_scale()`) instead of a fixed constant, and sorting `detect()`'s output
 most-recent-first. 6 regression tests added (2 replacing the informal manual check), verified
 live across all 5 timeframes this time, not just one.
+
+---
+
+## Ecosystem panel fixes and Audit Wave 2 (2026-09-17)
+
+**Ecosystem panel, user-reported.** Two more real bugs surfaced by the user actually using the
+app: the company summary was cut off mid-word ("...artificial intelligence solutions an…") —
+`company.py` sliced at a fixed 360-char count with no regard for word boundaries, and
+`Ecosystem.jsx` then unconditionally appended a SECOND "…" even onto text that already ended
+cleanly; and the beta explanation said "more volatile than the market" instead of naming the
+actual benchmark, because only a COMPUTED beta (the non-US fallback) carried an index name — a
+PROVIDER beta (the common case for most US tickers) never did. Fixed both, plus a follow-up the
+user asked for directly: hovering a peer node in the ecosystem graph showed only the bare ticker
+with no way to see the company name without already knowing it. Added `peerNames` to
+`company.get_profile` (parallel yfinance lookups — Yahoo's keyless batch-quote endpoint now
+401s without a session/crumb — ~0.85s for 8 peers rather than 8x that sequentially), wired to a
+native SVG `<title>` on each graph node. While verifying that live on QCOM, caught one more:
+"MRVL" appeared as two separate nodes — Finnhub's own peers list genuinely contained it twice.
+Deduped case-insensitively. **Mistakes/course-corrections:** none introduced this pass — three
+real bugs found and fixed, each one verified live (not just via unit tests) before moving on,
+which is the practice the earlier pattern-detector miss (see previous entry) should have
+followed from the start.
+
+**Audit Wave 2 — cost/reliability.** The last two mechanical items before deploy readiness:
+`orchestrator.analyze()` now caches its finished result for 20 minutes per ticker (separate from
+`gather()`'s own 5-minute cache) — previously every page reload, new tab, or new visitor spent a
+fresh paid Claude call for a ticker someone had already researched minutes earlier. A raised
+exception is deliberately never cached, so a missing key or a transient AI error recovers on the
+very next request rather than being stuck unavailable for the full 20 minutes. Verified live and
+carefully, mindful this spends real money: called `/analyze/AMD` twice back to back — the first
+took ~30s (a real Claude call), the second returned in 4 milliseconds, and the server log showed
+exactly one `[llm]` usage line for both requests, confirming the LLM was genuinely only invoked
+once. Also added an explicit timeout to the Anthropic client (90s for analysis, 45s for chat) —
+previously unset, meaning a hung request could occupy a FastAPI worker indefinitely; both
+endpoints already catch generic exceptions and degrade to `available:false`, so a timeout now
+surfaces as an ordinary graceful-degradation message instead of hanging forever. 6 new tests
+across both fixes. **Mistakes/course-corrections:** none. What remains of Wave 2 is the user's
+own action (Render host signup, setting `TRADE101_ACCESS_TOKEN` before sharing the link) — not
+something a coding session can do on their behalf.
+
+Backend: 65/65 tests passing (was 45 before the ecosystem-panel pass began). Frontend build
+clean throughout. **Remaining audit work:** Wave 3 — chart indicator overlays (a
+`lightweight-charts` v5 upgrade) and the UI/UX redesign the user asked to review before it's
+built — neither started.

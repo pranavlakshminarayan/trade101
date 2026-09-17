@@ -10,6 +10,16 @@ from __future__ import annotations
 from agents import analysis, chat, llm
 from services import cache, company, evidence, indicators, marketdata, news
 
+# How long a finished /analyze result is reused before spending the Claude key
+# again for the same ticker. Previously unbounded — every page reload, every
+# new tab, every friend opening the shared link ran a fresh effort="high" call
+# (docs/AUDIT.md finding M2), even though the frontend's OWN cache already
+# proves a stock's read doesn't need to change minute-to-minute. 20 min is
+# long enough that a normal research session (reload, tab close/reopen,
+# revisiting a stock) doesn't re-spend, short enough that a genuinely fresh
+# read is available again soon after.
+ANALYZE_CACHE_TTL = 1200.0
+
 
 def gather(ticker: str) -> dict | None:
     """Deterministic data bundle for a ticker — exact numbers + relevance-filtered
@@ -80,7 +90,15 @@ def news_bundle(ticker: str) -> dict | None:
 
 def analyze(ticker: str) -> dict | None:
     """Full AI narration bundle for `ticker`, or None if the symbol has no data.
-    Raises llm.MissingKeyError if no analysis key is configured."""
+    Raises llm.MissingKeyError if no analysis key is configured. Cached for
+    ANALYZE_CACHE_TTL — a raised exception is never cached (get_or_set only
+    stores a value fn() actually returns), so a missing key or a transient AI
+    error is retried on the very next call rather than sticking around."""
+    return cache.get_or_set(f"analyze:{ticker.upper()}", lambda: _analyze(ticker),
+                             ttl=ANALYZE_CACHE_TTL)
+
+
+def _analyze(ticker: str) -> dict | None:
     b = gather(ticker)
     if b is None:
         return None

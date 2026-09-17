@@ -17,6 +17,16 @@ import anthropic
 # TRADE101_MODEL in .env (e.g. claude-opus-5 for max depth, claude-haiku-4-5 for cheapest).
 MODEL = os.environ.get("TRADE101_MODEL", "claude-sonnet-5")
 
+# Client timeouts (docs/AUDIT.md finding M11): previously unset, meaning a
+# hung request could occupy a FastAPI worker indefinitely — for a single-
+# process deploy that's a real availability risk, not just slowness. Analysis
+# runs "high" effort with adaptive thinking on up to 4000 output tokens and
+# genuinely can take a while, so it gets a longer allowance than chat's
+# "medium" effort / 1200-token turns. Anthropic's client accepts a single
+# float (total per-request seconds); the SDK retries under this internally.
+ANALYSIS_TIMEOUT_S = 90.0
+CHAT_TIMEOUT_S = 45.0
+
 
 class MissingKeyError(RuntimeError):
     pass
@@ -39,7 +49,7 @@ def call(key_env: str, system: str, user: str, effort: str = "high", max_tokens:
             f"AI narration unavailable — set {key_env} in your .env "
             f"(a named Claude API key). The chart and indicators work without it."
         )
-    client = anthropic.Anthropic(api_key=key)
+    client = anthropic.Anthropic(api_key=key, timeout=ANALYSIS_TIMEOUT_S)
 
     kwargs = {}
     if "haiku" not in MODEL:  # adaptive thinking + effort aren't valid on Haiku
@@ -69,7 +79,7 @@ def call_chat(key_env: str, system: str, messages: list[dict],
         raise MissingKeyError(
             f"Ask-Claude is unavailable — set {key_env} in your .env (a named Claude API key)."
         )
-    client = anthropic.Anthropic(api_key=key)
+    client = anthropic.Anthropic(api_key=key, timeout=CHAT_TIMEOUT_S)
 
     kwargs = {}
     if "haiku" not in MODEL:

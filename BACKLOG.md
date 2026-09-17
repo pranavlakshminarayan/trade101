@@ -73,6 +73,19 @@ A running list so we don't lose ideas. Add freely; we pull from here after the M
 - [x] **H8 — Currency symbols covered only INR + USD.** Already fixed by the Phase 3 merge
   (`lib/currency.js`) before this wave started — confirmed still in place.
 
+## Audit — Wave 2: cost/reliability, then deploy — code half ✅ DONE 2026-09-17
+
+- [x] **M2 — No backend cache of the analysis result.** Fixed: `orchestrator.analyze()` now
+  caches its finished result for 20 min per ticker; a raised exception is never cached (retried
+  on the next request, not stuck for the TTL). Verified live: two `/analyze/AMD` calls → one
+  real ~30s Claude call then a 4ms cache hit, one `[llm]` log line for both. 3 new tests.
+- [x] **M11 — No timeout on the Anthropic client.** Fixed: `agents/llm.py` sets `timeout=` on
+  client construction (90s analysis, 45s chat) — a hung request now degrades gracefully instead
+  of occupying a worker indefinitely. 3 new tests.
+- [ ] **Deploy to Render**, set `TRADE101_ACCESS_TOKEN` + `TRADE101_DAILY_CAP`, verify the guard
+  from a logged-out browser, then share the link. **This step is the user's own action** (host
+  account signup) — not something that can be done from inside a coding session.
+
 ---
 
 ## Known bugs / debt from Phase 1

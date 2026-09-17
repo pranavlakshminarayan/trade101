@@ -188,6 +188,13 @@ frontend/ src/{App,api}.jsx · components/{Welcome,Research,PriceChart,Metrics,A
   (prompt caching) — served at ~0.1× input cost within the 5-min window. Requires the prefix to
   clear the model minimum (Sonnet 5 = 1024 tok, Opus 5 = 512); ours is ~1306 tok so it fires.
   `llm.py` logs `cache_write`/`cache_read`/`in`/`out` per call — check the server log to confirm.
+  Client `timeout=` is also set here (`ANALYSIS_TIMEOUT_S=90`, `CHAT_TIMEOUT_S=45`) — a hung
+  request degrades gracefully after that instead of occupying a worker indefinitely.
+- `orchestrator.analyze()` caches its finished result per ticker (`ANALYZE_CACHE_TTL=1200s`) —
+  separate from `gather()`'s own 5-min cache, so a page reload/new tab/new visitor within 20 min
+  reuses the prior read instead of spending the Claude key again. A raised exception is never
+  cached (only a value `fn()` actually returns is stored), so a missing key or transient AI
+  error is retried on the next request, not stuck for the full TTL.
 - **Ask-Claude chat**: `POST /ask/{ticker}` → `orchestrator.ask` → `agents/chat.py`. Same
   guardrails as analysis; the ticker's data bundle is rendered into a cached system prompt so
   multi-turn chat reuses it (chat turn 2+ reads the whole prefix from cache). `agents/chat.py`
@@ -271,10 +278,23 @@ on the host** — the gate is a no-op until that env var is set.
 
 ## Known bugs
 **Full ranked list with evidence: [`docs/AUDIT.md`](docs/AUDIT.md) (critical audit, 2026-09-16).**
-Mirrored as checkboxes in `BACKLOG.md` → "Audit — Wave 0/1". **Waves 0 and 1 are both done** —
-remaining audit items are `docs/AUDIT.md`'s Wave 2 (cache the analysis result, an Anthropic
-client timeout, then deploy) and Wave 3 (chart indicator overlays + the UI/UX redesign), neither
-started yet. See `docs/AUDIT.md` §10 for the full fix order.
+Mirrored as checkboxes in `BACKLOG.md` → "Audit — Wave 0/1/2". **Waves 0, 1, and the code half of
+Wave 2 are done** — remaining is Wave 2's deploy step (the user's own host signup, not code) and
+Wave 3 (chart indicator overlays + the UI/UX redesign), neither started. See `docs/AUDIT.md` §10.
+
+### Fixed 2026-09-17 (Audit Wave 2 — cost/reliability)
+- ~~No backend cache of the analysis result — every reload spent a fresh paid call~~ (M2) —
+  `orchestrator.analyze()` now caches its finished result for 20 min per ticker
+  (`ANALYZE_CACHE_TTL`); a raised exception (missing key, AI error) is never cached, so a
+  transient failure is retried on the very next request rather than sticking around. Verified
+  live: two `/analyze/AMD` calls back to back → one real ~30s Claude call, then a 4ms cache hit;
+  server log confirms exactly one `[llm]` line for both requests. 3 new tests.
+- ~~No timeout on the Anthropic client — a hung request could occupy a worker indefinitely~~
+  (M11) — `agents/llm.py` now sets `timeout=` on client construction: 90s for analysis
+  (`ANALYSIS_TIMEOUT_S`, high effort/4000 tokens), 45s for chat (`CHAT_TIMEOUT_S`, medium
+  effort/1200 tokens). Both endpoints already catch generic exceptions and degrade to
+  `available:false`, so a timeout now surfaces as a normal graceful-degradation message instead
+  of hanging the request forever. 3 new tests.
 
 ### Fixed 2026-09-16 (Audit Wave 0)
 - ~~Phase 3 work stranded off `master`~~ — was already merged to `origin/master` via PR #2 in a
