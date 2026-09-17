@@ -130,19 +130,19 @@ export default function App() {
   )
 
   if (view === 'history') {
-    return <History onNavigate={goToView} onOpen={(t) => doResearch(t)} />
+    return <History onNavigate={goToView} onOpen={(t) => doResearch(t)} onHome={goHome} />
   }
 
   if (view === 'compare') {
-    return <Compare onNavigate={goToView} onOpen={(t) => doResearch(t)} initial={data?.ticker} />
+    return <Compare onNavigate={goToView} onOpen={(t) => doResearch(t)} initial={data?.ticker} onHome={goHome} />
   }
 
   if (view === 'watchlist') {
-    return <Watchlist onNavigate={goToView} onOpen={(t) => doResearch(t)} />
+    return <Watchlist onNavigate={goToView} onOpen={(t) => doResearch(t)} onHome={goHome} />
   }
 
   if (view === 'practice') {
-    return <PracticeLab onNavigate={goToView} onOpen={(t) => doResearch(t)} />
+    return <PracticeLab onNavigate={goToView} onOpen={(t) => doResearch(t)} onHome={goHome} />
   }
 
   if (loading) {
@@ -151,7 +151,7 @@ export default function App() {
 
   if (data) {
     return (<>
-      <Research data={data} onBack={goHome} onSearch={submitQuery} onNavigate={goToView} />
+      <Research data={data} onBack={goHome} onSearch={submitQuery} onNavigate={goToView} onHome={goHome} />
       {picker}
     </>)
   }

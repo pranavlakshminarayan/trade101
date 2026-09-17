@@ -3,7 +3,8 @@ import {
   createChart, CandlestickSeries, AreaSeries, HistogramSeries, LineSeries, createSeriesMarkers,
 } from 'lightweight-charts'
 
-const PAT = '#F2A93B'   // amber — pattern overlay, stands out over green/red candles
+const PAT = '#B58EF2'   // violet — pattern overlay; was amber, which clashed with the
+                        // palette and doubled up with the watch-star color (user-reported)
 const SMA50_C = '#5B9BD5'
 const SMA200_C = '#C99A5A'
 const BOLL_C = 'rgba(158,124,255,0.55)'
@@ -100,15 +101,18 @@ export default function PriceChart({
       seriesRef.current.vol.setData(ohlcv.map((b) => ({ time: b.time, value: b.volume, color: b.close >= b.open ? 'rgba(0,214,143,.35)' : 'rgba(240,97,109,.35)' })))
     }
 
-    // Re-fit the view only when this is genuinely a different window (new
+    // Re-fit the view whenever this is genuinely a different window (new
     // ticker or timeframe changes the bar count and/or the first timestamp),
     // not on a same-shape auto-refresh tick — so the user's zoom/pan survive
-    // a refresh instead of being reset every 7 minutes.
+    // a refresh instead of being reset every 7 minutes. Previously this only
+    // ever fit on the VERY FIRST load (an `isFirstFit` guard on top of the
+    // key check), so every subsequent timeframe switch left the chart at
+    // whatever range it happened to have, unfit — user-reported: "does not
+    // autofit the window and has to be zoomed in to fit".
     const key = `${ohlcv.length}|${ohlcv[0]?.time}|${ohlcv[ohlcv.length - 1]?.time}`
     if (fitKeyRef.current !== key) {
-      const isFirstFit = fitKeyRef.current === null
       fitKeyRef.current = key
-      if (isFirstFit) chart.timeScale().fitContent()
+      chart.timeScale().fitContent()
     }
   }, [ohlcv, type])
 

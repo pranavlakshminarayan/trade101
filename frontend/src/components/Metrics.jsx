@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react'
 import { METRICS, metricLabel, metricValue, factFor, lessonFor } from '../lessons.js'
+import { CloseIcon } from './Icons.jsx'
 
 // Metric analyzer + learning in ONE block: click a metric → the fact for this
 // stock first, then the deeper lesson. Esc closes.
@@ -29,7 +30,7 @@ export default function Metrics({ indicators, ticker }) {
       </div>
       {selected && (
         <div className="lesson">
-          <button className="esc" onClick={() => setSelected(null)}>Esc ✕</button>
+          <button className="esc" onClick={() => setSelected(null)}>Esc <CloseIcon className="icon" /></button>
           <h4>{metricLabel(selected)} on {ticker}</h4>
           <p className="fact">{factFor(selected, indicators, ticker)}</p>
           <p style={{ margin: '8px 0 0' }}>{lessonFor(selected, indicators, ticker)}</p>

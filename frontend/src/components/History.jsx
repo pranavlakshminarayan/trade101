@@ -1,15 +1,16 @@
 import { useState } from 'react'
 import Logo from './Logo.jsx'
 import { getHistory, clearHistory, timeAgo } from '../lib/history.js'
+import { PlusIcon, ArrowIcon } from './Icons.jsx'
 
 function leanChip(lean) {
   if (!lean) return null
   const cls = lean === 'bullish' ? 'up' : lean === 'bearish' ? 'down' : 'flat'
-  const a = lean === 'bullish' ? '▲' : lean === 'bearish' ? '▼' : '■'
-  return <span className={'chip ' + cls}>{a} {lean}</span>
+  const dir = lean === 'bullish' ? 'up' : lean === 'bearish' ? 'down' : 'flat'
+  return <span className={'chip ' + cls}><ArrowIcon direction={dir} className="icon" /> {lean}</span>
 }
 
-export default function History({ onNavigate, onOpen }) {
+export default function History({ onNavigate, onOpen, onHome }) {
   const [items, setItems] = useState(getHistory())
 
   const wipe = () => { clearHistory(); setItems([]) }
@@ -18,7 +19,7 @@ export default function History({ onNavigate, onOpen }) {
     <div className="research">
       <div className="top">
         <div style={{ display: 'flex', alignItems: 'center' }}>
-          <div className="logo"><Logo /> Trade Craft</div>
+          <button className="logo logo-btn" onClick={onHome}><Logo /> Trade Craft</button>
           <div className="tabs">
             <button onClick={() => onNavigate('home')}>Research</button>
             <button onClick={() => onNavigate('compare')}>Comparison</button>
@@ -27,7 +28,7 @@ export default function History({ onNavigate, onOpen }) {
             <button onClick={() => onNavigate('practice')}>Practice Lab</button>
           </div>
         </div>
-        <button className="backbtn" onClick={() => onNavigate('home')}>＋ New research</button>
+        <button className="backbtn" onClick={() => onNavigate('home')}><PlusIcon className="icon" /> New research</button>
       </div>
 
       <div className="headline" style={{ justifyContent: 'space-between' }}>

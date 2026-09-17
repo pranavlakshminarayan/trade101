@@ -29,6 +29,30 @@ SEC_UA = {"User-Agent": f"Trade Craft research app "
 
 _cik_cache: dict[str, str] = {}
 
+# When the primary provider returns fewer than this many items, supplement
+# from a second provider instead of leaving the user with too few headlines
+# to actually form a view (user-reported — "decisions aren't made by reading
+# 2 or 3 headlines"). _MAX_MERGED caps the combined result.
+_SUPPLEMENT_BELOW = 8
+_MAX_MERGED = 25
+
+
+def _merge_news(primary: list[dict], extra: list[dict], cap: int) -> list[dict]:
+    """primary + extra, deduped by URL (falling back to headline text when a
+    URL is missing), primary items kept first. Order beyond that is whatever
+    each provider already returned (both are date-sorted upstream)."""
+    seen = {(it.get("url") or it.get("headline") or "").strip().lower() for it in primary}
+    out = list(primary)
+    for it in extra:
+        key = (it.get("url") or it.get("headline") or "").strip().lower()
+        if not key or key in seen:
+            continue
+        seen.add(key)
+        out.append(it)
+        if len(out) >= cap:
+            break
+    return out
+
 
 def get_news(ticker: str, days: int = 30, name: str | None = None) -> tuple[list[dict], str | None]:
     """Provider-agnostic news fetch. Swap providers with TRADE101_NEWS_PROVIDER
@@ -45,6 +69,14 @@ def get_news(ticker: str, days: int = 30, name: str | None = None) -> tuple[list
     if provider == "finnhub":
         items, note = get_company_news(ticker, days)
         if items:
+            # A handful of headlines isn't enough to "connect the dots" on a
+            # story (user-reported) — when the primary source is thin,
+            # supplement with Google News rather than stopping at whatever
+            # Finnhub happened to return, deduped by URL/headline so the same
+            # story from two providers doesn't show twice.
+            if len(items) < _SUPPLEMENT_BELOW:
+                g_items, _ = _google_news(ticker, name, days)
+                items = _merge_news(items, g_items, _MAX_MERGED)
             return items, note
         g_items, g_note = _google_news(ticker, name, days)
         if g_items:
@@ -110,7 +142,7 @@ def _google_news(ticker: str, name: str | None, days: int = 30) -> tuple[list[di
             "datetime": date_iso,
         })
     note = None if items else f"No recent Google News results for {query}."
-    return items[:15], note
+    return items[:_MAX_MERGED], note
 
 
 def _yahoo_news(ticker: str, days: int = 30) -> tuple[list[dict], str | None]:
@@ -148,7 +180,7 @@ def _yahoo_news(ticker: str, days: int = 30) -> tuple[list[dict], str | None]:
             "datetime": date_iso,
         })
     note = None if items else "No recent company news returned for this listing."
-    return items[:15], note
+    return items[:_MAX_MERGED], note
 
 
 def get_company_news(ticker: str, days: int = 30) -> tuple[list[dict], str | None]:
@@ -176,7 +208,7 @@ def get_company_news(ticker: str, days: int = 30) -> tuple[list[dict], str | Non
         return [], "Couldn't reach the news provider just now — the read continues without news."
 
     items = []
-    for a in raw[:15]:
+    for a in raw[:_MAX_MERGED]:
         ts = a.get("datetime")
         items.append({
             "headline": a.get("headline"),

@@ -19,12 +19,17 @@ def _fake_hist(n=60):
     })
 
 
-def _patch_gather(monkeypatch, news_items=None):
+def _patch_gather(monkeypatch, news_items=None, extra_items=None):
     app.orchestrator.cache.clear()  # tests must not see another test's cached bundle
     quote = {"symbol": "NEWSTEST", "name": "News Test Co", "currency": "USD"}
     monkeypatch.setattr(app.orchestrator.marketdata, "get", lambda *a, **k: (_fake_hist(), quote))
     monkeypatch.setattr(app.orchestrator.news, "get_news", lambda *a, **k: (news_items or [], None))
     monkeypatch.setattr(app.orchestrator.news, "get_recent_filings", lambda *a, **k: ([], None))
+    # A thin (<_MIN_COMPANY_NEWS) filtered feed triggers a second, name-targeted
+    # Google News fetch (orchestrator._gather) — stub it too so tests don't hit
+    # the real network, and so callers can opt into supplying supplementary
+    # items via `extra_items`.
+    monkeypatch.setattr(app.orchestrator.news, "_google_news", lambda *a, **k: (extra_items or [], None))
     monkeypatch.setattr(app.orchestrator.company, "get_profile",
                          lambda *a, **k: {"sector": "Technology", "industry": "Software", "peers": []})
 

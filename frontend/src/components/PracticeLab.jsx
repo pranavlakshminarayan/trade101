@@ -3,6 +3,7 @@ import Logo from './Logo.jsx'
 import { research, search } from '../api.js'
 import { currencySymbol } from '../lib/currency.js'
 import { getPortfolio, resetPortfolio, buy, sell, STARTING_CASH } from '../lib/practiceLab.js'
+import { PlusIcon } from './Icons.jsx'
 
 function money(v) {
   const n = Number(v) || 0
@@ -21,7 +22,7 @@ function pnlClass(v) {
 // every price is a real live quote fetched at the moment of logging, never a
 // user-typed number, and nothing here is a recommendation — it only records
 // the user's OWN decisions so they can reflect on the outcome later.
-export default function PracticeLab({ onNavigate, onOpen }) {
+export default function PracticeLab({ onNavigate, onOpen, onHome }) {
   const [portfolio, setPortfolio] = useState(getPortfolio())
   const [quotes, setQuotes] = useState({}) // ticker -> live quote
 
@@ -112,7 +113,7 @@ export default function PracticeLab({ onNavigate, onOpen }) {
     <div className="research">
       <div className="top">
         <div style={{ display: 'flex', alignItems: 'center' }}>
-          <div className="logo"><Logo /> Trade Craft</div>
+          <button className="logo logo-btn" onClick={onHome}><Logo /> Trade Craft</button>
           <div className="tabs">
             <button onClick={() => onNavigate('home')}>Research</button>
             <button onClick={() => onNavigate('compare')}>Comparison</button>
@@ -121,7 +122,7 @@ export default function PracticeLab({ onNavigate, onOpen }) {
             <button className="on" aria-current="page">Practice Lab</button>
           </div>
         </div>
-        <button className="backbtn" onClick={() => onNavigate('home')}>＋ New research</button>
+        <button className="backbtn" onClick={() => onNavigate('home')}><PlusIcon className="icon" /> New research</button>
       </div>
 
       <div className="headline">

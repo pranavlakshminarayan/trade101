@@ -247,9 +247,13 @@ Endpoints: `/health`, `/search?q=` (ranked, badged candidates), `/research/{tick
 
 ## Run (two terminals)
 ```
-# backend (from backend/)
-.venv/Scripts/python.exe -m uvicorn app:app --reload --port 8000
-# frontend (from frontend/)
+# backend (from backend/) — port 8000/8001 are currently stuck-orphaned on this machine (see
+# Gotchas); running on 8002 until a machine restart reclaims one of them. --reload has also
+# proven unreliable here (WatchFiles missed several edits) — restart manually after backend
+# changes rather than trusting it to pick them up.
+.venv/Scripts/python.exe -m uvicorn app:app --port 8002
+# frontend (from frontend/) — VITE_API_BASE in frontend/.env.local must match the port above;
+# Vite only reads .env.local at startup, so restart this after changing that file.
 npm run dev            # PowerShell blocks npm → use npm.cmd run dev, or Set-ExecutionPolicy -Scope CurrentUser RemoteSigned
 ```
 Open http://127.0.0.1:5173. Tests: `cd backend && .venv/Scripts/python.exe -m pytest -q`.
@@ -285,13 +289,139 @@ on the host** — the gate is a no-op until that env var is set.
   still work, it's just not a real contact then. Never hardcode a personal email in committed
   source for this; put it in the gitignored `.env` instead.
 - Windows 11, Git Bash available; the `claude` CLI is at `C:\Users\prana\.local\bin\claude.exe`.
+- **Backend currently runs on port 8002** (2026-09-17 — port 8001 also got stuck with an orphaned
+  LISTENING socket, same class of issue as the port-8000 incident; see Gotchas). `frontend/
+  .env.local`'s `VITE_API_BASE` points at it. If you restart the backend, prefer 8002 unless/until
+  a machine restart reclaims 8000/8001 — check `frontend/.env.local` for whichever port is live
+  before assuming the backend is down.
 
 ## Known bugs
 **Full ranked list with evidence: [`docs/AUDIT.md`](docs/AUDIT.md) (critical audit, 2026-09-16).**
 Mirrored as checkboxes in `BACKLOG.md` → "Audit — Wave 0/1/2/3". **Waves 0, 1, 2 (code half), and
 Wave 3's chart-overlay item (H5) are done** — remaining: Wave 2's deploy step (the user's own
-host signup, not code) and Wave 3's UI/UX redesign, which the user asked to review as a proposal
-before any of it is built. See `docs/AUDIT.md` §10.
+host signup, not code). See `docs/AUDIT.md` §10.
+
+### In progress 2026-09-17 — Wave 3 UI/UX redesign (built, awaiting user review/approval before finalizing)
+User asked to see the redesign in the running app before deciding — direction discussed and
+narrowed first (see `docs/AUDIT.md` §8/§10 item 12 for the original sketch), then implemented for
+live review at `http://127.0.0.1:5173`. **Nothing here is finalized — do not treat as done until
+the user approves.** Also renamed the Ask-Claude chat widget to **Ask TC-Buddy** (UI label only;
+the endpoint/agent are unchanged) with a candlestick SVG icon replacing the ✦ glyph, per explicit
+user request alongside this wave.
+- **Layout**: replaced the height-balancing masonry (`Research.jsx`'s old `useLayoutEffect` that
+  measured block heights and moved panels between columns as data streamed in — the actual bug,
+  not the multi-column idea) with a **fixed two-zone layout**: left/main column is the spine
+  (chart → AI momentum read → metrics, always in that order), right column is always news →
+  ecosystem → references. Panels no longer jump columns mid-load. User pushed back on a fully
+  rigid three-zone grid (worried about dead space on the short side) — this keeps the
+  space-filling two-column flow, just with deterministic panel→column assignment.
+- **Icon system**: new `frontend/src/components/Icons.jsx` — SVG components (Search, Paperclip,
+  Scale, Star, Clock, Plus, Flask, Sparkle, Arrow, Close, Chevron, plus the TC-Buddy candlestick
+  icon in `AskClaude.jsx`) replacing every emoji glyph (🔍📎⚖️★☆🕘✚✦▲▼■✕🧪) across Welcome/
+  Research/Watchlist/History/PracticeLab/Metrics/AiRead/NewsPanel. User confirmed the *symbols*
+  were deliberately chosen (not to be replaced) — only the rendering technology changed, so
+  cross-platform/OS rendering is consistent and icons can be recolored via `currentColor` to
+  match the accent system, which emoji couldn't do.
+- **Evidence panel redesign**: the Fact/Interpretation/Unknown list in `AiRead.jsx` was a plain
+  unstyled `<ul>` (docs/AUDIT.md UI-UX #7 — "the most valuable thing is the least designed").
+  Now a `.evidence-list` of bordered cards, left-border colored per type (green/teal/gray),
+  matching the badge colors so the type reads at a glance while scrolling.
+- **Accessibility/mobile**: added a `max-width:720px` media query for the Welcome screen's rail
+  nav (was a fixed 230px column eating most of a phone viewport — docs/AUDIT.md L1); `.top`/
+  `.tabs` now wrap on narrow widths. Global `:focus-visible` and the ecosystem graph's keyboard
+  focus ring were already done in an earlier wave.
+- **Dead CSS removed** (docs/AUDIT.md L4): `.row`, `.cockpit`, `.midrow`, `.snap`, `.refs`,
+  `.mkt`, `.phase`, `.eco-peers` — confirmed unused via grep before deletion.
+- **Not yet done from the original sketch**: a full type scale / 8pt spacing system —
+  deferred pending user feedback on this first pass rather than assumed.
+
+### In progress 2026-09-17 — user feedback round on the Wave 3 redesign (built, still awaiting final approval)
+User reviewed the first pass live and gave 7 concrete notes. Addressed:
+- **Metrics/AI-read order** — user wants the indicators they're learning visible right under the
+  chart, not at the bottom. Spine is now chart → **metrics** → AI momentum read (was chart → AI
+  read → metrics). `Research.jsx`.
+- **News feed too thin** — the bottleneck wasn't the provider fetch cap, it was
+  `services/evidence.py`'s relevance filter dropping most of what Finnhub returned (e.g. NVDA:
+  15 raw → 3 kept). Rather than weaken that guardrail, `agents/orchestrator.py::_gather` now
+  supplements with a second, name-targeted Google News search (deduped by URL/headline, itself
+  filtered through the same relevance guard) whenever the FILTERED company-news count is below
+  `_MIN_COMPANY_NEWS` (6) — verified NVDA went 3 kept → 8 kept. Provider-level caps also raised
+  15 → 25 (`_MAX_MERGED` in `services/news.py`); `NewsPanel.jsx` now renders up to 20 instead of 8.
+  One test (`test_news_endpoint.py`) updated to stub the new `_google_news` call the same way it
+  already stubbed `get_news`.
+- **Patterns reading stale price action** — on intraday timeframes (5m/15m/30m bars) a pattern
+  built from swings 3-4 hours old is already stale (user-reported: "the market has passed that").
+  `app.py::detect_patterns` now restricts the pattern SCAN (not the chart's own candles, which
+  still show the full window) to the trailing `_RECENT_HOURS` (2) on intraday intervals only —
+  daily/weekly patterns are unrestricted, since "recent" means something different on a 1Y chart.
+- **Pattern color** — amber clashed with the palette and doubled up with the watch-star color.
+  New `--pattern`/`--pattern-soft` CSS vars (violet, `#B58EF2`), used by `.patbtn.on`/`.pat-tab.on`
+  and `PriceChart.jsx`'s `PAT` overlay constant. Amber is now unambiguously "the watch star."
+  (This also **resolves** the "amber for patterns only" open item from the first redesign pass —
+  patterns got their own color entirely instead.)
+- **Chart didn't autofit** — real bug, not a perception issue: `PriceChart.jsx`'s `fitContent()`
+  call was gated behind an `isFirstFit` check on top of the "new dataset" key check, so it only
+  ever fired on the chart's very first-ever load — every subsequent timeframe switch left the
+  view at whatever range it last had, unfit. Removed the redundant gate; `fitContent()` now runs
+  on every genuinely new dataset (which was already the intended trigger), while still skipping
+  same-shape auto-refresh ticks so zoom/pan still survive those.
+- **Logo doesn't go home** — `<div className="logo">` on every page (Research/Watchlist/History/
+  Compare/PracticeLab) is now a real `<button className="logo logo-btn">` wired to a new `onHome`
+  prop (`App.jsx`'s existing `goHome`, now also passed to the tab views, not just Research).
+  Welcome's own logo is unchanged (already home).
+- **Practice Lab** — user explicitly deferred this to Wave 4; no change made.
+- Backend: also killed several orphaned `uvicorn` processes squatting on port 8001 with no
+  `--reload` (this session's Python edits weren't taking effect until noticed and restarted) and
+  relaunched with `--reload` so future backend edits apply live. All 71 backend tests pass.
+- **Still awaiting final user sign-off before this wave is committed/pushed** — same status as
+  the redesign entry above.
+
+### In progress 2026-09-17 — second feedback round: SMA200/patterns/news, port 8001 also got stuck
+User caught real bugs in the previous round's fixes on a live test case (TECA.F, a thin Frankfurt
+secondary listing of Toshiba Tec):
+- **SMA200 "same error repeated"** — genuine bug, not stale cache: `Metrics` always rendered
+  `live.indicators` (the base 1Y/1D snapshot) regardless of which chart timeframe tab was active,
+  so viewing the 10D/30m tab still showed the unrelated 1Y daily SMA200 value (a real number for
+  the 1Y period, but meaningless next to a 10D chart that has no SMA200 line at all — not enough
+  30-min bars for 200 of them). `Research.jsx` now derives `indicators` from the SELECTED
+  timeframe's own `/research` response (`tfData[timeframe].indicators`, now captured — it was
+  being fetched and discarded), falling back to the 1Y value only while on the 1Y tab itself.
+  Verified: 10D tab now correctly shows "—" for SMA200 instead of a mismatched number.
+- **"Frontend session cache never expires" (docs/AUDIT.md M1) fixed as a side effect** — while
+  chasing the above, found `frontend/src/api.js`'s `research`/`ecosystem`/`patterns`/`news` caches
+  had no TTL at all (only `analyze`, the paid call, was meant to persist all session). Added a
+  5-min TTL (matches the backend's own `services/cache.py`) so a stale entry ages out instead of
+  needing a full page reload. `analyze` deliberately untouched.
+- **Patterns "not below 2 hours" — user meant the opposite of what was built.** The prior fix
+  restricted the intraday pattern SCAN to the trailing 2 hours, meant to stop STALE 3-4-hour-old
+  swings from being shown — but the user wanted recent patterns ADDED, not older ones EXCLUDED
+  wholesale; the 2-hour window (with a 20-bar floor) was cutting out both genuinely recent
+  forming patterns (needed more bars than fit in 2h) and older-but-real ones. Reverted `app.py`'s
+  `_RECENT_HOURS`/`_BAR_MINUTES` restriction entirely — `detect_patterns` scans the whole fetched
+  window again, relying on `patterns.detect`'s existing most-recent-first sort (docs/AUDIT.md H6)
+  to surface the freshest match without hiding anything from the scan.
+  **Lesson: "recent" was ambiguous — always confirm whether the ask is "prioritize recent" vs.
+  "restrict to only recent" before implementing a filter.**
+- **News "still US-only" — investigated, and the real finding is nuanced.** Google News RSS
+  genuinely does return non-US coverage (verified: a real Toshiba Tec earnings article came back
+  for the exact query used) — the problem was the 30-day recency cutoff silently discarding
+  results that were real but a few months old, which is common for thinly-covered secondary/
+  foreign listings. `orchestrator._gather`'s supplement call now uses a 90-day window
+  (`_SUPPLEMENT_DAYS`) instead of the default 30. When a listing STILL has zero company-relevant
+  results after that (verified case: TECA.F has essentially no findable English coverage under
+  its own name), the app now says so explicitly instead of silently showing an empty feed —
+  mirrors the honesty pattern `company.py`'s `coverage` map already uses for missing peers/beta.
+  This is a genuine, expected data-availability limit for some listings, not a fixable code gap —
+  well-covered tickers (NVDA, AAPL, etc.) were unaffected throughout.
+- **Port 8001 also got a stuck orphaned LISTENING socket** (same class of issue as the
+  documented port-8000 incident — `Stop-Process` succeeded on 5 processes but the port stayed
+  bound with no live owning PID). Also separately discovered `uvicorn --reload`'s WatchFiles
+  watcher was NOT picking up backend edits reliably on this machine (only one reload fired across
+  several subsequent file saves) — silently serving stale code, which is why the SMA200 fix
+  initially looked like it hadn't worked. **Backend now runs on port 8002, without `--reload`**
+  (restart manually after backend edits rather than trusting the watcher) — `frontend/.env.local`
+  updated to match. Frontend dev server was also restarted (Vite only reads `.env.local` at
+  startup). All 71 backend tests still pass.
 
 ### Fixed 2026-09-17 (SMA lookback, user-reported — same day as H5)
 - ~~SMA200 was cut short on 1Y and vanished entirely on 5D/1D~~ — SMA200 needs 200 bars of
@@ -526,8 +656,26 @@ before any of it is built. See `docs/AUDIT.md` §10.
   Workaround: run the backend on a fallback port (`--port 8001`) and point the frontend at it via
   `frontend/.env.local`'s `VITE_API_BASE` (gitignored, local-only — see Config). A machine restart
   should reclaim the original port; this needs no code change once it does.
-- Chart-pattern detection is a heuristic learning aid (returns "none" when nothing clean) — never present it as a signal. Detects on High/Low, not Close (2026-09-17).
-- Layout is a self-balancing JS masonry (measures block heights). Browser back/forward + `#TICKER` shareable links work — and now `#/compare` `#/watchlist` `#/history` too (2026-09-15).
+- **On 8001 too (2026-09-17, first occurrence): found FIVE separate stray processes all launched
+  as `uvicorn app:app --port 8001` (no `--reload`)** — from several past sessions never cleanly
+  exited. Only one (`Get-NetTCPConnection -LocalPort 8001 -State Listen`) actually owned the
+  socket; the rest were dead weight, but backend code edits were silently NOT taking effect
+  because that one live process had no `--reload` and was running stale code from before this
+  session's changes. `Stop-Process -Force` on all five worked cleanly that time (not a stuck
+  kernel socket) — killed all five, confirmed the port was free, relaunched with `--reload`.
+- **8001 again (2026-09-17, same session, later): this time it WAS the stuck-orphaned-socket
+  problem** (like the port-8000 incident) — `Get-NetTCPConnection -LocalPort 8001` kept reporting
+  PID 32592 as `LISTEN`, but `Get-Process -Id 32592` said no such process exists. Also separately
+  found `uvicorn --reload`'s WatchFiles watcher was NOT reliably picking up backend file edits on
+  this machine — only one reload fired across several subsequent saves, so code changes looked
+  "not applied" when the process just hadn't restarted. **Net effect: don't trust `--reload` on
+  this machine, and check who actually owns the port before assuming a code fix didn't work.**
+  Resolution: moved to **port 8002, without `--reload`** (restart manually after backend edits).
+  `frontend/.env.local`'s `VITE_API_BASE` updated to match — **check this file for the currently
+  live port** before assuming the backend is down or a fix didn't land. Vite only reads
+  `.env.local` at startup, so the frontend dev server needs restarting too after changing it.
+- Chart-pattern detection is a heuristic learning aid (returns "none" when nothing clean) — never present it as a signal. Detects on High/Low, not Close (2026-09-17). Scans the WHOLE fetched window on every timeframe, including intraday — a brief attempt to restrict intraday scans to a recent rolling window backfired (it excluded genuine patterns, not just stale ones) and was reverted the same day; recency is handled by `patterns.detect`'s most-recent-first sort, not by hiding data from the scan.
+- Layout is a fixed two-zone column split (chart → metrics → AI read spine; news → ecosystem → references side) — no longer a self-balancing masonry (removed 2026-09-17, see "Wave 3 UI/UX redesign" above). Browser back/forward + `#TICKER` shareable links work — and now `#/compare` `#/watchlist` `#/history` too (2026-09-15).
 - Any element that doesn't set an explicit `color` can fall back to browser UA defaults instead
   of inheriting the page's `--ink` — this bit the `.metric` buttons once already (2026-09-15).
   `color-scheme: dark` is set on `:root` as a guard, but still set colors explicitly on new

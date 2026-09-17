@@ -160,7 +160,13 @@ def ecosystem(ticker: str):
 @app.get("/patterns/{ticker}")
 def detect_patterns(ticker: str, period: str = "1y", interval: str = "1d"):
     """Detect chart patterns on the given timeframe — works for any period/interval,
-    so the magnifier applies across all chart tabs."""
+    so the magnifier applies across all chart tabs. Scans the WHOLE fetched window
+    (not just a recent slice): a brief attempt to restrict intraday scans to the
+    trailing 2 hours (user-reported "3-4 hours ago is stale") backfired — it also
+    excluded genuinely recent patterns that need more than 2 hours of bars to
+    form, and older-but-real ones the user still wanted visible. `patterns.detect`
+    already sorts most-recent-first (docs/AUDIT.md H6), so recency is handled by
+    ranking, not by hiding data from the scan."""
     data = marketdata.get(ticker, period=period, interval=interval)
     if data is None:
         raise HTTPException(status_code=404, detail=f"No data for '{ticker}'.")

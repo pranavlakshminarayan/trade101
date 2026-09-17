@@ -1,4 +1,5 @@
 import { useState } from 'react'
+import { ChevronIcon } from './Icons.jsx'
 
 // AI momentum read — synthesis + confidence + sourced evidence + a collapsible
 // "learn the read" note (kept collapsed so the block doesn't tower over the page).
@@ -58,13 +59,15 @@ export default function AiRead({ ai, loading }) {
       </div>
       <p style={{ margin: '0 0 4px', fontSize: 14 }}>{m.summary}</p>
       {m.evidence?.length > 0 && (
-        <ul className="why">
+        <div className="evidence-list">
           {m.evidence.slice(0, 6).map((e, i) => (
-            <li key={i}>
-              <EvidenceType type={e.type} /> <b>{e.point}</b> <span className="src">[{e.source}]</span>
-            </li>
+            <div key={i} className={'evidence-item evidence-' + (e.type || 'interpretation')}>
+              <EvidenceType type={e.type} />
+              <div className="evidence-point">{e.point}</div>
+              <div className="evidence-src">{e.source}</div>
+            </div>
           ))}
-        </ul>
+        </div>
       )}
       {ai.news?.sourcing?.dropped > 0 && (
         <div className="faint" style={{ fontSize: 11, marginTop: 6 }}>
@@ -74,7 +77,7 @@ export default function AiRead({ ai, loading }) {
       {ai.learning_note && (
         <div className="lesson" style={{ marginTop: 10 }}>
           <button className="collapse" onClick={() => setOpen(!open)}>
-            {open ? '▾' : '▸'} Learn the read
+            <ChevronIcon open={open} className="icon" /> Learn the read
           </button>
           {open && <p style={{ margin: '8px 0 0' }}>{ai.learning_note}</p>}
         </div>

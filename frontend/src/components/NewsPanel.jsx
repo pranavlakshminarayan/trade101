@@ -1,4 +1,5 @@
 import { useState } from 'react'
+import { SparkleIcon } from './Icons.jsx'
 
 // News block with two tabs: Feed (raw sourced headlines, DETERMINISTIC — loads
 // from the free /news endpoint, independent of the AI) and "What it means"
@@ -25,7 +26,7 @@ export default function NewsPanel({ newsData, newsLoading, ai, aiLoading, ticker
       <div className="lbl">News &amp; financial signals</div>
       <div className="newstabs">
         <button className={'ntab' + (tab === 'feed' ? ' on' : '')} onClick={() => setTab('feed')}>Feed</button>
-        <button className={'ntab' + (tab === 'means' ? ' on' : '')} onClick={() => setTab('means')}>What it means ✦</button>
+        <button className={'ntab' + (tab === 'means' ? ' on' : '')} onClick={() => setTab('means')}>What it means <SparkleIcon className="icon" /></button>
       </div>
 
       {tab === 'feed' && (
@@ -37,7 +38,7 @@ export default function NewsPanel({ newsData, newsLoading, ai, aiLoading, ticker
         ) : !newsData?.available ? (
           <div className="placeholder">{newsData?.reason || 'News feed unavailable.'}</div>
         ) : feed.length ? (
-          feed.slice(0, 8).map((n, i) => {
+          feed.slice(0, 20).map((n, i) => {
             // A source URL isn't always available. Render those as a plain (non-link)
             // block instead of href="#" — a "#" link both goes nowhere useful and
             // mutates the URL hash, which doubles as this app's ticker route and would

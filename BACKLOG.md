@@ -103,6 +103,29 @@ A running list so we don't lose ideas. Add freely; we pull from here after the M
   from a logged-out browser, then share the link. **This step is the user's own action** (host
   account signup) — not something that can be done from inside a coding session.
 
+## Audit — Wave 3: UI/UX redesign — H5 done 2026-09-17; rest built 2026-09-17, awaiting user approval
+
+- [x] **H5 — chart indicator overlays.** Done (see "Known bugs" in `CLAUDE.md` for detail).
+- [~] **Layout, icon system, evidence panel, accessibility/mobile pass.** Built and live at
+  `http://127.0.0.1:5173` for review — **not finalized**. Direction was discussed with the user
+  first (they pushed back on a fully rigid three-zone grid over dead-space concerns, and on
+  swapping icon *meanings* rather than just their rendering) and narrowed before building. Full
+  detail in `CLAUDE.md` → "Known bugs" → "In progress 2026-09-17 — Wave 3 UI/UX redesign".
+  Summary: fixed two-zone layout (deterministic panel→column assignment, no more masonry
+  reshuffling), new SVG icon set (`Icons.jsx`) replacing all emoji with the same symbols, a
+  redesigned evidence "receipts" panel, a mobile media query for the Welcome rail, dead CSS
+  removed. Also renamed the Ask-Claude widget to **Ask TC-Buddy** with a candlestick icon
+  (user's explicit request alongside this wave).
+- [ ] **Not yet done**: full type scale / 8pt spacing system; amber reserved exclusively for
+  pattern overlays (still doubles for the watch star). Deferred pending feedback on this pass.
+- [ ] **User review/approval, then push.** Per the user's instruction, this wave stays
+  uncommitted until they've looked at it running and signed off.
+- [x] **M1 — frontend session cache never expired (fixed as a side effect, 2026-09-17).** Found
+  while chasing a stale-SMA200 report: `api.js`'s `research`/`ecosystem`/`patterns`/`news` caches
+  had no TTL. Added a 5-min TTL matching the backend's own cache; `analyze` (the paid call)
+  deliberately stays session-long by design. See `CLAUDE.md` → "Known bugs" → the 2026-09-17
+  second feedback round entry for full detail.
+
 ---
 
 ## Known bugs / debt from Phase 1

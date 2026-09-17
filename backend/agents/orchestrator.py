@@ -30,6 +30,17 @@ def gather(ticker: str) -> dict | None:
     return cache.get_or_set(f"gather:{ticker.upper()}", lambda: _gather(ticker))
 
 
+
+# When the relevance-filtered feed still has fewer than this many company
+# items, one provider's raw fetch wasn't enough to "connect the dots" (user-
+# reported: 2-3 headlines isn't enough to form a view) — pull a second,
+# name-targeted search and filter it too, rather than accepting a thin feed
+# just because the first provider's raw pool happened to clear the filter
+# for only a few items.
+_MIN_COMPANY_NEWS = 6
+_SUPPLEMENT_DAYS = 90
+
+
 def _gather(ticker: str) -> dict | None:
     data = marketdata.get(ticker)
     if data is None:
@@ -50,6 +61,49 @@ def _gather(ticker: str) -> dict | None:
         sector=profile.get("sector"), industry=profile.get("industry"),
         peers=profile.get("peers"),
     )
+
+    if sourcing["counts"]["company"] < _MIN_COMPANY_NEWS:
+        # A thinly-covered listing (small/foreign-secondary caps especially)
+        # often has real coverage that's simply older than the primary 30-day
+        # window — verified on a Frankfurt secondary listing: Google News had
+        # a genuine earnings article, just from ~4 months back, so the 30-day
+        # cutoff silently discarded it and left the feed empty. Widen to 90
+        # days for the supplement only (each item still carries its own date,
+        # so nothing here is presented as more current than it is).
+        extra_items, _ = news._google_news(ticker, quote.get("name"), days=_SUPPLEMENT_DAYS)
+        already = {(a.get("url") or a.get("headline") or "") for a in news_items}
+        new_items = [a for a in extra_items if (a.get("url") or a.get("headline") or "") not in already]
+        if new_items:
+            extra_kept, extra_sourcing = evidence.filter_news(
+                new_items,
+                name=quote.get("name"), ticker=quote["symbol"],
+                sector=profile.get("sector"), industry=profile.get("industry"),
+                peers=profile.get("peers"),
+            )
+            seen = {(a.get("url") or a.get("headline") or "") for a in kept_news}
+            for a in extra_kept:
+                key = a.get("url") or a.get("headline") or ""
+                if key and key not in seen:
+                    seen.add(key)
+                    kept_news.append(a)
+            sourcing = {
+                "kept": len(kept_news),
+                "dropped": sourcing["dropped"] + extra_sourcing["dropped"],
+                "has_company_news": sourcing["has_company_news"] or extra_sourcing["has_company_news"],
+                "counts": {k: sourcing["counts"][k] + extra_sourcing["counts"][k] for k in sourcing["counts"]},
+            }
+
+    # Even after supplementing, some listings genuinely have almost no
+    # findable coverage (a thin secondary/foreign listing of a company whose
+    # real coverage sits on its primary exchange). Say so plainly rather than
+    # leaving an empty feed looking like a bug — matches the honesty pattern
+    # `company.py`'s `coverage` map already uses for missing peers/beta.
+    if sourcing["counts"]["company"] == 0:
+        thin_note = ("Little findable news coverage for this specific listing — common for a "
+                     "secondary or foreign listing of a company whose coverage centers on its "
+                     "primary exchange. Try searching the primary listing for fuller coverage.")
+        news_note = f"{news_note} {thin_note}" if news_note else thin_note
+
     return {
         "quote": quote, "indicators": ind, "profile": profile,
         "news": kept_news, "news_note": news_note, "filings": filings,

@@ -49,7 +49,7 @@ function useSlot() {
   return [state, loadSymbol, reloadTf]
 }
 
-export default function Compare({ onNavigate, onOpen, initial }) {
+export default function Compare({ onNavigate, onOpen, initial, onHome }) {
   const [timeframe, setTimeframe] = useState('1Y')
   const [qa, setQa] = useState('')
   const [qb, setQb] = useState('')
@@ -126,7 +126,7 @@ export default function Compare({ onNavigate, onOpen, initial }) {
     <div className="research">
       <div className="top">
         <div style={{ display: 'flex', alignItems: 'center' }}>
-          <div className="logo"><Logo /> Trade Craft</div>
+          <button className="logo logo-btn" onClick={onHome}><Logo /> Trade Craft</button>
           <div className="tabs">
             <button onClick={() => onNavigate('home')}>Research</button>
             <button className="on" aria-current="page">Comparison</button>

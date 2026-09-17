@@ -3,16 +3,17 @@ import Logo from './Logo.jsx'
 import { getWatchlist, removeWatch } from '../lib/watchlist.js'
 import { research } from '../api.js'
 import { currencySymbol } from '../lib/currency.js'
+import { PlusIcon, ArrowIcon, CloseIcon } from './Icons.jsx'
 
 function changeChip(pct) {
   if (pct == null) return <span className="chip flat">—</span>
   const cls = pct > 0 ? 'up' : pct < 0 ? 'down' : 'flat'
-  const a = pct > 0 ? '▲' : pct < 0 ? '▼' : '■'
-  return <span className={'chip ' + cls}>{a} {pct > 0 ? '+' : ''}{pct}%</span>
+  const dir = pct > 0 ? 'up' : pct < 0 ? 'down' : 'flat'
+  return <span className={'chip ' + cls}><ArrowIcon direction={dir} className="icon" /> {pct > 0 ? '+' : ''}{pct}%</span>
 }
 const sym = currencySymbol
 
-export default function Watchlist({ onNavigate, onOpen }) {
+export default function Watchlist({ onNavigate, onOpen, onHome }) {
   const [items, setItems] = useState(getWatchlist())
   const [quotes, setQuotes] = useState({}) // ticker -> quote
 
@@ -34,7 +35,7 @@ export default function Watchlist({ onNavigate, onOpen }) {
     <div className="research">
       <div className="top">
         <div style={{ display: 'flex', alignItems: 'center' }}>
-          <div className="logo"><Logo /> Trade Craft</div>
+          <button className="logo logo-btn" onClick={onHome}><Logo /> Trade Craft</button>
           <div className="tabs">
             <button onClick={() => onNavigate('home')}>Research</button>
             <button onClick={() => onNavigate('compare')}>Comparison</button>
@@ -43,7 +44,7 @@ export default function Watchlist({ onNavigate, onOpen }) {
             <button onClick={() => onNavigate('practice')}>Practice Lab</button>
           </div>
         </div>
-        <button className="backbtn" onClick={() => onNavigate('home')}>＋ New research</button>
+        <button className="backbtn" onClick={() => onNavigate('home')}><PlusIcon className="icon" /> New research</button>
       </div>
 
       <div className="headline">
@@ -52,7 +53,7 @@ export default function Watchlist({ onNavigate, onOpen }) {
       </div>
 
       {items.length === 0 ? (
-        <div className="card"><div className="placeholder">Nothing tracked yet. Open a company and tap ☆ Watch to add it here. This is a study list to revisit — no positions, no profit/loss, no signals.</div></div>
+        <div className="card"><div className="placeholder">Nothing tracked yet. Open a company and tap "Watch" to add it here. This is a study list to revisit — no positions, no profit/loss, no signals.</div></div>
       ) : (
         <div className="watch-list">
           {items.map((it) => {
@@ -65,7 +66,7 @@ export default function Watchlist({ onNavigate, onOpen }) {
                   <span className="watch-px mono">{q ? `${sym(q.currency)}${q.price}` : '…'}</span>
                   {q ? changeChip(q.changePercent) : <span className="chip flat">—</span>}
                 </button>
-                <button className="watch-x" title="Remove" onClick={() => drop(it.ticker)}>✕</button>
+                <button className="watch-x" title="Remove" onClick={() => drop(it.ticker)}><CloseIcon className="icon" /></button>
               </div>
             )
           })}

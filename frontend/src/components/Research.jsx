@@ -1,4 +1,4 @@
-import { useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react'
+import { useEffect, useMemo, useRef, useState } from 'react'
 import Logo from './Logo.jsx'
 import PriceChart from './PriceChart.jsx'
 import Metrics from './Metrics.jsx'
@@ -6,6 +6,7 @@ import AiRead from './AiRead.jsx'
 import NewsPanel from './NewsPanel.jsx'
 import Ecosystem from './Ecosystem.jsx'
 import AskClaude from './AskClaude.jsx'
+import { SearchIcon, StarIcon, PlusIcon, ArrowIcon, PaperclipIcon } from './Icons.jsx'
 import { analyze, news as fetchNews, research, patterns as fetchPatterns } from '../api.js'
 import { addHistory } from '../lib/history.js'
 import { isWatched, toggleWatch } from '../lib/watchlist.js'
@@ -21,16 +22,15 @@ const TF = {
   '1D':  { period: '1d',  interval: '5m' },
 }
 const TF_ORDER = ['1Y', '1M', '10D', '5D', '1D']
-const FLOW = ['metrics', 'news', 'ecosystem', 'references'] // blocks the masonry distributes
 
 function changeChip(pct) {
   if (pct == null) return <span className="chip flat">—</span>
   const cls = pct > 0 ? 'up' : pct < 0 ? 'down' : 'flat'
-  const arrow = pct > 0 ? '▲' : pct < 0 ? '▼' : '■'
-  return <span className={'chip ' + cls}>{arrow} {pct > 0 ? '+' : ''}{pct}%</span>
+  const dir = pct > 0 ? 'up' : pct < 0 ? 'down' : 'flat'
+  return <span className={'chip ' + cls}><ArrowIcon direction={dir} className="icon" /> {pct > 0 ? '+' : ''}{pct}%</span>
 }
 
-export default function Research({ data, onBack, onSearch, onNavigate }) {
+export default function Research({ data, onBack, onSearch, onNavigate, onHome }) {
   const [live, setLive] = useState(data)
   const [ai, setAi] = useState(null)
   const [aiLoading, setAiLoading] = useState(true)
@@ -52,13 +52,9 @@ export default function Research({ data, onBack, onSearch, onNavigate }) {
   const [patSel, setPatSel] = useState(0)
   const [updatedAt, setUpdatedAt] = useState(new Date())
   const [q, setQ] = useState('')
-  const [assign, setAssign] = useState({ metrics: 'L', news: 'L', ecosystem: 'R', references: 'R' })
-  const [tick, setTick] = useState(0)
   const [watched, setWatched] = useState(false)
 
   const ticker = live.ticker
-  const refs = useRef({})
-  const setRef = (id) => (el) => { refs.current[id] = el }
 
   useEffect(() => {
     setLive(data); setTfData({}); setPatData({}); setShowPatterns(false); setPatSel(0)
@@ -97,7 +93,7 @@ export default function Research({ data, onBack, onSearch, onNavigate }) {
     let alive = true
     setTfLoading(true)
     research(ticker, TF[timeframe])
-      .then((r) => { if (alive) setTfData((c) => ({ ...c, [timeframe]: { ohlcv: r.ohlcv, indicatorSeries: r.indicatorSeries } })) })
+      .then((r) => { if (alive) setTfData((c) => ({ ...c, [timeframe]: { ohlcv: r.ohlcv, indicatorSeries: r.indicatorSeries, indicators: r.indicators } })) })
       .catch(() => {}).finally(() => { if (alive) setTfLoading(false) })
     return () => { alive = false }
   }, [timeframe, ticker, tfData])
@@ -120,30 +116,24 @@ export default function Research({ data, onBack, onSearch, onNavigate }) {
         const tf = tfRef.current
         if (tf !== '1Y') {
           const r = await research(data.ticker, { ...TF[tf], fresh: true })
-          setTfData((c) => ({ ...c, [tf]: { ohlcv: r.ohlcv, indicatorSeries: r.indicatorSeries } }))
+          setTfData((c) => ({ ...c, [tf]: { ohlcv: r.ohlcv, indicatorSeries: r.indicatorSeries, indicators: r.indicators } }))
         }
       } catch { /* keep last good */ }
     }, REFRESH_MS)
     return () => clearInterval(id)
   }, [data.ticker])
 
-  // Masonry: measure each block and send each flow-block to the shorter column.
-  useLayoutEffect(() => {
-    const h = (id) => refs.current[id]?.offsetHeight || 0
-    let L = h('chart'), R = h('ai')
-    const next = {}
-    for (const id of FLOW) {
-      if (L <= R) { next[id] = 'L'; L += h(id) } else { next[id] = 'R'; R += h(id) }
-    }
-    if (FLOW.some((id) => next[id] !== assign[id])) setAssign(next)
-  })
-  useEffect(() => {
-    const onResize = () => setTick((t) => t + 1)
-    window.addEventListener('resize', onResize)
-    return () => window.removeEventListener('resize', onResize)
-  }, [])
-
-  const { quote, indicators, ohlcv, meta, indicatorSeries: liveIndicatorSeries } = live
+  const { quote, indicators: liveIndicators, ohlcv, meta, indicatorSeries: liveIndicatorSeries } = live
+  // Metrics must reflect the SELECTED chart timeframe, not always the base
+  // 1Y/daily snapshot — previously `indicators` here was unconditionally
+  // `live.indicators` (the 1Y figures) even while a 10D/5D/1D tab was active,
+  // so e.g. a 200-day SMA that's genuinely undefined on 30-min bars (not
+  // enough intraday history for 200 bars) instead silently showed the
+  // unrelated 1Y daily SMA200 value — a real number, just for the wrong
+  // timeframe, and confusing next to a chart with no SMA200 line at all
+  // (user-reported, TECA.F 10D). `null` fields render as "—" correctly once
+  // the RIGHT (per-timeframe) indicators object is used.
+  const indicators = timeframe === '1Y' ? liveIndicators : (tfData[timeframe]?.indicators || liveIndicators)
   const sym = currencySymbol(quote.currency)
   const sources = ai?.available ? (ai.sources || []) : []
   const lean = ai?.available ? ai.momentum?.lean : null
@@ -172,14 +162,14 @@ export default function Research({ data, onBack, onSearch, onNavigate }) {
 
   const submit = () => { const s = q.trim(); if (s) onSearch(s) }
 
-  // block elements the masonry places
+  // side-column blocks (fixed order: news -> ecosystem -> references)
   const blocks = {
     metrics: <Metrics indicators={indicators} ticker={ticker} />,
     news: <NewsPanel newsData={newsData} newsLoading={newsLoading} ai={ai} aiLoading={aiLoading} ticker={ticker} />,
     ecosystem: <Ecosystem ticker={ticker} onSearch={onSearch} />,
     references: (
       <div className="card">
-        <div className="lbl">📎 References — every source used</div>
+        <div className="lbl"><PaperclipIcon className="icon" /> References — every source used</div>
         <div className="reflist">
           <div><a href="#">Yahoo Finance</a> <span className="faint">— price &amp; indicators</span></div>
           {sources.map((s, i) => (
@@ -199,7 +189,7 @@ export default function Research({ data, onBack, onSearch, onNavigate }) {
         <div className="chart-toggle">
           {TF_ORDER.map((t) => <button key={t} className={timeframe === t ? 'on' : ''} onClick={() => setTimeframe(t)}>{t}</button>)}
         </div>
-        <button className={'patbtn' + (showPatterns ? ' on' : '')} onClick={() => setShowPatterns((s) => !s)}>🔍 Patterns{showPatterns ? ' ✓' : ''}</button>
+        <button className={'patbtn' + (showPatterns ? ' on' : '')} onClick={() => setShowPatterns((s) => !s)}><SearchIcon className="icon" /> Patterns{showPatterns ? ' ✓' : ''}</button>
       </div>
       <div className="chart-toggle chart-indtoggle">
         <button className={overlays.sma ? 'on' : ''} onClick={() => setOverlays((o) => ({ ...o, sma: !o.sma }))} title="50/200-day simple moving averages">SMA</button>
@@ -219,7 +209,7 @@ export default function Research({ data, onBack, onSearch, onNavigate }) {
               <div className="pat-select">
                 {pats.map((p, i) => (
                   <button key={i} className={'pat-tab' + (i === patSel ? ' on' : '')} onClick={() => setPatSel(i)}>
-                    {p.direction === 'bullish' ? '▲' : '▼'} {p.name}
+                    <ArrowIcon direction={p.direction === 'bullish' ? 'up' : 'down'} className="icon" /> {p.name}
                   </button>
                 ))}
               </div>
@@ -245,23 +235,29 @@ export default function Research({ data, onBack, onSearch, onNavigate }) {
     <div className="research">
       <div className="top">
         <div style={{ display: 'flex', alignItems: 'center' }}>
-          <div className="logo"><Logo /> Trade Craft</div>
+          <button className="logo logo-btn" onClick={onHome}><Logo /> Trade Craft</button>
           <div className="tabs"><button className="on" aria-current="page">Research</button><button onClick={() => onNavigate('compare')}>Comparison</button><button onClick={() => onNavigate('watchlist')}>Watchlist</button><button onClick={() => onNavigate('history')}>History</button><button onClick={() => onNavigate('practice')}>Practice Lab</button></div>
         </div>
         <div style={{ display: 'flex', gap: 8 }}>
-          <button className={'watchbtn' + (watched ? ' on' : '')} onClick={onWatch}>{watched ? '★ Watching' : '☆ Watch'}</button>
-          <button className="backbtn" onClick={onBack}>← New search</button>
+          <button className={'watchbtn' + (watched ? ' on' : '')} onClick={onWatch}>
+            <StarIcon filled={watched} className="icon" /> {watched ? 'Watching' : 'Watch'}
+          </button>
+          <button className="backbtn" onClick={onBack}><PlusIcon className="icon" /> New search</button>
         </div>
       </div>
 
       <div className="strip">
         <div className="strip-search">
-          <span className="faint">🔍</span>
+          <SearchIcon className="icon faint" />
           <input placeholder="Search another company or ticker…" value={q}
                  onChange={(e) => setQ(e.target.value)} onKeyDown={(e) => { if (e.key === 'Enter') submit() }} />
         </div>
         <span className="strip-tk"><b>{ticker}</b> — {quote.name}</span>
-        {lean && <span className={'chip ' + (lean === 'bullish' ? 'up' : lean === 'bearish' ? 'down' : 'flat')}>{lean === 'bullish' ? '▲' : lean === 'bearish' ? '▼' : '■'} {lean}</span>}
+        {lean && (
+          <span className={'chip ' + (lean === 'bullish' ? 'up' : lean === 'bearish' ? 'down' : 'flat')}>
+            <ArrowIcon direction={lean === 'bullish' ? 'up' : lean === 'bearish' ? 'down' : 'flat'} className="icon" /> {lean}
+          </span>
+        )}
         <span className="strip-meta">{quote.exchange}</span>
         <span className="strip-meta faint">delayed ~15m</span>
       </div>
@@ -273,15 +269,24 @@ export default function Research({ data, onBack, onSearch, onNavigate }) {
         {changeChip(quote.changePercent)}
       </div>
 
-      {/* self-balancing two-column masonry */}
-      <div className="cols" data-tick={tick}>
+      {/* Fixed two-zone layout: chart -> metrics -> AI read is the main spine
+          (metrics sit right under the chart, since the indicators are the
+          thing being learned here, not an afterthought at the bottom);
+          news -> ecosystem -> references always sit in the side column.
+          Panels no longer move between columns as data streams in
+          (docs/AUDIT.md UI-UX #2 — the old height-balancing masonry
+          reshuffled unpredictably mid-load, which was the actual bug, not
+          the multi-column layout). */}
+      <div className="cols">
         <div className="col">
-          <div ref={setRef('chart')}>{chartBlock}</div>
-          {FLOW.filter((id) => assign[id] === 'L').map((id) => <div key={id} ref={setRef(id)}>{blocks[id]}</div>)}
+          {chartBlock}
+          {blocks.metrics}
+          <AiRead ai={ai} loading={aiLoading} />
         </div>
         <div className="col">
-          <div ref={setRef('ai')}><AiRead ai={ai} loading={aiLoading} /></div>
-          {FLOW.filter((id) => assign[id] === 'R').map((id) => <div key={id} ref={setRef(id)}>{blocks[id]}</div>)}
+          {blocks.news}
+          {blocks.ecosystem}
+          {blocks.references}
         </div>
       </div>
 
