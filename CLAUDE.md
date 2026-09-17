@@ -179,7 +179,11 @@ frontend/ src/{App,api}.jsx · components/{Welcome,Research,PriceChart,Metrics,A
   auto-refresh. `services/indicators.py::compute_indicator_series()` supplies the full
   time-aligned arrays this needs (the original `compute_indicators()` only ever returns the
   latest snapshot — fine for the Metrics panel, useless for drawing a line) via `/research`'s
-  `indicatorSeries` field.
+  `indicatorSeries` field. `app.py::_fetch_with_lookback` (+ `_LOOKBACK_FETCH` map) fetches MORE
+  history than a short display window needs (e.g. "60d" of 15-min bars for a "5D" display) so
+  SMA200's 200-bar lookback is satisfied across the WHOLE visible window, not just a trailing
+  sliver — then trims back to the original display width before returning. Unrecognized
+  period/interval combos pass through unchanged.
 - `frontend/src/api.js` holds a **session result cache** (research/analyze/ecosystem/patterns) —
   tab-switching restores from memory; `/analyze` runs at most once per ticker per session.
 - **Comparison tab**: `components/Compare.jsx` (App `view === 'compare'`, tabs in Research/Welcome)
@@ -288,6 +292,20 @@ Mirrored as checkboxes in `BACKLOG.md` → "Audit — Wave 0/1/2/3". **Waves 0, 
 Wave 3's chart-overlay item (H5) are done** — remaining: Wave 2's deploy step (the user's own
 host signup, not code) and Wave 3's UI/UX redesign, which the user asked to review as a proposal
 before any of it is built. See `docs/AUDIT.md` §10.
+
+### Fixed 2026-09-17 (SMA lookback, user-reported — same day as H5)
+- ~~SMA200 was cut short on 1Y and vanished entirely on 5D/1D~~ — SMA200 needs 200 bars of
+  lookback before it produces a single point; the backend fetched ONLY the display window (e.g.
+  exactly 5 days for the 5D chart), leaving no room for that lookback, so SMA200 only appeared
+  over whatever trailing sliver of the window happened to have 200+ bars behind it. Fixed:
+  `app.py::_fetch_with_lookback` + `_LOOKBACK_FETCH` now fetch MORE history than the display
+  window needs (e.g. "60d" of 15-min bars for the "5D" tab, verified empirically against
+  yfinance — "3mo" is silently REJECTED for 30m/15m/5m intervals, intraday history is capped at
+  60 days regardless of which period token asks for it), compute indicators on the full fetch,
+  then trim back to the original display width so the visible candles are unchanged — only the
+  indicators drawn on them are now fully populated. 3 new tests. Verified live on NVDA: SMA200
+  now spans the ENTIRE visible window on every timeframe (1Y/1M/10D/5D/1D), not just a tail
+  sliver or nothing at all.
 
 ### Fixed 2026-09-17 (Audit Wave 3, first item — H5: chart indicator overlays)
 - ~~No indicators were drawn on the chart~~ — SMA/Bollinger/RSI/MACD were computed and explained

@@ -66,6 +66,14 @@ A running list so we don't lose ideas. Add freely; we pull from here after the M
   tests (`test_indicators.py`). Verified live: SMA/Bollinger overlays render correctly on price; RSI's live value
   (46.89) matches the Metrics panel's snapshot (46.8876) exactly; crosshair legend confirmed via
   a real hover event.
+- [x] **User caught a real bug in H5's first pass, fixed same day:** SMA200 was cut short on 1Y
+  and vanished entirely on 5D/1D. Root cause: SMA200 needs 200 bars of lookback before it
+  produces a single point, but the backend fetched ONLY the display window (e.g. exactly 5 days
+  for the "5D" tab) — no room for that lookback. Fixed: `app.py::_fetch_with_lookback` fetches
+  more history than it displays (e.g. "60d" of 15-min bars for "5D" — verified empirically that
+  "3mo" is silently REJECTED for 30m/15m/5m intervals, intraday history is capped at 60 days
+  regardless of the period token used), computes indicators on the full fetch, trims back to the
+  original display width. 3 new tests. Verified live: SMA200 now spans every timeframe fully.
 - [x] **H6 — Pattern detection was structurally limited.** Fixed: `services/patterns.py`
   rewritten — full-series scan (not just the last 3 swings), all non-overlapping matches
   returned, detection on High/Low (not Close), double top/bottom no longer requires an unrelated

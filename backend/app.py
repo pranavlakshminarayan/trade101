@@ -45,24 +45,80 @@ def search_symbols(q: str):
     return {"query": q, "candidates": search.resolve(q)}
 
 
+# SMA200 needs 200 bars of lookback before it can produce a single point.
+# Fetching only the DISPLAY window (e.g. exactly 5 days for the "5D" chart
+# tab) leaves no room for that lookback, so SMA200 only ever appeared over
+# whatever trailing sliver of the window happened to have 200+ bars behind
+# it — cut short on 1Y, gone entirely on 5D/1D (user-reported 2026-09-17).
+# Fix: fetch MORE history than we intend to display, compute indicators on
+# the full fetch (so the lookback is actually satisfied), then trim back to
+# the original display width. `display_bars` mirrors the bar count the
+# ORIGINAL (undersized) fetch used to return, so the visible chart window is
+# unchanged — only the indicators drawn on it are now fully populated.
+# Periods empirically verified against yfinance (see docs/DEVELOPMENT-LOG.md):
+# "3mo" is REJECTED for 30m/15m/5m intervals (0 bars back) — intraday history
+# is capped at 60 days regardless of which valid period token requests it.
+_LOOKBACK_FETCH = {
+    ("1y", "1d"): ("2y", 251),
+    ("1mo", "1d"): ("1y", 22),
+    ("1mo", "30m"): ("60d", 286),
+    ("5d", "15m"): ("60d", 130),
+    ("1d", "5m"): ("60d", 78),
+}
+
+
+def _fetch_with_lookback(ticker: str, period: str, interval: str):
+    """marketdata.get(), but fetching extra history first when the requested
+    (period, interval) is a known short display window — see _LOOKBACK_FETCH.
+    Returns (hist, quote, display_bars) — display_bars is None when no
+    trimming is needed (either an unrecognized combo, passed straight
+    through unchanged, or the fetch was already exactly what's wanted)."""
+    fetch_period, display_bars = _LOOKBACK_FETCH.get((period, interval), (period, None))
+    data = marketdata.get(ticker, period=fetch_period, interval=interval)
+    if data is None:
+        return None
+    hist, quote = data
+    return hist, quote, display_bars
+
+
 @app.get("/research/{ticker}")
 def research(ticker: str, period: str = "1y", interval: str = "1d"):
     """
     Live research bundle for ANY ticker: quote + indicators + OHLCV (for the
     chart). Ticker-agnostic — nothing is hardcoded to a specific symbol.
     """
-    data = marketdata.get(ticker, period=period, interval=interval)
+    data = _fetch_with_lookback(ticker, period, interval)
     if data is None:
         raise HTTPException(
             status_code=404,
             detail=f"No market data found for '{ticker}'. Try the company name instead — "
                    f"search resolves any market and lets you pick from the matches.",
         )
-    hist, quote = data
+    hist, quote, display_bars = data
+    # Indicators are computed on the FULL fetched history (the lookback
+    # buffer above) so SMA200 etc. are actually defined; only the display
+    # window is trimmed afterward, for the chart and for the Metrics snapshot.
     ind = indicators.compute_indicators(hist)
+    times_full = [int(idx.timestamp()) for idx in hist.index]
+    ind_series = indicators.compute_indicator_series(hist, times_full)
+
+    display_hist = hist.tail(display_bars) if display_bars else hist
+    times = times_full[-display_bars:] if display_bars else times_full
+    cutoff = times[0] if times else None
+    if cutoff is not None:
+        # Trim the indicator series to the same display window — the extra
+        # lookback bars did their job (populating SMA200 etc.) and are never
+        # shown, so there's no reason to ship their indicator points either.
+        def _trim(pts):
+            return [p for p in pts if p["time"] >= cutoff]
+        ind_series = {
+            "sma50": _trim(ind_series["sma50"]), "sma200": _trim(ind_series["sma200"]),
+            "bollinger": {k: _trim(v) for k, v in ind_series["bollinger"].items()},
+            "rsi14": _trim(ind_series["rsi14"]),
+            "macd": {k: _trim(v) for k, v in ind_series["macd"].items()},
+        }
 
     # UNIX seconds so both daily and intraday intervals render correctly.
-    times = [int(idx.timestamp()) for idx in hist.index]
     ohlcv = [
         {
             "time": t,
@@ -72,13 +128,8 @@ def research(ticker: str, period: str = "1y", interval: str = "1d"):
             "close": round(float(row.Close), 2),
             "volume": int(row.Volume),
         }
-        for t, (_, row) in zip(times, hist.iterrows())
+        for t, (_, row) in zip(times, display_hist.iterrows())
     ]
-    # Full time-aligned series (not just the latest snapshot in `indicators`)
-    # so the chart can actually PLOT SMA/Bollinger/RSI/MACD instead of only
-    # explaining them in prose next to a chart that never shows them
-    # (docs/AUDIT.md finding H5).
-    ind_series = indicators.compute_indicator_series(hist, times)
 
     return {
         "ticker": quote["symbol"],
@@ -90,7 +141,7 @@ def research(ticker: str, period: str = "1y", interval: str = "1d"):
             "source": "Yahoo Finance",
             "delayed": True,
             "note": "Data delayed ~15m; not real-time trading data.",
-            "asOf": hist.index[-1].date().isoformat() if len(hist) else None,
+            "asOf": display_hist.index[-1].date().isoformat() if len(display_hist) else None,
             "bars": len(ohlcv),
             "interval": interval,
         },

@@ -878,3 +878,51 @@ exactly; SMA/Bollinger overlays and the RSI/MACD panes all confirmed rendering w
 data; crosshair legend confirmed via a real hover event, not a simulated one.
 
 **Remaining Wave 3 work:** the UI/UX redesign — still a proposal to review, not started.
+
+---
+
+## SMA200 lookback bug, user-reported same day (2026-09-17)
+
+Right after H5 shipped, the user asked why SMA 200 only spanned a short stretch at the end of the
+1Y chart, and vanished entirely on 5D and 1D — screenshotting exactly what they meant. This was a
+real, structural bug, not a display glitch: SMA200 needs 200 bars of prior history before it can
+produce even its FIRST point. The backend's `/research` endpoint fetched exactly the display
+window Yahoo would need for the chart itself — e.g. literally 5 calendar days of 15-minute bars
+for the "5D" tab (130 bars) — leaving zero bars of lookback margin. SMA200 could therefore only
+ever be defined for whatever trailing sliver of the window happened to already have 200+ bars
+behind it: mostly nothing on 5D/1D (well under 200 bars fetched in total), and only the last
+~50 days on the 1Y view (252 fetched bars − 200 needed = 52 with a defined value).
+
+**The fix.** `_fetch_with_lookback()` + a `_LOOKBACK_FETCH` map in `app.py`: for each of the five
+period/interval combinations the frontend actually uses, fetch a LARGER window than what gets
+displayed, compute both the snapshot and the full indicator series on that larger fetch (so the
+200-bar requirement is satisfied by bars the user never sees), then trim the OHLCV and indicator
+series back down to the original display width before returning. Unrecognized period/interval
+combinations (nothing outside the five known chart tabs) pass straight through unchanged — no
+behavior change for anything this fix wasn't scoped to touch.
+
+Before writing the fix, verified the actual yfinance limits empirically rather than guessing:
+`period="3mo"` is silently REJECTED for 30-minute (and 15-minute, 5-minute) intervals — returns
+zero rows with a warning, not an error — because intraday history is capped at 60 calendar days
+by Yahoo regardless of which named period token asks for it. `period="60d"` works reliably for
+all three intraday intervals used by the app (5m/15m/30m) and comfortably covers the 200-bar
+requirement plus the display window on top. For daily bars, `"2y"` (fetched for the "1Y" display)
+and `"1y"` (fetched for the "1M" display) were both confirmed to return the expected bar counts
+directly against Yahoo before committing to the mapping.
+
+**Mistakes/course-corrections:** none in the shipped fix — but worth naming plainly that this
+gap existed in the ORIGINAL H5 implementation a few minutes earlier and wasn't caught by that
+pass's own testing, because the tests and the live verification both used the 1Y timeframe almost
+exclusively (the tail-cut-off symptom on 1Y is far less visually obvious than 5D/1D's complete
+absence, and neither the backend tests nor the live check specifically compared bar-count-fetched
+against bar-count-needed for a 200-bar lookback on the shorter timeframes). The same lesson from
+the earlier pattern-detector miss applies again here: verifying one timeframe (or one condition)
+is not the same as verifying the feature across the actual range of inputs it's meant to serve.
+The regression tests added this time explicitly assert full indicator coverage (`len(sma200) ==
+len(ohlcv)`) for a short-window case, which the H5 pass's own tests never checked.
+
+3 new backend tests (`test_research_lookback.py`). 71/71 backend tests passing. Frontend build
+clean (this was a backend-only fix). Verified live on NVDA: SMA200 now spans the FULL visible
+window on every one of the five timeframes, confirmed via both the API response directly and a
+screenshot of the 5D view (previously showing no gold SMA200 line at all, now showing one across
+the entire chart).
