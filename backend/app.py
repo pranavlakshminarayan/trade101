@@ -10,7 +10,7 @@ from __future__ import annotations
 from pathlib import Path
 
 from dotenv import load_dotenv
-from fastapi import FastAPI, Header, HTTPException
+from fastapi import FastAPI, Header, HTTPException, Response
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel
 
@@ -258,12 +258,14 @@ class AskBody(BaseModel):
 
 
 @app.post("/ask/{ticker}")
-def ask(ticker: str, body: AskBody, x_anthropic_key: str | None = Header(default=None)):
+def ask(response: Response, ticker: str, body: AskBody, x_anthropic_key: str | None = Header(default=None)):
     """Ask-Claude chat: answer a question about a stock, grounded in the same exact
     data + filtered evidence as /analyze. Degrades gracefully (no key / error →
     available:false) so the rest of the app is unaffected. BYOK (2026-09-17):
     spends the VISITOR's own Anthropic key, sent as X-Anthropic-Key — never the
-    app owner's, so an open shared link carries no cost risk. See agents/llm.py."""
+    app owner's, so an open shared link carries no cost risk. See agents/llm.py.
+    `Cache-Control: no-store` for the same reason as /analyze — see its docstring."""
+    response.headers["Cache-Control"] = "no-store"
     q = (body.question or "").strip()
     if not q:
         raise HTTPException(status_code=400, detail="Ask a question first.")
@@ -279,7 +281,7 @@ def ask(ticker: str, body: AskBody, x_anthropic_key: str | None = Header(default
 
 
 @app.get("/analyze/{ticker}")
-def analyze(ticker: str, x_anthropic_key: str | None = Header(default=None)):
+def analyze(response: Response, ticker: str, x_anthropic_key: str | None = Header(default=None)):
     """
     AI narration for a ticker: momentum read (sourced), news Feed + "What it
     means" inference. Separate from /research so the chart renders instantly and
@@ -287,7 +289,17 @@ def analyze(ticker: str, x_anthropic_key: str | None = Header(default=None)):
     available:false with a reason, not a crash. BYOK (2026-09-17): spends the
     VISITOR's own Anthropic key, sent as X-Anthropic-Key — never the app
     owner's. See agents/llm.py.
+
+    `Cache-Control: no-store` (2026-09-17, user-reported): this is a GET
+    endpoint whose result depends on the X-ANTHROPIC-KEY HEADER, which browser
+    HTTP caching does not key on by default (only the URL/method, unless the
+    response sets `Vary`). Without this, a request to `/analyze/AAPL` that
+    failed (e.g. during testing with an invalid key) could get cached and
+    silently served back to a LATER request for the same ticker with a
+    genuinely valid key — the visitor would see a stale "key rejected" error
+    even though their real key works, with no way to tell it was ever cached.
     """
+    response.headers["Cache-Control"] = "no-store"
     try:
         result = orchestrator.analyze(ticker, client_key=x_anthropic_key)
     except llm.MissingKeyError as e:
