@@ -153,15 +153,28 @@ frontend/ src/{App,api}.jsx · components/{Welcome,Research,PriceChart,Metrics,A
   "Sony") no longer silently skips disambiguation.
 - `company.py` **computes beta** vs the regional index (suffix→index map: .T→Nikkei, .KS→KOSPI,
   .NS→Nifty, …) when the provider has none — deterministic; response carries `betaSource`
-  ("provider"|"computed") + `betaIndex`. Non-US peers are still gapped (Firecrawl is post-deploy).
-  `marketCapCurrency` is also on this response — `Ecosystem.jsx`/`Compare.jsx` format market cap
-  in the listing's own currency (it's never USD by default; formatting it as `$` regardless was
-  producing false comparisons, e.g. a JPY cap reading larger than Apple's real USD cap). `betaIndex`
-  is now populated for a provider beta too, not just a computed one, so the UI always names the
-  actual benchmark ("vs the S&P 500") instead of vaguely "the market". `peers` is deduped
-  case-insensitively (Finnhub's own list can repeat a symbol). `peerNames` (ticker → full company
-  name, resolved in parallel via yfinance) backs the ecosystem graph's hover tooltip only —
-  `peers` itself stays a plain ticker list for `services/evidence.py`.
+  ("provider"|"computed") + `betaIndex`. `marketCapCurrency` is also on this response —
+  `Ecosystem.jsx`/`Compare.jsx` format market cap in the listing's own currency (it's never USD
+  by default; formatting it as `$` regardless was producing false comparisons, e.g. a JPY cap
+  reading larger than Apple's real USD cap). `betaIndex` is populated for a provider beta too,
+  not just a computed one, so the UI always names the actual benchmark ("vs the S&P 500") instead
+  of vaguely "the market". `peers` is deduped case-insensitively (Finnhub's own list can repeat
+  a symbol). `peerNames` (ticker → full company name, resolved in parallel via yfinance) backs
+  the ecosystem graph's hover tooltip only — `peers` itself stays a plain ticker list for
+  `services/evidence.py`. **Non-US peers (2026-09-17)**: Finnhub's peers endpoint is US-listed
+  only, which left non-US stocks with no ecosystem graph at all (user-reported, RELIANCE.NS) —
+  `_peers()` now falls back to Yahoo Finance's keyless public "people also watch" endpoint
+  (`_yahoo_related()`) when Finnhub has nothing. This is a DIFFERENT signal (co-viewed by other
+  investors, not same-industry competitors) — tracked via `peersSource` ("finnhub"|"yahoo"|None)
+  and the frontend labels the Yahoo case differently rather than presenting it as if it were the
+  same kind of peer data.
+- `company.py::_fundamentals()` (2026-09-17, docs/AUDIT.md M5 — the biggest content gap) — P/E
+  (trailing+forward), EPS, revenue growth, profit margin, dividend yield, debt/equity, next
+  earnings date, all straight from yfinance's `.info`/`.calendar` (nothing computed/estimated).
+  `dividendYield` and `debtToEquity` are already percentage figures in yfinance's own convention
+  (unlike `revenueGrowth`/`profitMargins`, which are fractions) — verified empirically. Wired
+  into `/ecosystem/{ticker}`'s `fundamentals` field; degrades to a `coverage.fundamentals` note
+  (never fabricated) when a listing genuinely has nothing. Rendered in `Ecosystem.jsx`.
 - `patterns.py` scans the WHOLE series (every consecutive pair/triple of swings, not just the
   most recent few) for reversal **and** trendline shapes, built from High/Low (not Close — matches
   the actual wicks). Its similar-level/min-dip/flat tolerances are derived PER SERIES from that

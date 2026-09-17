@@ -125,9 +125,22 @@ A running list so we don't lose ideas. Add freely; we pull from here after the M
 
 From `docs/AUDIT.md` §10 item 14-17. Working through in order per the audit's own sequencing.
 
-- [ ] **M5 — fundamentals + earnings dates.** Zero fundamentals (P/E, EPS, revenue growth,
-  margins, dividend yield, debt) anywhere in the app — the single biggest content gap per the
-  audit. Also no earnings-date surfacing. Biggest scope item in this wave.
+- [x] **M5 — fundamentals + earnings dates.** Done 2026-09-17. `services/company.py::
+  _fundamentals()` — P/E (trailing+forward), EPS, revenue growth, profit margin, dividend
+  yield, debt/equity, next earnings date, all straight from yfinance's `.info`/`.calendar`
+  (nothing computed). Wired into `/ecosystem/{ticker}`'s response; rendered in `Ecosystem.jsx`.
+  Degrades honestly (a genuinely thin listing gets a coverage note, not fabricated numbers).
+  6 new backend tests.
+- [x] **Bonus fix (user-reported mid-wave): non-US peers were completely empty.** Finnhub's
+  free peers endpoint is US-listed-only, so every non-US stock (verified: RELIANCE.NS) showed
+  no ecosystem graph at all — previously deferred to a paid Firecrawl/Exa tier. Found a free,
+  keyless alternative: Yahoo Finance's own public "people also watch" endpoint
+  (`_yahoo_related()`), used as a fallback when Finnhub has nothing. This is a DIFFERENT signal
+  (co-viewed by other investors, not same-industry competitors) — tracked via a new
+  `peersSource` field and labeled differently in the UI ("Related companies (commonly viewed
+  together)... not necessarily direct competitors") so it's never presented as if it were the
+  same kind of data Finnhub returns. 5 new backend tests. Verified live: RELIANCE.NS now shows
+  a real 5-node graph (HDFCBANK/TCS/ICICIBANK/SBIN/LT) with the honest caveat.
 - [ ] **M3 — sharper evidence matching.** `services/evidence.py`'s relevance filter is bare token
   matching (e.g. "Apple cider" would match AAPL) — tighten it.
 - [ ] **M10 — frontend tests + symbol-resolution tests.** Zero frontend tests exist; backend
@@ -222,8 +235,9 @@ the existing single-stock read is demonstrably trustworthy end to end.
 - **TradingView widget option** — embed the exact TV chart look as an alternative to Lightweight-Charts.
 
 ## Phase 3 — surface & scale
-**Feature-complete as of 2026-09-15**, except non-US peers (still gapped behind the deferred
-paid Firecrawl/Exa tier) and desktop packaging (deliberately parked, not planned).
+**Feature-complete as of 2026-09-15.** Non-US peers were gapped until 2026-09-17 (see Wave 4
+below — a free Yahoo fallback closed this); desktop packaging remains deliberately parked, not
+planned.
 - [x] **Comparison tab** — DONE 2026-09-14/15. Two stocks side by side: normalized price chart
   (rebased to 100) + metrics table (RSI/MACD/SMA/Bollinger/volume/beta/sector/mktcap).
   Deterministic (no AI call); "describes differences, never which to buy". `Compare.jsx` +
@@ -253,9 +267,12 @@ paid Firecrawl/Exa tier) and desktop packaging (deliberately parked, not planned
   - [x] **Currency display fixed** (2026-09-15) — non-US currencies (JPY/KRW/HKD/SGD/CNY/EUR/GBP/…)
     were rendering as a bare number with no symbol; three duplicated, USD/INR-only `sym()`
     helpers replaced with one shared `frontend/src/lib/currency.js`. Verified live on 7974.T.
-  - [ ] Non-US peers (Ecosystem tab) — still gapped; Finnhub's peers endpoint is US-only free
-    tier, and a real free substitute wasn't found. Real fix is the paid Firecrawl/Exa tier
-    (already deferred to post-deploy elsewhere in this doc).
+  - [x] **Non-US peers (Ecosystem tab) fixed 2026-09-17** — a free substitute WAS found:
+    Yahoo Finance's keyless "people also watch" endpoint, used as a fallback when Finnhub (US-only
+    free tier) has nothing. Different signal (co-viewed, not same-industry) — labeled as such.
+    See "Audit — Wave 4" below for detail. The paid Firecrawl/Exa tier remains a future option for
+    TRUE same-industry peers on non-US listings, but is no longer the only path to a populated
+    ecosystem graph.
   - [x] **Non-US news broadened** (2026-09-15) — added a keyless Google News RSS fallback
     (`services/news.py::_google_news`, searches by company name) ahead of the Yahoo fallback,
     so non-US markets get real, diverse coverage instead of relying on Yahoo Finance's own feed

@@ -100,7 +100,18 @@ def _peer_names(symbols: list[str]) -> dict[str, str]:
     return {sym: name for sym, name in results if name}
 
 
-def _peers(ticker: str) -> list[str]:
+def _dedupe(ticker: str, symbols: list[str]) -> list[str]:
+    seen: set[str] = set()
+    out = []
+    for p in symbols:
+        if not p or p.upper() == ticker.upper() or p.upper() in seen:
+            continue
+        seen.add(p.upper())
+        out.append(p)
+    return out[:8]
+
+
+def _finnhub_peers(ticker: str) -> list[str]:
     key = os.environ.get("TRADE101_NEWS_KEY")  # same Finnhub key as news
     if not key:
         return []
@@ -110,16 +121,81 @@ def _peers(ticker: str) -> list[str]:
         # Finnhub's own peers list can contain duplicates (confirmed live on
         # QCOM: "MRVL" appears twice) — dedupe case-insensitively, preserving
         # order, or the ecosystem graph renders the same company as two nodes.
-        seen: set[str] = set()
-        out = []
-        for p in r.json():
-            if not p or p.upper() == ticker.upper() or p.upper() in seen:
-                continue
-            seen.add(p.upper())
-            out.append(p)
-        return out[:8]
+        return _dedupe(ticker, r.json())
     except Exception:
         return []
+
+
+def _yahoo_related(ticker: str) -> list[str]:
+    """Fallback for when Finnhub has nothing — its free peers endpoint is
+    US-listed-only, which left every non-US stock (Reliance, Toshiba, ...)
+    with an empty ecosystem panel (user-reported). Yahoo Finance's own public
+    "people also watch" endpoint is keyless and genuinely global. It's a
+    DIFFERENT signal from Finnhub's peers — co-viewed by other investors,
+    not necessarily same-industry competitors (verified: RELIANCE.NS returns
+    HDFCBANK/TCS/ICICIBANK — major Indian large-caps investors also track,
+    not oil & gas competitors) — so callers must track which source was used
+    (see `peersSource`) and the UI should label it differently, not present
+    it as if it were the same kind of "peer" Finnhub returns."""
+    try:
+        r = httpx.get(
+            f"https://query1.finance.yahoo.com/v6/finance/recommendationsbysymbol/{ticker.upper()}",
+            timeout=12, headers={"User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) Trade101/0.1"},
+        )
+        r.raise_for_status()
+        result = (r.json().get("finance", {}).get("result") or [{}])[0]
+        symbols = [s.get("symbol") for s in (result.get("recommendedSymbols") or [])]
+        return _dedupe(ticker, symbols)
+    except Exception:
+        return []
+
+
+def _peers(ticker: str) -> tuple[list[str], str | None]:
+    """Returns (symbols, source) — source is "finnhub" | "yahoo" | None."""
+    finnhub = _finnhub_peers(ticker)
+    if finnhub:
+        return finnhub, "finnhub"
+    yahoo = _yahoo_related(ticker)
+    if yahoo:
+        return yahoo, "yahoo"
+    return [], None
+
+
+def _fundamentals(ticker: str, info: dict) -> dict:
+    """Fundamentals — the biggest content gap the app had (docs/AUDIT.md M5):
+    technical analysis only teaches half the picture for a beginning investor.
+    All values come straight from the provider's own `.info`/`.calendar`
+    fields — nothing computed or estimated here, matching the "numbers are
+    exact" guardrail. `dividendYield` is already a percentage figure in
+    yfinance's own convention (unlike `profitMargins`/`revenueGrowth`, which
+    are fractions) — verified empirically (AAPL: 0.33 == 0.33%, not 33%).
+    `debtToEquity` is likewise already a percentage in yfinance's convention.
+    Degrades field-by-field: a missing figure is `None`, never fabricated or
+    interpolated, and a genuinely thin listing simply has more `None`s."""
+    next_earnings = None
+    try:
+        cal = yf.Ticker(ticker).calendar
+        dates = (cal or {}).get("Earnings Date")
+        if dates:
+            d = dates[0] if isinstance(dates, list) else dates
+            next_earnings = d.isoformat() if hasattr(d, "isoformat") else str(d)
+    except Exception:
+        pass
+
+    fields = {
+        "pe": info.get("trailingPE"),
+        "forwardPe": info.get("forwardPE"),
+        "eps": info.get("trailingEps"),
+        "revenueGrowth": info.get("revenueGrowth"),   # fraction, e.g. 0.164 = 16.4%
+        "profitMargin": info.get("profitMargins"),    # fraction
+        "dividendYield": info.get("dividendYield"),   # already a percent figure
+        "debtToEquity": info.get("debtToEquity"),     # already a percent figure
+        "nextEarningsDate": next_earnings,
+    }
+    coverage = None if any(v is not None for v in fields.values()) else (
+        "Fundamentals aren't available for this listing."
+    )
+    return {**fields, "coverage": coverage}
 
 
 def get_profile(ticker: str) -> dict:
@@ -131,7 +207,7 @@ def get_profile(ticker: str) -> dict:
         info = {}
 
     beta = info.get("beta")
-    peers = _peers(ticker)
+    peers, peers_source = _peers(ticker)
     is_us = "." not in ticker  # US symbols have no exchange suffix (e.g. AAPL vs 7974.T)
 
     # If no published beta (the usual non-US case), compute it ourselves against
@@ -159,13 +235,14 @@ def get_profile(ticker: str) -> dict:
             + (" (no regional index data)." if not is_us else ".")
         )
     if not peers:
-        coverage["peers"] = (
-            "Peer companies aren't available for this listing"
-            + (" — the peers source currently covers US-listed symbols." if not is_us
-               else ".")
-        )
+        coverage["peers"] = "Peer/related companies aren't available for this listing."
+
+    fundamentals = _fundamentals(ticker, info)
+    if fundamentals["coverage"]:
+        coverage["fundamentals"] = fundamentals["coverage"]
 
     return {
+        "fundamentals": {k: v for k, v in fundamentals.items() if k != "coverage"},
         "sector": info.get("sector"),
         "industry": info.get("industry"),
         "beta": beta,
@@ -178,6 +255,11 @@ def get_profile(ticker: str) -> dict:
         "exchange": info.get("fullExchangeName") or info.get("exchange"),
         "country": info.get("country"),
         "peers": peers,
+        # "finnhub" (same-industry peers) | "yahoo" (co-viewed by other
+        # investors — a related-but-different signal, see _yahoo_related) |
+        # None. The UI must label these differently, not present a Yahoo
+        # fallback as if it were an industry-peer list.
+        "peersSource": peers_source,
         # Full company name per peer ticker, for the ecosystem graph's hover
         # tooltip — kept separate from `peers` (a plain ticker list) because
         # services/evidence.py matches news relevance against `peers` directly

@@ -27,6 +27,14 @@ function betaNote(b, indexName) {
   return `Beta ${b} — this stock is ${mag}. Beta measures how much a stock's price tends to move for a given move in ${idx}: 1 = in step, above 1 = amplified, below 1 = muted. It's how ${idx}'s swings tend to ripple into this name specifically — not the sector in general, though a stock's sector is usually a big part of why its beta looks the way it does.`
 }
 
+// Fundamentals formatting — values arrive exact from the backend (docs/AUDIT.md
+// M5); this only formats, never computes. pctFrac takes a FRACTION (0.164 ->
+// "16.4%"); pctRaw takes an already-percentage figure (yfinance's own
+// convention for dividendYield/debtToEquity — see services/company.py).
+const pctFrac = (v) => (v == null ? '—' : (v * 100).toFixed(1) + '%')
+const pctRaw = (v) => (v == null ? '—' : v.toFixed(2) + '%')
+const num = (v, digits = 2) => (v == null ? '—' : v.toFixed(digits))
+
 // Radial node graph: the company at the centre, peers on a ring around it,
 // each clickable to research. Richer than a flat chip list — shows the company
 // sitting in a web of related names. Each node carries a native <title> (a
@@ -105,8 +113,18 @@ export default function Ecosystem({ ticker, onSearch }) {
 
           {eco.peers?.length > 0 ? (
             <div style={{ marginTop: 14 }}>
-              <div className="faint" style={{ fontSize: 12, marginBottom: 2 }}>Peers / ecosystem — tap a node to research</div>
+              <div className="faint" style={{ fontSize: 12, marginBottom: 2 }}>
+                {eco.peersSource === 'yahoo'
+                  ? 'Related companies (commonly viewed together by other investors) — tap a node to research'
+                  : 'Peers / ecosystem — tap a node to research'}
+              </div>
               <EcoGraph ticker={ticker} peers={eco.peers} peerNames={eco.peerNames} onSearch={onSearch} />
+              {eco.peersSource === 'yahoo' && (
+                <div className="faint" style={{ fontSize: 11, marginTop: 4 }}>
+                  Same-industry peer data isn't available for this listing, so these are shown
+                  instead — not necessarily direct competitors.
+                </div>
+              )}
             </div>
           ) : eco.coverage?.peers && (
             <div className="faint" style={{ fontSize: 12, marginTop: 14 }}>{eco.coverage.peers}</div>
@@ -116,6 +134,24 @@ export default function Ecosystem({ ticker, onSearch }) {
               by the backend only when genuinely cut at a word boundary) —
               appending another "…" here used to truncate mid-word regardless. */}
           {eco.summary && <p className="placeholder" style={{ marginTop: 12 }}>{eco.summary}</p>}
+
+          {eco.fundamentals && (eco.coverage?.fundamentals ? (
+            <div className="faint" style={{ fontSize: 12, marginTop: 14 }}>{eco.coverage.fundamentals}</div>
+          ) : (
+            <div style={{ marginTop: 14 }}>
+              <div className="lbl" style={{ marginBottom: 8 }}>Fundamentals</div>
+              <div className="eco-facts">
+                <div><span className="faint">P/E (trailing)</span><b className="mono">{num(eco.fundamentals.pe)}</b></div>
+                <div><span className="faint">P/E (forward)</span><b className="mono">{num(eco.fundamentals.forwardPe)}</b></div>
+                <div><span className="faint">EPS</span><b className="mono">{num(eco.fundamentals.eps)}</b></div>
+                <div><span className="faint">Revenue growth</span><b className="mono">{pctFrac(eco.fundamentals.revenueGrowth)}</b></div>
+                <div><span className="faint">Profit margin</span><b className="mono">{pctFrac(eco.fundamentals.profitMargin)}</b></div>
+                <div><span className="faint">Dividend yield</span><b className="mono">{pctRaw(eco.fundamentals.dividendYield)}</b></div>
+                <div><span className="faint">Debt/Equity</span><b className="mono">{pctRaw(eco.fundamentals.debtToEquity)}</b></div>
+                <div><span className="faint">Next earnings</span><b className="mono">{eco.fundamentals.nextEarningsDate || '—'}</b></div>
+              </div>
+            </div>
+          ))}
         </>
       )}
 
