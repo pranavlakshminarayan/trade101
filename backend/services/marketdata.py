@@ -14,14 +14,19 @@ from typing import Optional, Tuple
 import pandas as pd
 import yfinance as yf
 
+from services.net import with_timeout
+
 
 def get(ticker: str, period: str = "1y", interval: str = "1d") -> Optional[Tuple[pd.DataFrame, dict]]:
     """
     Fetch (OHLCV DataFrame, quote dict) for `ticker`, or None if the symbol
     has no data (unknown/delisted). Prices are split/dividend-adjusted.
+    Raises TimeoutError if Yahoo doesn't respond within a bounded time
+    (services/net.py) — a slow/rate-limited provider degrades to a clear
+    "try again" response instead of hanging the request indefinitely.
     """
     t = yf.Ticker(ticker)
-    hist = t.history(period=period, interval=interval, auto_adjust=True)
+    hist = with_timeout(t.history, period=period, interval=interval, auto_adjust=True, timeout=15)
     if hist is None or hist.empty:
         return None
     # Drop rows with a NaN OHLC value (some markets return holiday/partial bars,
@@ -53,7 +58,7 @@ def _quote(t: "yf.Ticker", hist: pd.DataFrame, ticker: str) -> dict:
 
     fi = {}
     try:
-        fi = dict(t.fast_info)
+        fi = dict(with_timeout(lambda: t.fast_info, timeout=10))
     except Exception:
         fi = {}
 
@@ -66,7 +71,7 @@ def _quote(t: "yf.Ticker", hist: pd.DataFrame, ticker: str) -> dict:
 
     name, exchange, currency = None, None, None
     try:
-        info = t.info
+        info = with_timeout(lambda: t.info, timeout=10)
         # Prefer the properly-cased full name (longName) over the ALL-CAPS
         # shortName; this is what makes non-US listings show "Nintendo Co., Ltd."
         # instead of the bare ticker.

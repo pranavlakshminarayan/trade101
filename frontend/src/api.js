@@ -7,6 +7,26 @@ const BASE = import.meta.env.DEV ? (import.meta.env.VITE_API_BASE || 'http://127
 
 import { getApiKey } from './lib/apiKey.js'
 
+// Bug (user-reported 2026-09-17, live on Render): searching a thin/newly
+// listed ticker left the chart stuck on "Loading…" forever — none of these
+// fetches ever had a timeout, so a slow backend response (Yahoo being slow
+// or rate-limited server-side, or just a cold Render dyno) hung the UI with
+// nothing to fall back to. Every request below now gives up after TIMEOUT_MS
+// and surfaces a clear error instead of an infinite spinner. Fixed together
+// with a matching backend-side timeout (services/net.py) — this is the
+// belt-and-suspenders half: it also protects against a slow/cold backend,
+// not just a slow upstream provider.
+const TIMEOUT_MS = 25000
+// /analyze and /ask run a real Claude call server-side (up to 90s/45s — see
+// agents/llm.py's ANALYSIS_TIMEOUT_S/CHAT_TIMEOUT_S) — a 25s client timeout
+// would abort a request the backend was still legitimately working on.
+const AI_TIMEOUT_MS = 100000
+function fetchWithTimeout(url, options = {}, timeoutMs = TIMEOUT_MS) {
+  const controller = new AbortController()
+  const id = setTimeout(() => controller.abort(), timeoutMs)
+  return fetch(url, { ...options, signal: controller.signal }).finally(() => clearTimeout(id))
+}
+
 // BYOK (2026-09-17): only /analyze and /ask (the paid calls) need the
 // visitor's own Anthropic key — every other endpoint is deterministic and
 // free, so it stays open with no header at all.
@@ -57,7 +77,7 @@ export async function research(ticker, { period, interval, fresh } = {}) {
     const cached = cacheGet(_cache.research, ckey)
     if (cached) return cached
   }
-  const res = await fetch(`${BASE}/research/${encodeURIComponent(ticker.trim())}${q ? '?' + q : ''}`)
+  const res = await fetchWithTimeout(`${BASE}/research/${encodeURIComponent(ticker.trim())}${q ? '?' + q : ''}`)
   if (!res.ok) {
     const err = await res.json().catch(() => ({ detail: `Request failed (HTTP ${res.status})` }))
     throw new Error(err.detail || `HTTP ${res.status}`)
@@ -70,7 +90,7 @@ export async function research(ticker, { period, interval, fresh } = {}) {
 // Resolve a company name or partial ticker to candidate symbols.
 export async function search(q) {
   try {
-    const res = await fetch(`${BASE}/search?q=${encodeURIComponent(q.trim())}`)
+    const res = await fetchWithTimeout(`${BASE}/search?q=${encodeURIComponent(q.trim())}`)
     if (!res.ok) return { candidates: [] }
     return res.json()
   } catch {
@@ -84,7 +104,7 @@ export async function ecosystem(ticker) {
   const cached = cacheGet(_cache.ecosystem, k)
   if (cached) return cached
   try {
-    const res = await fetch(`${BASE}/ecosystem/${encodeURIComponent(ticker.trim())}`)
+    const res = await fetchWithTimeout(`${BASE}/ecosystem/${encodeURIComponent(ticker.trim())}`)
     if (!res.ok) return null
     const data = await res.json()
     cacheSet(_cache.ecosystem, k, data)
@@ -104,7 +124,7 @@ export async function patterns(ticker, { period, interval } = {}) {
   const cached = cacheGet(_cache.patterns, ckey)
   if (cached) return cached
   try {
-    const res = await fetch(`${BASE}/patterns/${encodeURIComponent(ticker.trim())}${q ? '?' + q : ''}`)
+    const res = await fetchWithTimeout(`${BASE}/patterns/${encodeURIComponent(ticker.trim())}${q ? '?' + q : ''}`)
     if (!res.ok) return { patterns: [] }
     const data = await res.json()
     cacheSet(_cache.patterns, ckey, data)
@@ -123,7 +143,7 @@ export async function news(ticker) {
   const cached = cacheGet(_cache.news, k)
   if (cached) return cached
   try {
-    const res = await fetch(`${BASE}/news/${encodeURIComponent(ticker.trim())}`)
+    const res = await fetchWithTimeout(`${BASE}/news/${encodeURIComponent(ticker.trim())}`)
     if (!res.ok) return { available: false, reason: `News request failed (HTTP ${res.status})` }
     const data = await res.json()
     if (data && data.available !== false) cacheSet(_cache.news, k, data)
@@ -137,11 +157,11 @@ export async function news(ticker) {
 // a fresh, paid call; history is sent so the backend can keep the thread.
 export async function ask(ticker, question, history = []) {
   try {
-    const res = await fetch(`${BASE}/ask/${encodeURIComponent(ticker.trim())}`, {
+    const res = await fetchWithTimeout(`${BASE}/ask/${encodeURIComponent(ticker.trim())}`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json', ...authHeaders() },
       body: JSON.stringify({ question, history }),
-    })
+    }, AI_TIMEOUT_MS)
     if (!res.ok) {
       const err = await res.json().catch(() => ({}))
       return { available: false, reason: err.detail || `Ask request failed (HTTP ${res.status})` }
@@ -162,12 +182,19 @@ export async function analyze(ticker) {
   if (_cache.analyze.has(key)) return _cache.analyze.get(key)
   if (_inflight[key]) return _inflight[key]
   const p = (async () => {
-    const res = await fetch(`${BASE}/analyze/${encodeURIComponent(key)}`, { headers: authHeaders() })
-    if (!res.ok) {
-      const err = await res.json().catch(() => ({}))
-      return { available: false, reason: err.detail || `AI request failed (HTTP ${res.status})` }
+    try {
+      const res = await fetchWithTimeout(`${BASE}/analyze/${encodeURIComponent(key)}`, { headers: authHeaders() }, AI_TIMEOUT_MS)
+      if (!res.ok) {
+        const err = await res.json().catch(() => ({}))
+        return { available: false, reason: err.detail || `AI request failed (HTTP ${res.status})` }
+      }
+      return res.json()
+    } catch {
+      // No try/catch here previously meant a network failure or timeout left
+      // Research.jsx's aiLoading stuck true forever (its .then has no .catch) —
+      // same "stuck loading" bug class as the chart hang this fix addresses.
+      return { available: false, reason: 'Could not reach the backend for AI narration.' }
     }
-    return res.json()
   })()
   _inflight[key] = p
   try {

@@ -337,6 +337,41 @@ Mirrored as checkboxes in `BACKLOG.md` → "Audit — Wave 0/1/2/3/4". **All wav
 done, including the deploy step** — live at https://trade-craft-qdsw.onrender.com
 (2026-09-17). See `docs/AUDIT.md` §10.
 
+### Fixed 2026-09-17 — no timeout anywhere on yfinance calls, hung the UI forever on a slow/thin ticker
+**User-reported on the LIVE deployed link** (first bug caught post-deploy): searching "SK hynix"
+(a brand-new NASDAQ listing, `SKHY`, alongside the mature `000660.KS` Korean listing) left the
+10D chart tab stuck on "Loading 10D…" indefinitely, and the Ecosystem panel showed a confusing
+peer graph. Root cause: yfinance's underlying Yahoo requests default to a 30s timeout **per
+request**, but a single `/research`/`/ecosystem` call chains several of them sequentially
+(`.info`, `.calendar`, beta history ×2, up to 8 peer-name lookups) — a slow or rate-limited
+response (more likely from Render's shared datacenter IP than a home IP in local dev, and more
+likely for a genuinely thin/brand-new listing Yahoo hasn't fully backfilled yet) could stack into
+60s, 90s, or more, and **nothing anywhere — backend or frontend — ever gave up**. Fixed on both
+sides:
+- **Backend**: new `services/net.py::with_timeout()` — a hard wall-clock deadline via
+  `ThreadPoolExecutor.result(timeout=)` around every risky yfinance call (`marketdata.get`'s
+  `t.history`/`t.fast_info`/`t.info`; `company.py`'s `t.info`/`.calendar`/beta histories/peer
+  lookups). A timeout on a REQUIRED call (`marketdata.get`, used by `/research`/`/patterns`)
+  now surfaces as a proper 504 with an honest "Yahoo is responding slowly, try again" message
+  instead of a misleading 404 "no data"; a timeout on a degradable field (beta, fundamentals,
+  peer names) falls back to `None`/empty, same as any other provider gap.
+- **Frontend**: `api.js` had NO timeout on any `fetch()` call at all — new
+  `fetchWithTimeout()` (AbortController, 25s for deterministic endpoints, 100s for
+  `/analyze`/`/ask` since those legitimately run a real Claude call up to 90s server-side) is
+  now used everywhere. Also fixed a latent bug found while doing this: `analyze()` had no
+  try/catch around its fetch at all — a network failure or timeout would reject uncaught, and
+  Research.jsx's `.then()` (no `.catch()`) meant `aiLoading` would stay stuck `true` forever,
+  same "infinite loading" bug class as the chart hang, just for the AI panel.
+- 87 backend tests pass throughout (no test changes needed — `TimeoutError` is a subclass of
+  `Exception`, so it flows through every existing degrade-gracefully path unchanged). Frontend
+  build verified clean.
+- **Separately observed, not yet fixed**: `services/search.py::resolve()`'s OTC/secondary
+  detection doesn't catch every thin/low-quality listing — `SKHY` (a brand-new NASDAQ line,
+  `exchange: "NMS"`, not in `_OTC_EXCHANGES`) ranked ABOVE `000660.KS` with no badge, despite
+  Yahoo's `.info` having nothing backfilled for it yet (fundamentals/beta/sector all null) while
+  the mature Korean listing has full coverage. This is a real ranking-quality gap, not the bug
+  that was actually hanging the UI — tracked here for a future pass rather than fixed now.
+
 ### Added 2026-09-17 — README rewrite + real screenshots
 `README.md` was stale (missing Comparison/Watchlist/Practice Lab/Glossary/Ask TC-Buddy/
 fundamentals entirely, still described the old shared-access-token model). Rewrote to match

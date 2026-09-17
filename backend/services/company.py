@@ -14,6 +14,8 @@ import httpx
 import numpy as np
 import yfinance as yf
 
+from services.net import with_timeout
+
 FINNHUB = "https://finnhub.io/api/v1"
 
 # Exchange suffix → the market index a stock's beta is measured against. This is
@@ -44,8 +46,10 @@ def _computed_beta(ticker: str) -> tuple[float | None, str | None]:
     Returns (beta, index_name) or (None, None) if the data is insufficient."""
     idx_sym, idx_name = _index_for(ticker)
     try:
-        stock = yf.Ticker(ticker).history(period="1y", interval="1d", auto_adjust=True)["Close"]
-        index = yf.Ticker(idx_sym).history(period="1y", interval="1d", auto_adjust=True)["Close"]
+        stock = with_timeout(
+            lambda: yf.Ticker(ticker).history(period="1y", interval="1d", auto_adjust=True)["Close"], timeout=12)
+        index = with_timeout(
+            lambda: yf.Ticker(idx_sym).history(period="1y", interval="1d", auto_adjust=True)["Close"], timeout=12)
     except Exception:
         return None, None
     sr = stock.pct_change().dropna()
@@ -90,7 +94,7 @@ def _peer_names(symbols: list[str]) -> dict[str, str]:
 
     def _one(sym: str) -> tuple[str, str | None]:
         try:
-            info = yf.Ticker(sym).info
+            info = with_timeout(lambda: yf.Ticker(sym).info, timeout=10)
             return sym, (info.get("shortName") or info.get("longName"))
         except Exception:
             return sym, None
@@ -174,7 +178,7 @@ def _fundamentals(ticker: str, info: dict) -> dict:
     interpolated, and a genuinely thin listing simply has more `None`s."""
     next_earnings = None
     try:
-        cal = yf.Ticker(ticker).calendar
+        cal = with_timeout(lambda: yf.Ticker(ticker).calendar, timeout=10)
         dates = (cal or {}).get("Earnings Date")
         if dates:
             d = dates[0] if isinstance(dates, list) else dates
@@ -202,7 +206,7 @@ def get_profile(ticker: str) -> dict:
     t = yf.Ticker(ticker)
     info = {}
     try:
-        info = t.info
+        info = with_timeout(lambda: t.info, timeout=12)
     except Exception:
         info = {}
 

@@ -104,7 +104,16 @@ def research(ticker: str, period: str = "1y", interval: str = "1d"):
     Live research bundle for ANY ticker: quote + indicators + OHLCV (for the
     chart). Ticker-agnostic — nothing is hardcoded to a specific symbol.
     """
-    data = _fetch_with_lookback(ticker, period, interval)
+    try:
+        data = _fetch_with_lookback(ticker, period, interval)
+    except TimeoutError:
+        # Yahoo is responding slowly/being rate-limited (services/net.py) —
+        # an honest "try again" beats a misleading "no data for this ticker"
+        # (user-reported 2026-09-17: this used to hang the UI forever instead).
+        raise HTTPException(
+            status_code=504,
+            detail="Yahoo Finance is responding slowly for this ticker right now. Try again in a moment.",
+        )
     if data is None:
         raise HTTPException(
             status_code=404,
@@ -168,7 +177,13 @@ def research(ticker: str, period: str = "1y", interval: str = "1d"):
 @app.get("/ecosystem/{ticker}")
 def ecosystem(ticker: str):
     """Company profile + peers: sector, industry, beta, market cap, peer symbols."""
-    data = marketdata.get(ticker, period="5d")  # confirm the symbol exists
+    try:
+        data = marketdata.get(ticker, period="5d")  # confirm the symbol exists
+    except TimeoutError:
+        raise HTTPException(
+            status_code=504,
+            detail="Yahoo Finance is responding slowly for this ticker right now. Try again in a moment.",
+        )
     if data is None:
         raise HTTPException(status_code=404, detail=f"No data for '{ticker}'.")
     return {"ticker": ticker.upper(), **company.get_profile(ticker)}
@@ -184,7 +199,13 @@ def detect_patterns(ticker: str, period: str = "1y", interval: str = "1d"):
     form, and older-but-real ones the user still wanted visible. `patterns.detect`
     already sorts most-recent-first (docs/AUDIT.md H6), so recency is handled by
     ranking, not by hiding data from the scan."""
-    data = marketdata.get(ticker, period=period, interval=interval)
+    try:
+        data = marketdata.get(ticker, period=period, interval=interval)
+    except TimeoutError:
+        raise HTTPException(
+            status_code=504,
+            detail="Yahoo Finance is responding slowly for this ticker right now. Try again in a moment.",
+        )
     if data is None:
         raise HTTPException(status_code=404, detail=f"No data for '{ticker}'.")
     hist, _ = data
