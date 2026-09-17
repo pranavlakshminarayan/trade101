@@ -952,3 +952,69 @@ it needs to serve. New tests explicitly assert full indicator coverage on a shor
 - This session ends here on the user's request, to continue in a new chat — see `CLAUDE.md`'s
   "Known bugs" and `BACKLOG.md`'s "Audit — Wave 0/1/2/3" sections for the authoritative, current
   checklist a new session should read first.
+
+## 21. Wave 3 executed, reviewed live across two feedback rounds, merged — 2026-09-17
+
+New session continuing from §20. User confirmed direction for Wave 3 (pushed back on a fully
+rigid three-zone grid over dead-space concerns, and on the icon plan implying the chosen symbols
+themselves would change) before anything was built — see `CLAUDE.md`'s "Known bugs" → the Wave 3
+"Fixed" entry for the current-state summary of what shipped. This entry is the narrative: what
+went wrong along the way and why, kept here rather than bloating `CLAUDE.md`.
+
+**Round 1 (initial build).** Fixed layout, SVG icon set, evidence-card redesign, mobile media
+query, dead CSS removal. Also renamed Ask-Claude → "Ask TC-Buddy" with a candlestick icon
+(user's explicit ask, alongside the redesign discussion). Built and left uncommitted for review.
+
+**Round 2 (user feedback, 7 notes on the live app).** Metrics/AI-read swap, pattern color, logo→
+home wiring, and a real chart-autofit bug (`fitContent()` gated behind an `isFirstFit` check that
+only ever fired once, ever — every timeframe switch after the first left the chart unfit). Also
+attempted a news-depth fix (supplement thin feeds with Google News) and a patterns fix (restrict
+intraday pattern scans to the trailing 2 hours, to stop stale 3-4-hour-old swings from showing).
+**The patterns fix was wrong** — confirmed in round 3 below.
+
+**Round 3 (user feedback on a real thin-coverage stock, TECA.F — Toshiba Tec's Frankfurt
+secondary listing).** Three real bugs surfaced by testing against an actual edge case rather than
+just NVDA/AAPL:
+1. **SMA200 "same error" reported again** — looked like the round-2 fix hadn't landed, but was
+   actually a *different*, previously-unnoticed bug: `Metrics` always rendered the base 1Y/1D
+   `indicators` object regardless of which chart timeframe was selected, so the 10D tab showed
+   a real-but-irrelevant 1Y SMA200 number. Chased this down through: (a) suspecting the frontend
+   session cache was stale (it turned out ALSO to have a real bug — no TTL at all, docs/AUDIT.md
+   M1, now fixed as a side effect), (b) suspecting the backend `gather()` cache was stale, before
+   (c) finding the actual root cause by tracing which `indicators` object `Research.jsx` passed
+   to `<Metrics>`. Lesson: when a user reports "the same bug again" after a fix, don't assume the
+   fix was incomplete — verify it's the SAME bug before re-patching, since here it was a sibling
+   bug with an identical-looking symptom.
+2. **Patterns: user meant the OPPOSITE of round 2's fix.** "I don't want to see only patterns
+   below 2 hours, I want to see patterns below 2 hours AS WELL" — the round-2 restriction excluded
+   both genuinely recent and older-but-real patterns by shrinking the scan window. Reverted
+   entirely back to the pre-Wave-3 full-series scan. **This is the second time in this session a
+   "make X more recent" request got over-literally translated into "exclude anything not recent"
+   — worth remembering as a pattern of misreading, not a one-off.**
+3. **News "still US-only, proves my point"** — investigated properly rather than assuming the
+   user was right or wrong. Finding: Google News RSS genuinely does return non-US results (verified
+   with a real query), but a 30-day recency cutoff was silently discarding real coverage that was
+   simply a few months old — common for a thinly-covered secondary listing. Widened the
+   supplement window to 90 days, and added an honest "little findable coverage" note for the
+   (expected, real) case where a listing has almost nothing. This was NOT a US-market-only bug —
+   it was a recency-window bug that happened to disproportionately hit thin non-US listings.
+
+**Infrastructure, twice.** Port 8001 (like port 8000 before it) got a stuck orphaned LISTENING
+socket with no owning process partway through this work. Separately, `uvicorn --reload`'s
+WatchFiles watcher proved unreliable on this machine — only one reload fired across several
+subsequent backend file saves, so a code fix could look "not applied" when the process just
+hadn't restarted. This directly caused false starts while chasing bug #1 above. Resolution:
+backend now runs on **port 8002, without `--reload`** — restart manually after backend edits.
+`frontend/.env.local` updated; the frontend dev server also needed restarting (Vite only reads
+`.env.local` at startup). **Recommend for future sessions:** don't trust `--reload` on this
+machine at all; treat every backend edit as needing a manual restart to verify.
+
+**User then explicitly asked one more thing mid-review** (not part of the original Wave 3 scope,
+addressed alongside round 2): clicking the "Trade Craft" logo from any page should return to the
+true Welcome/home screen. It was a static, unclickable `<div>` on every page — now a real button
+wired to `App.jsx`'s existing `goHome`.
+
+**Outcome:** all of the above approved and committed as `897514c`, pushed to `origin/master`.
+71 backend tests pass throughout. Wave 4 (fundamentals/earnings, sharper evidence matching,
+frontend tests, glossary/watchlist notes) started immediately after in the same session — see
+`BACKLOG.md` for its checklist.

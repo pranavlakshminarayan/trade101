@@ -103,28 +103,37 @@ A running list so we don't lose ideas. Add freely; we pull from here after the M
   from a logged-out browser, then share the link. **This step is the user's own action** (host
   account signup) — not something that can be done from inside a coding session.
 
-## Audit — Wave 3: UI/UX redesign — H5 done 2026-09-17; rest built 2026-09-17, awaiting user approval
+## Audit — Wave 3: UI/UX redesign — ✅ DONE 2026-09-17, merged to `master` (commit `897514c`)
 
 - [x] **H5 — chart indicator overlays.** Done (see "Known bugs" in `CLAUDE.md` for detail).
-- [~] **Layout, icon system, evidence panel, accessibility/mobile pass.** Built and live at
-  `http://127.0.0.1:5173` for review — **not finalized**. Direction was discussed with the user
-  first (they pushed back on a fully rigid three-zone grid over dead-space concerns, and on
-  swapping icon *meanings* rather than just their rendering) and narrowed before building. Full
-  detail in `CLAUDE.md` → "Known bugs" → "In progress 2026-09-17 — Wave 3 UI/UX redesign".
-  Summary: fixed two-zone layout (deterministic panel→column assignment, no more masonry
-  reshuffling), new SVG icon set (`Icons.jsx`) replacing all emoji with the same symbols, a
-  redesigned evidence "receipts" panel, a mobile media query for the Welcome rail, dead CSS
-  removed. Also renamed the Ask-Claude widget to **Ask TC-Buddy** with a candlestick icon
-  (user's explicit request alongside this wave).
-- [ ] **Not yet done**: full type scale / 8pt spacing system; amber reserved exclusively for
-  pattern overlays (still doubles for the watch star). Deferred pending feedback on this pass.
-- [ ] **User review/approval, then push.** Per the user's instruction, this wave stays
-  uncommitted until they've looked at it running and signed off.
-- [x] **M1 — frontend session cache never expired (fixed as a side effect, 2026-09-17).** Found
-  while chasing a stale-SMA200 report: `api.js`'s `research`/`ecosystem`/`patterns`/`news` caches
-  had no TTL. Added a 5-min TTL matching the backend's own cache; `analyze` (the paid call)
-  deliberately stays session-long by design. See `CLAUDE.md` → "Known bugs" → the 2026-09-17
-  second feedback round entry for full detail.
+- [x] **Layout, icon system, evidence panel, accessibility/mobile pass.** Reviewed live across
+  two feedback rounds on real tickers (including a thin-coverage edge case, TECA.F) and approved.
+  Full detail in `CLAUDE.md` → "Known bugs" → the Wave 3 "Fixed" entry; full narrative (including
+  a pattern-scan fix that was reverted after user feedback) in `docs/HANDOVER.md` §21. Summary:
+  fixed two-zone layout, new SVG icon set (`Icons.jsx`), a redesigned evidence "receipts" panel,
+  a mobile media query for the Welcome rail, dead CSS removed, logo→home navigation, a chart
+  autofit bug fixed, a per-timeframe Metrics bug fixed, news-coverage recency window widened.
+  Also renamed the Ask-Claude widget to **Ask TC-Buddy** with a candlestick icon.
+- [x] **M1 — frontend session cache never expired.** Found while chasing a stale-SMA200 report:
+  `api.js`'s `research`/`ecosystem`/`patterns`/`news` caches had no TTL. Added a 5-min TTL
+  matching the backend's own cache; `analyze` (the paid call) deliberately stays session-long.
+- [ ] **Not yet done**: full type scale / 8pt spacing system. Not pursued further this wave.
+
+---
+
+## Audit — Wave 4: depth (in progress, started 2026-09-17)
+
+From `docs/AUDIT.md` §10 item 14-17. Working through in order per the audit's own sequencing.
+
+- [ ] **M5 — fundamentals + earnings dates.** Zero fundamentals (P/E, EPS, revenue growth,
+  margins, dividend yield, debt) anywhere in the app — the single biggest content gap per the
+  audit. Also no earnings-date surfacing. Biggest scope item in this wave.
+- [ ] **M3 — sharper evidence matching.** `services/evidence.py`'s relevance filter is bare token
+  matching (e.g. "Apple cider" would match AAPL) — tighten it.
+- [ ] **M10 — frontend tests + symbol-resolution tests.** Zero frontend tests exist; backend
+  tests don't cover symbol resolution at all.
+- [ ] **Glossary + watchlist notes.** A beginner meeting "beta" or "neckline" in prose has
+  nowhere to look it up; the watchlist has no field to record why a user is tracking a stock.
 
 ---
 
