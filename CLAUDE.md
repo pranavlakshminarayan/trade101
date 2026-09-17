@@ -365,16 +365,29 @@ sides:
 - 87 backend tests pass throughout (no test changes needed — `TimeoutError` is a subclass of
   `Exception`, so it flows through every existing degrade-gracefully path unchanged). Frontend
   build verified clean.
-- **The actual root cause of the reported "loading forever," found doing a full button-by-button
-  audit right after this fix**: it wasn't (only) a timeout issue. `Research.jsx`'s chart
-  placeholder condition was `chartLoading || !chartOhlcv.length` — when a timeframe genuinely has
-  no data (SKHY, a brand-new listing, lacks 60 days of 30-min bars for its 10D tab, a legitimate
-  404, not a hang), `chartOhlcv` stays permanently empty even after `tfLoading` correctly clears,
-  so the UI kept showing "Loading 10D…" forever — indistinguishable from an actually-stuck fetch.
-  Fixed with a new `tfError` state tracking a per-timeframe fetch failure; the chart now shows
-  "No 10D data for SKHY — try a different timeframe" instead of lying that it's still working.
-  Reproduced and verified fixed locally (fresh page load, clicked 10D, confirmed the new message
-  appears immediately instead of hanging).
+- **A UI symptom fixed first, found doing a full button-by-button audit right after the timeout
+  fix**: `Research.jsx`'s chart placeholder condition was `chartLoading || !chartOhlcv.length` —
+  whenever a timeframe fetch came back with nothing, `chartOhlcv` stayed permanently empty even
+  after `tfLoading` correctly cleared, so the UI kept showing "Loading 10D…" forever —
+  indistinguishable from an actually-stuck fetch. Fixed with a new `tfError` state tracking a
+  per-timeframe fetch failure, so a real failure now shows an honest message instead of lying
+  that it's still working. **This masked, but did not cause,** the real bug below — initially
+  misdiagnosed as "SKHY is a brand-new listing without 60 days of history," which the user
+  correctly challenged (the 1Y chart plainly has months of real data) and which turned out to be
+  wrong.
+- **The actual root cause, found by testing the exact yfinance calls directly**: `_fetch_with_lookback`
+  (used by the 10D/5D/1D tabs to fetch extra history so SMA200 has enough lookback — see the SMA
+  lookback fix above) assumes a WIDER period request is always a safe superset of a narrower one.
+  False for SKHY: `yfinance.Ticker('SKHY').history(period="60d", interval="30m")` returns **zero
+  rows**, while `history(period="1mo", interval="30m")` — the narrower, ORIGINAL request the "10D"
+  tab actually wants — returns **287 real bars**, verified directly. Something about this specific
+  ticker's intraday data window rejects the wider ask outright rather than degrading to fewer
+  bars. Fixed: `_fetch_with_lookback` now falls back to the original (period, interval) — no
+  lookback extension — when the widened fetch comes back empty, recovering the real data instead
+  of reporting no data at all. 1 new backend test
+  (`test_lookback_fetch_falls_back_to_original_window_when_wider_fetch_is_empty`). Verified live
+  in the browser: all 5 timeframes (1Y/1M/10D/5D/1D) now render real candles + SMA for SKHY,
+  where 10D/5D/1D previously showed nothing.
 - **Also found and fixed in the same audit — `/ecosystem` was slow even when nothing failed**:
   `company.get_profile()` ran its `info`/`calendar`/beta-history/peer-name yfinance calls
   sequentially — harmless when each is fast, but they stack: AAPL (a completely normal, healthy

@@ -74,6 +74,35 @@ def test_indicator_series_points_are_trimmed_to_the_display_window(monkeypatch):
         assert pt["time"] in ohlcv_times, "an indicator point outside the display window leaked through"
 
 
+def test_lookback_fetch_falls_back_to_original_window_when_wider_fetch_is_empty(monkeypatch):
+    # Bug (user-reported 2026-09-17, live on Render): SK hynix's SKHY listing
+    # returned ZERO rows for the widened "60d"/30m lookback fetch the "10D"
+    # tab substitutes in, even though the ORIGINAL "1mo"/30m request had 287
+    # real bars all along (verified directly against yfinance) — the wider
+    # fetch isn't always a safe superset of the narrower one. The backend
+    # must fall back to the original (period, interval) instead of reporting
+    # "no data" for a ticker that plainly has data at the narrower window.
+    calls = []
+
+    def fake_get(ticker, period=None, interval=None):
+        calls.append(period)
+        if period == "60d":
+            return None  # the widened lookback fetch finds nothing
+        h = _hist(287, freq="30min")
+        quote = {"symbol": ticker, "name": "Test Co", "currency": "USD", "price": 100.0}
+        return h, quote
+
+    monkeypatch.setattr(app.marketdata, "get", fake_get)
+    r = client.get("/research/TEST?period=1mo&interval=30m")
+    assert r.status_code == 200
+    body = r.json()
+    # Tried the widened fetch first, then fell back to the original window.
+    assert calls == ["60d", "1mo"]
+    # No trimming applied on the fallback path — the fallback fetch already
+    # IS the intended display window (display_bars must reset to None).
+    assert len(body["ohlcv"]) == 287
+
+
 def test_unrecognized_period_interval_combo_is_unaffected(monkeypatch):
     # Any (period, interval) pair not in the known short-window map is passed
     # straight through — no surprise fetch-size change for combos this fix

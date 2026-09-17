@@ -89,9 +89,25 @@ def _fetch_with_lookback(ticker: str, period: str, interval: str):
     (period, interval) is a known short display window — see _LOOKBACK_FETCH.
     Returns (hist, quote, display_bars) — display_bars is None when no
     trimming is needed (either an unrecognized combo, passed straight
-    through unchanged, or the fetch was already exactly what's wanted)."""
+    through unchanged, or the fetch was already exactly what's wanted).
+
+    Bug (user-reported 2026-09-17, live on the Render deploy): the lookback
+    substitution assumes fetching a WIDER window is always a safe superset of
+    the original request — false for SK hynix's SKHY listing, which had
+    genuinely months of daily history (1Y worked fine) but returned ZERO rows
+    for "60d"/30m (the substitute for the "10D" tab's "1mo"/30m) while the
+    ORIGINAL, narrower "1mo"/30m request had 287 real bars all along —
+    verified directly against yfinance. Something about this ticker's
+    intraday data window rejects the wider ask outright rather than just
+    returning fewer bars. Falling back to the original (period, interval)
+    when the extended fetch comes back empty recovers the real data instead
+    of reporting "no data" (or, before the timeout/loading-state fixes,
+    hanging) for a ticker that plainly has data to show."""
     fetch_period, display_bars = _LOOKBACK_FETCH.get((period, interval), (period, None))
     data = marketdata.get(ticker, period=fetch_period, interval=interval)
+    if data is None and fetch_period != period:
+        data = marketdata.get(ticker, period=period, interval=interval)
+        display_bars = None  # the original fetch IS the display window — no trimming needed
     if data is None:
         return None
     hist, quote = data
