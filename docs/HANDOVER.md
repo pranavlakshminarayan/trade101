@@ -5,14 +5,14 @@ A faithful, detailed record of the entire conversation and build that produced T
 - **Repo:** https://github.com/pranavlakshminarayan/trade101 (**PRIVATE** as of 2026-09-15 — set on the user's explicit instruction; do not make it public again without being asked). Local folder, package names, and internal `Trade101` references in code/prompts are being migrated to the "Trade Craft" brand gradually; the repo name itself stays `trade101`.
 - **Local:** `C:\Users\prana\Documents\Claude Code\Trading idea`
 - **Brand:** **Trade Craft** (renamed from "Trade101" on 2026-09-15 — see §11). Near-black theme with a navy tint and cream/near-white text (retinted 2026-09-15, was a lighter deep navy).
-- **Status (2026-09-15):** MVP (M0–M5) + Phase 1 flaw pass + Phase 1.5 (mostly) + Phase 2
-  (essentially complete) + **Phase 3 (feature-complete)** all shipped — Comparison, Watchlist,
-  History, Practice Lab, more-markets fixes, accessibility fixes, and the pre-share endpoint
-  guard. Deploy-ready (two free paths, Docker and no-Docker) but **not yet live** — going live
-  is the user's one remaining step (host signup). See §14/§15 for deploy, and §16 for the
-  pre-share guard's status before any link is ever shared with anyone.
+- **Status (2026-09-17):** MVP + Phase 1/1.5/2/3 all shipped (as of 2026-09-15), then a full
+  adversarial audit (`docs/AUDIT.md`) drove **Audit Waves 0, 1, and 2's code half, plus Wave 3's
+  chart-overlay item, all done** — see §20 for the complete summary. Still not live: deploy
+  needs the user's own host signup (§14/§15), and Wave 3's UI/UX redesign is still a proposal to
+  review before it's built, per the user's explicit instruction. See §20.8 for exactly what to
+  pick up next.
 - **User:** Pranav (student, beginning trader; trades on Moomoo; workspace.sonic@gmail.com). GitHub: pranavlakshminarayan.
-- **Companion docs (all kept current, cross-reference this one):** `CLAUDE.md` (concise current-state reference, auto-loaded every session, carries the hard "memory protocol" rules), `BACKLOG.md` (live checklist), `docs/DEVELOPMENT-LOG.md` (phase-by-phase narrative + an explicit "mistakes/course-corrections" note per phase — lighter-weight than this file), `docs/DEPLOY.md` (deploy instructions), `docs/trade101-phase-2-recommendations.md` (the 2026-09-10 product/technical review that shaped Phase 1.5's priorities).
+- **Companion docs (all kept current, cross-reference this one):** `CLAUDE.md` (concise current-state reference, auto-loaded every session, carries the hard "memory protocol" rules), `BACKLOG.md` (live checklist), `docs/AUDIT.md` (the 2026-09-16 adversarial audit — 30+ ranked findings, the wave plan §20 executes), `docs/DEVELOPMENT-LOG.md` (phase-by-phase narrative + an explicit "mistakes/course-corrections" note per phase — lighter-weight than this file), `docs/DEPLOY.md` (deploy instructions), `docs/trade101-phase-2-recommendations.md` (the 2026-09-10 product/technical review that shaped Phase 1.5's priorities).
 
 ---
 
@@ -804,3 +804,151 @@ link, the paid Firecrawl/Exa tier for non-US peers, and desktop packaging (parke
 **North-star reminder, unchanged since §0:** the app describes and teaches; it never gives
 buy/sell advice or price targets; numbers are exact (deterministic code); every AI claim is
 sourced, and an unreachable source is disclosed rather than papered over.
+
+---
+
+## 20. The critical audit, and Audit Waves 0–3 (started) — 2026-09-16/17
+
+A new session. The user asked for an adversarial, no-flattery review of the whole app before
+treating Phase 3 as "done" — explicitly invoking the framing of a **product critic / systems
+analyst / solution architect reviewer / red-teamer**, plus a critique (not yet a rebuild) of the
+UI/UX, with any redesign to be reviewed as a proposal before being built. This section is the
+summary; full blow-by-blow detail (including every mistake made and how it was caught) lives in
+`docs/DEVELOPMENT-LOG.md`'s entries for the same dates, and the audit's full findings live in
+**`docs/AUDIT.md`**, which is now a permanent companion doc (link it from here — an unlinked doc
+is as good as lost).
+
+### 20.1 The audit itself
+
+Read the entire codebase and reproduced every finding by running the code, not just reading it.
+Three findings were worse than "unfinished": (1) market cap rendered with a hardcoded `$`
+regardless of the listing's actual currency, so Nintendo's cap read as `$9.36T` — larger than
+Apple's real `$4.81T` — a false number breaking the app's own "numbers are exact" guardrail, on
+screen, silently; (2) `above_sma50/200` collapsed "the average isn't available" and "price is
+below the average" into the same `False`, which reached the analysis agent as exact data; (3) a
+completed Phase 3 commit (including the pre-share access guard from §16) was sitting **unmerged
+in a stray git worktree** — `CLAUDE.md` said the guard was still outstanding while git said it
+had been written, i.e. the project's own memory contradicted itself. Also reproduced: the "Sony"
+search bug (typing the company name silently opened the NYSE ADR because the name equals its own
+ticker), the news panel depending entirely on the paid `/analyze` call, the chart being torn down
+and rebuilt on every keystroke, and a pattern detector capped at one reversal shape from only the
+last 3 swings. `docs/AUDIT.md` has the full ranked list (30+ findings) and a wave-by-wave fix
+order; §10 of that doc is the plan this section's work followed.
+
+### 20.2 Wave 0 — critical fixes
+
+Currency-correct market cap; tri-state `above_sma50/200` (both agent prompts taught to read
+`null` as unknown, with a regression test); a React error boundary so a render crash no longer
+white-screens the app; a `href="#"` news-link bug that mutated the hash router and could bounce
+the user back to Welcome. The stranded-branch finding turned out to have *already* been merged
+via GitHub PR #2 in a parallel session between the audit being written and this fix session
+starting — a routine `git merge` (one conflict, in `CLAUDE.md`'s own status text) closed the gap.
+
+### 20.3 Wave 1 — the four flaws the user named, plus shareability
+
+**Search:** `App.jsx`'s `looksLikeTicker()` fixed the "Sony" auto-pick bug — the picker is now
+skipped only for a genuinely ticker-shaped, unambiguous query. `services/search.py::resolve()`
+now scores and ranks candidates by listing quality (home/major exchange first; OTC/CDR/preferred/
+secondary-dealer lines demoted and badged in the picker with a plain-language tooltip) instead of
+passing Yahoo's raw order straight through.
+
+**News:** a new free `GET /news/{ticker}` decouples the Feed tab from the paid `/analyze` call
+entirely — headlines render immediately regardless of Claude-key/error/daily-cap state, sharing
+one cached data bundle so nothing is fetched twice.
+
+**Chart:** `PriceChart.jsx` rewritten from one effect (any prop change → full teardown/rebuild)
+into independent effects, so the chart survives re-renders and only re-fits its view on a
+genuinely new dataset — zoom/pan now survive the 7-minute auto-refresh.
+
+**Patterns:** `services/patterns.py` rewritten to scan the whole series (not just the last 3
+swings), built from High/Low (not Close), with overlapping matches deduplicated and a real
+per-match confidence label. Found **11 distinct patterns on a real NVDA/1Y series** where the old
+code could return at most 2. *(A first-pass regression the user then caught: the fixed 4%/2%
+tolerances never fired on intraday timeframes, and results weren't sorted by recency — both
+fixed same-day; see `docs/DEVELOPMENT-LOG.md`'s "mistakes" note for the honest accounting.)*
+
+**Shareability:** de-personalized the Welcome greeting; moved the SEC EDGAR contact email out of
+committed source into `TRADE101_SEC_CONTACT` (the real value lives in the gitignored `.env`).
+
+### 20.4 Ecosystem panel — three more user-reported bugs
+
+Fixed after the user actually used the app: the company summary was cut off mid-word (a fixed
+360-char slice with no word-boundary awareness, plus the frontend appending a second ellipsis
+unconditionally); the beta explanation said "the market" instead of naming the actual benchmark,
+because only a computed (non-US-fallback) beta carried an index name, never a provider beta (the
+common case); and — the user's own follow-up ask — hovering a peer node in the ecosystem graph
+showed only the bare ticker, no company name. Added `peerNames` (resolved via parallel yfinance
+lookups, ~0.85s for 8 peers) wired to a native SVG `<title>` tooltip. While verifying that live on
+QCOM, caught a fourth: "MRVL" appeared as two separate graph nodes — Finnhub's own peers list
+genuinely contained it twice. Deduped case-insensitively.
+
+### 20.5 New brand mark
+
+Mid-session, the user supplied a full new brand brief (T/C monogram, navy/teal/copper, explicitly
+avoiding finance iconography) and asked for the logo to be rebuilt to match, while keeping the
+existing dark-navy theme rather than switching to the brief's off-white background. `Logo.jsx`
+rebuilt as a bold T (crossbar + a pointed ribbon-tail stem) with a teal ribbon wrapping into a C,
+rendered in `--ink` instead of navy (navy would vanish on a dark background) — iterated once
+live for boldness/legibility per the user's feedback.
+
+### 20.6 Wave 2 — cost/reliability (code half done; deploy is the user's step)
+
+`orchestrator.analyze()` now caches its finished result for 20 minutes per ticker — previously
+every page reload, new tab, or new visitor spent a fresh paid Claude call for a ticker someone
+had already researched minutes earlier; a raised exception is never cached, so a failure recovers
+on the next request. Verified carefully (mindful this spends real money): two `/analyze/AMD`
+calls back to back — first ~30s (a real call), second 4ms (cache hit), one `[llm]` log line for
+both. Also added an explicit Anthropic client timeout (90s analysis, 45s chat) — previously
+unset, meaning a hung request could occupy a worker indefinitely. **What's left of Wave 2 is not
+code:** deploying to Render and setting `TRADE101_ACCESS_TOKEN`, which needs the user's own host
+signup (§14/§15/§16 cover the deploy paths and the pre-share guard in detail).
+
+### 20.7 Wave 3, first item — chart indicator overlays (H5)
+
+The app computed SMA50/SMA200/Bollinger Bands/RSI/MACD and explained them at length in the
+Metrics panel's lessons, but never plotted a single one — `lightweight-charts` v4.2 has no
+multi-pane support, and the backend's indicator function only ever returned the LATEST snapshot
+value, nothing to draw a line from. Upgraded to **v5.2.1** (multi-pane support is the entire
+reason for the upgrade). New `indicators.compute_indicator_series()` reuses the same primitive
+functions already used for the snapshot, just without collapsing to the last value, so the two
+views can never drift apart (tested). `PriceChart.jsx` now overlays SMA50/SMA200 + Bollinger
+Bands on the price pane, puts RSI and MACD each in their own pane below (RSI on a fixed 0–100
+scale with 30/70 reference lines), and adds a crosshair-driven OHLC + change% + volume legend —
+all four togglable, SMA on by default. Verified live: RSI's hovered value matched the Metrics
+panel's snapshot exactly.
+
+**A bug the user caught immediately after, fixed same day:** SMA200 was cut short on the 1Y chart
+and vanished entirely on 5D/1D. Root cause: SMA200 needs 200 bars of lookback before it produces
+even one point, and `/research` fetched exactly the display window (e.g. literally 5 calendar
+days of 15-minute bars for the "5D" tab) with zero lookback margin. Fixed with
+`app.py::_fetch_with_lookback` — fetch more history than gets displayed (verified against
+yfinance directly that `period="3mo"` is silently REJECTED for 30m/15m/5m intervals; intraday
+history is capped at 60 days regardless of the period token used, so `"60d"` is the safe choice),
+compute indicators on the larger fetch, trim back to the original display width before returning.
+**Course-correction worth stating plainly:** this gap existed in the H5 pass's own shipped code a
+few minutes earlier, and that pass's own tests/live verification checked almost exclusively the
+1Y timeframe — the general lesson (also true of the pattern-detector miss in §20.3) is that
+verifying one condition is not the same as verifying a feature across the actual range of inputs
+it needs to serve. New tests explicitly assert full indicator coverage on a short-window case now.
+
+### 20.8 Where things stand at the end of this session
+
+- **Test count:** 29 (session start) → **71** backend tests, all passing throughout.
+- **Commits this session** (all local; **not yet pushed** until the push at the end of this
+  handover): `d170e32` (audit doc) → `f160d05` (merge PR #2/#3) → `8980c3a` (Wave 0) →
+  `bf9ed66` (logo) → `1d8d22e` (Wave 1) → `fbeb408` (pattern fixes) → `ced7f7b` (ecosystem
+  panel) → `4a41f31` (ecosystem hover/dedupe) → `4a952b8` (Wave 2) → `4d663f5` (Wave 3/H5) →
+  `2851394` (SMA lookback fix).
+- **Done:** Waves 0, 1, and 2's code half; Wave 3's chart-overlay item (H5) plus the SMA
+  lookback bug it surfaced.
+- **Not done, and the two things to pick up in the next session:**
+  1. **Wave 2's deploy step** — the user's own Render signup + setting `TRADE101_ACCESS_TOKEN`
+     before ever sharing the link. Code side has been ready since §14/§15/§16.
+  2. **Wave 3's UI/UX redesign** — a proposal to review before any of it is built, per the
+     user's explicit instruction from the very start of this session. Not started. The chart is
+     now materially more complex (multiple panes, overlays, a legend) than when this was first
+     scoped, which is useful context for that proposal rather than something to design around
+     the old flat-price chart.
+- This session ends here on the user's request, to continue in a new chat — see `CLAUDE.md`'s
+  "Known bugs" and `BACKLOG.md`'s "Audit — Wave 0/1/2/3" sections for the authoritative, current
+  checklist a new session should read first.
