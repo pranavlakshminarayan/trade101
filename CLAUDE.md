@@ -340,6 +340,20 @@ started yet. See `docs/AUDIT.md` §10 for the full fix order.
   instead of a hardcoded personal email in committed source — the real email still lives in the
   gitignored local `.env`, which is the correct place for it.
 
+### Fixed 2026-09-17 (Ecosystem panel, user-reported)
+- ~~Company summary was cut off mid-word~~ (e.g. "...artificial intelligence solutions an…") —
+  `company.py` sliced the summary at a fixed 360-char count with no regard for word boundaries,
+  and `Ecosystem.jsx` then unconditionally appended a SECOND "…" even when the text already
+  ended cleanly. Fixed: `company._truncate_summary()` cuts at the last word boundary and only
+  adds "…" when actually truncated; the frontend no longer appends its own. 4 new tests.
+- ~~Beta explanation named "the market" instead of the actual benchmark~~ — a PROVIDER-sourced
+  beta (the common case for most US tickers) carried no index name at all, unlike a computed
+  one. `company.get_profile` now also names the benchmark for the provider case (reusing the
+  same suffix→index map `_computed_beta` uses — S&P 500 for US, Nikkei 225/KOSPI/etc.
+  elsewhere); `Ecosystem.jsx::betaNote()` names it throughout ("more volatile than the S&P 500"
+  instead of "than the market"). 2 new tests. Verified live on NVDA: beta 2.217 now explicitly
+  reads "vs the S&P 500" end to end.
+
 ### Fixed 2026-09-15 (UI/UX + news + accessibility, user-reported)
 - ~~RSI/MACD/SMA/etc. metric values were nearly invisible~~ — `.metric`/`.metric .v` in
   `styles.css` never set an explicit text color, so a `<button>` (native form control) fell

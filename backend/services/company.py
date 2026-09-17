@@ -60,6 +60,21 @@ def _computed_beta(ticker: str) -> tuple[float | None, str | None]:
     return round(beta, 3), idx_name
 
 
+def _truncate_summary(text: str, limit: int = 360) -> str | None:
+    """Cut at the last word boundary within `limit`, never mid-word/mid-sentence,
+    and only append '…' when the text was actually cut — a hard character-count
+    slice used to lop a business summary off mid-word (e.g. "solutions an…")
+    and the frontend appended '…' unconditionally, even to a summary that
+    already ended cleanly on its own."""
+    text = (text or "").strip()
+    if not text:
+        return None
+    if len(text) <= limit:
+        return text
+    cut = text[:limit].rsplit(" ", 1)[0].rstrip(".,;: ")
+    return cut + "…"
+
+
 def _peers(ticker: str) -> list[str]:
     key = os.environ.get("TRADE101_NEWS_KEY")  # same Finnhub key as news
     if not key:
@@ -92,6 +107,13 @@ def get_profile(ticker: str) -> dict:
         beta, beta_index = _computed_beta(ticker)
         if beta is not None:
             beta_source = "computed"
+    elif beta_index is None:
+        # Provider betas (the common case) don't come with a named benchmark,
+        # but Yahoo/most providers measure US beta against the S&P 500 and
+        # non-US beta against the local index — the same map _computed_beta
+        # uses. Naming it (rather than just saying "the market") is what lets
+        # the UI actually explain "vs the S&P 500" instead of something vague.
+        _, beta_index = _index_for(ticker)
 
     # Explain the gaps rather than showing a blank panel. Coverage outside the US
     # is thinner: yfinance often has no beta, and Finnhub's peers endpoint is US-only.
@@ -121,6 +143,6 @@ def get_profile(ticker: str) -> dict:
         "exchange": info.get("fullExchangeName") or info.get("exchange"),
         "country": info.get("country"),
         "peers": peers,
-        "summary": (info.get("longBusinessSummary") or "")[:360] or None,
+        "summary": _truncate_summary(info.get("longBusinessSummary")),
         "coverage": coverage,
     }

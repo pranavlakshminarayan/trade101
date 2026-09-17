@@ -15,12 +15,16 @@ function marketCap(v, currency) {
   return sym + v
 }
 
-function betaNote(b) {
+// Names the actual benchmark (e.g. "the S&P 500", "the Nikkei 225") instead of
+// vaguely saying "the market" — the backend always supplies eco.betaIndex now,
+// whether beta came from the provider or was computed in-house.
+function betaNote(b, indexName) {
   if (b == null) return 'Beta unavailable for this stock.'
-  const mag = b > 1.15 ? `more volatile than the market (~${Math.round((b - 1) * 100)}% bigger swings)`
-    : b < 0.85 ? (b < 0 ? 'tends to move opposite the market' : 'calmer than the market')
-    : 'moves roughly in line with the market'
-  return `Beta ${b} — this stock is ${mag}. Beta measures how much a stock moves versus the overall market: 1 = in step, above 1 = amplified, below 1 = muted. It's how the index's moves tend to ripple into this name.`
+  const idx = indexName ? `the ${indexName}` : 'the broader market'
+  const mag = b > 1.15 ? `more volatile than ${idx} (~${Math.round((b - 1) * 100)}% bigger swings)`
+    : b < 0.85 ? (b < 0 ? `tends to move opposite ${idx}` : `calmer than ${idx}`)
+    : `moves roughly in line with ${idx}`
+  return `Beta ${b} — this stock is ${mag}. Beta measures how much a stock's price tends to move for a given move in ${idx}: 1 = in step, above 1 = amplified, below 1 = muted. It's how ${idx}'s swings tend to ripple into this name specifically — not the sector in general, though a stock's sector is usually a big part of why its beta looks the way it does.`
 }
 
 // Radial node graph: the company at the centre, peers on a ring around it,
@@ -83,7 +87,7 @@ export default function Ecosystem({ ticker, onSearch }) {
 
           <div className="lesson" style={{ marginTop: 12 }}>
             <h4>Beta {eco.beta ?? '—'} — market sensitivity</h4>
-            <p style={{ margin: 0 }}>{betaNote(eco.beta)}</p>
+            <p style={{ margin: 0 }}>{betaNote(eco.beta, eco.betaIndex)}</p>
             {eco.beta != null && eco.betaSource === 'computed' && (
               <p className="faint" style={{ margin: '6px 0 0', fontSize: 11.5 }}>
                 Computed by Trade Craft from ~1y of daily returns vs the {eco.betaIndex || 'regional index'} (no provider beta for this listing).
@@ -100,7 +104,10 @@ export default function Ecosystem({ ticker, onSearch }) {
             <div className="faint" style={{ fontSize: 12, marginTop: 14 }}>{eco.coverage.peers}</div>
           )}
 
-          {eco.summary && <p className="placeholder" style={{ marginTop: 12 }}>{eco.summary}…</p>}
+          {/* eco.summary already ends cleanly (a full sentence, or "…" appended
+              by the backend only when genuinely cut at a word boundary) —
+              appending another "…" here used to truncate mid-word regardless. */}
+          {eco.summary && <p className="placeholder" style={{ marginTop: 12 }}>{eco.summary}</p>}
         </>
       )}
 
