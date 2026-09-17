@@ -71,3 +71,50 @@ def test_provider_beta_names_the_regional_index_for_a_non_us_listing(monkeypatch
     profile = company.get_profile("7974.T")
     assert profile["betaSource"] == "provider"
     assert profile["betaIndex"] == "Nikkei 225"
+
+
+def test_peer_names_resolves_each_symbol_and_skips_failures(monkeypatch):
+    # User-reported: the ecosystem graph showed only bare tickers with no way
+    # to see the company name without already knowing it. peerNames is looked
+    # up per symbol (in parallel — no keyless batch-quote endpoint survives on
+    # Yahoo's side any more) and must degrade per-symbol, not fail the whole
+    # profile if one peer's lookup errors.
+    fakes = {
+        "AVGO": _FakeTicker({"shortName": "Broadcom Inc."}),
+        "MU": _FakeTicker({"longName": "Micron Technology, Inc."}),  # no shortName
+    }
+
+    def fake_ticker(sym):
+        if sym == "BROKEN":
+            raise RuntimeError("network down")
+        return fakes[sym]
+
+    monkeypatch.setattr(company.yf, "Ticker", fake_ticker)
+    out = company._peer_names(["AVGO", "MU", "BROKEN"])
+    assert out == {"AVGO": "Broadcom Inc.", "MU": "Micron Technology, Inc."}
+
+
+def test_peer_names_empty_input_returns_empty_dict():
+    assert company._peer_names([]) == {}
+
+
+class _Resp:
+    def __init__(self, payload):
+        self._payload = payload
+
+    def raise_for_status(self):
+        pass
+
+    def json(self):
+        return self._payload
+
+
+def test_peers_deduplicates_case_insensitively(monkeypatch):
+    # Regression: Finnhub's own peers list can (and does, confirmed live on
+    # QCOM) contain the same symbol twice — the ecosystem graph rendered the
+    # same company as two separate nodes as a result.
+    monkeypatch.setenv("TRADE101_NEWS_KEY", "fake")
+    monkeypatch.setattr(company.httpx, "get",
+                         lambda *a, **k: _Resp(["MU", "AMD", "mu", "QCOM", "AMD"]))
+    out = company._peers("QCOM")
+    assert out == ["MU", "AMD"]  # QCOM excluded (it's the ticker itself), no repeats

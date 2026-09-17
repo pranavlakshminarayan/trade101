@@ -29,11 +29,16 @@ function betaNote(b, indexName) {
 
 // Radial node graph: the company at the centre, peers on a ring around it,
 // each clickable to research. Richer than a flat chip list — shows the company
-// sitting in a web of related names.
-function EcoGraph({ ticker, peers, onSearch }) {
+// sitting in a web of related names. Each node carries a native <title> (a
+// real browser tooltip, no extra markup needed) showing the full company
+// name on hover — the always-visible label stays the ticker, since the full
+// name rarely fits in a 19px-radius circle.
+function EcoGraph({ ticker, peers, peerNames, onSearch }) {
   const cx = 160, cy = 108, rx = 122, ry = 80
   const nodes = peers.slice(0, 8)
   const short = (s) => (s.length > 7 ? s.slice(0, 6) + '…' : s)
+  const nameFor = (p) => peerNames?.[p] || p
+  const go = (p) => onSearch(p)
   return (
     <svg className="ecograph" viewBox="0 0 320 216" role="img" aria-label={`${ticker} peer graph`}>
       {nodes.map((p, i) => {
@@ -45,7 +50,10 @@ function EcoGraph({ ticker, peers, onSearch }) {
         const a = (-90 + i * (360 / nodes.length)) * Math.PI / 180
         const x = cx + rx * Math.cos(a), y = cy + ry * Math.sin(a)
         return (
-          <g key={p} className="eco-node" onClick={() => onSearch(p)}>
+          <g key={p} className="eco-node" onClick={() => go(p)}
+             role="button" tabIndex={0} aria-label={`Research ${nameFor(p)}`}
+             onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); go(p) } }}>
+            <title>{nameFor(p)}</title>
             <circle cx={x} cy={y} r="19" />
             <text x={x} y={y + 3.5} textAnchor="middle">{short(p)}</text>
           </g>
@@ -98,7 +106,7 @@ export default function Ecosystem({ ticker, onSearch }) {
           {eco.peers?.length > 0 ? (
             <div style={{ marginTop: 14 }}>
               <div className="faint" style={{ fontSize: 12, marginBottom: 2 }}>Peers / ecosystem — tap a node to research</div>
-              <EcoGraph ticker={ticker} peers={eco.peers} onSearch={onSearch} />
+              <EcoGraph ticker={ticker} peers={eco.peers} peerNames={eco.peerNames} onSearch={onSearch} />
             </div>
           ) : eco.coverage?.peers && (
             <div className="faint" style={{ fontSize: 12, marginTop: 14 }}>{eco.coverage.peers}</div>

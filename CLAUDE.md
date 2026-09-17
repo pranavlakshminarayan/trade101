@@ -156,7 +156,12 @@ frontend/ src/{App,api}.jsx · components/{Welcome,Research,PriceChart,Metrics,A
   ("provider"|"computed") + `betaIndex`. Non-US peers are still gapped (Firecrawl is post-deploy).
   `marketCapCurrency` is also on this response — `Ecosystem.jsx`/`Compare.jsx` format market cap
   in the listing's own currency (it's never USD by default; formatting it as `$` regardless was
-  producing false comparisons, e.g. a JPY cap reading larger than Apple's real USD cap).
+  producing false comparisons, e.g. a JPY cap reading larger than Apple's real USD cap). `betaIndex`
+  is now populated for a provider beta too, not just a computed one, so the UI always names the
+  actual benchmark ("vs the S&P 500") instead of vaguely "the market". `peers` is deduped
+  case-insensitively (Finnhub's own list can repeat a symbol). `peerNames` (ticker → full company
+  name, resolved in parallel via yfinance) backs the ecosystem graph's hover tooltip only —
+  `peers` itself stays a plain ticker list for `services/evidence.py`.
 - `patterns.py` scans the WHOLE series (every consecutive pair/triple of swings, not just the
   most recent few) for reversal **and** trendline shapes, built from High/Low (not Close — matches
   the actual wicks). Its similar-level/min-dip/flat tolerances are derived PER SERIES from that
@@ -353,6 +358,18 @@ started yet. See `docs/AUDIT.md` §10 for the full fix order.
   elsewhere); `Ecosystem.jsx::betaNote()` names it throughout ("more volatile than the S&P 500"
   instead of "than the market"). 2 new tests. Verified live on NVDA: beta 2.217 now explicitly
   reads "vs the S&P 500" end to end.
+- ~~Ecosystem peer nodes showed only a bare ticker, no way to see the company name without
+  already knowing it~~ — `company.get_profile` now also returns `peerNames` (ticker → full name,
+  resolved via parallel yfinance lookups — Yahoo's keyless batch-quote endpoint now 401s without
+  a session/crumb, so this is one `.info` call per peer run concurrently, ~0.85s for 8 rather than
+  8x that sequentially) purely for the ecosystem graph's hover tooltip; `peers` itself is
+  untouched (still a plain ticker list — `services/evidence.py` matches news against it
+  directly). `EcoGraph` nodes now carry a native SVG `<title>` (hovering "MU" shows "Micron
+  Technology, Inc.") and are keyboard-focusable/Enter-activatable with a `:focus-visible` ring
+  (click-to-navigate itself already worked correctly). 2 new tests.
+- ~~A peer could appear twice in the ecosystem graph~~ (confirmed live: QCOM's Finnhub peers list
+  genuinely contained "MRVL" twice) — `company._peers()` now dedupes case-insensitively,
+  preserving order. 1 new test.
 
 ### Fixed 2026-09-15 (UI/UX + news + accessibility, user-reported)
 - ~~RSI/MACD/SMA/etc. metric values were nearly invisible~~ — `.metric`/`.metric .v` in

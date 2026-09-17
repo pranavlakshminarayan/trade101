@@ -8,6 +8,7 @@ peers are the ecosystem. All real data, degrades gracefully.
 from __future__ import annotations
 
 import os
+from concurrent.futures import ThreadPoolExecutor
 
 import httpx
 import numpy as np
@@ -75,6 +76,30 @@ def _truncate_summary(text: str, limit: int = 360) -> str | None:
     return cut + "…"
 
 
+def _peer_names(symbols: list[str]) -> dict[str, str]:
+    """Company name for each peer symbol, fetched in parallel (yfinance has no
+    keyless batch-quote endpoint left — Yahoo's v7/finance/quote now 401s
+    without a session/crumb — so this is one .info lookup per symbol, run
+    concurrently rather than sequentially so 8 peers costs ~1 request's worth
+    of wall-clock time, not 8x). `peers` itself stays a plain list of ticker
+    strings (services/evidence.py matches news against those directly) — this
+    is an ADDITIONAL lookup, only used so the ecosystem graph can show a real
+    name on hover instead of just the bare ticker."""
+    if not symbols:
+        return {}
+
+    def _one(sym: str) -> tuple[str, str | None]:
+        try:
+            info = yf.Ticker(sym).info
+            return sym, (info.get("shortName") or info.get("longName"))
+        except Exception:
+            return sym, None
+
+    with ThreadPoolExecutor(max_workers=min(8, len(symbols))) as ex:
+        results = list(ex.map(_one, symbols))
+    return {sym: name for sym, name in results if name}
+
+
 def _peers(ticker: str) -> list[str]:
     key = os.environ.get("TRADE101_NEWS_KEY")  # same Finnhub key as news
     if not key:
@@ -82,7 +107,17 @@ def _peers(ticker: str) -> list[str]:
     try:
         r = httpx.get(f"{FINNHUB}/stock/peers", params={"symbol": ticker.upper(), "token": key}, timeout=12)
         r.raise_for_status()
-        return [p for p in r.json() if p and p.upper() != ticker.upper()][:8]
+        # Finnhub's own peers list can contain duplicates (confirmed live on
+        # QCOM: "MRVL" appears twice) — dedupe case-insensitively, preserving
+        # order, or the ecosystem graph renders the same company as two nodes.
+        seen: set[str] = set()
+        out = []
+        for p in r.json():
+            if not p or p.upper() == ticker.upper() or p.upper() in seen:
+                continue
+            seen.add(p.upper())
+            out.append(p)
+        return out[:8]
     except Exception:
         return []
 
@@ -143,6 +178,11 @@ def get_profile(ticker: str) -> dict:
         "exchange": info.get("fullExchangeName") or info.get("exchange"),
         "country": info.get("country"),
         "peers": peers,
+        # Full company name per peer ticker, for the ecosystem graph's hover
+        # tooltip — kept separate from `peers` (a plain ticker list) because
+        # services/evidence.py matches news relevance against `peers` directly
+        # and expects strings, not {symbol, name} objects.
+        "peerNames": _peer_names(peers),
         "summary": _truncate_summary(info.get("longBusinessSummary")),
         "coverage": coverage,
     }
