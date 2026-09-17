@@ -338,6 +338,16 @@ done.** Remaining: Wave 2's deploy step (the user's own host signup, not code) �
 than before, since BYOK (below) means the deploy is safe to share the moment it's live, with
 nothing to configure first. See `docs/AUDIT.md` §10.
 
+### Added 2026-09-17 — README rewrite + real screenshots
+`README.md` was stale (missing Comparison/Watchlist/Practice Lab/Glossary/Ask TC-Buddy/
+fundamentals entirely, still described the old shared-access-token model). Rewrote to match
+current features/setup, plus six real screenshots captured from the running app (Research,
+Comparison, Watchlist, Glossary, Ask TC-Buddy, Welcome) — `docs/screenshots/*.png`, committed
+(repo is private, so this is safe). Captured via a temporary `puppeteer-core` script pointed at
+the machine's existing Edge install (not a project dependency — installed with `--no-save` and
+uninstalled again after use; nothing added to `package.json`). This is what surfaced the
+Comparison-tab crash below.
+
 ### Fixed 2026-09-17 — Comparison tab crashed on load (lightweight-charts v4→v5 leftover)
 Found while capturing README screenshots (see the BYOK entry below — same session): loading two
 stocks in the Comparison tab crashed the whole app (`TypeError: chart.addLineSeries is not a
