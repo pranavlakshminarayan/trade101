@@ -88,11 +88,12 @@ def _citation_guard(result: dict, has_news: bool) -> dict:
 
 
 def run(ticker: str, quote: dict, indicators: dict, news_items: list, filings: list,
-        sourcing: dict | None = None) -> dict:
-    """Produce the analysis bundle. Raises llm.MissingKeyError if no key set.
+        sourcing: dict | None = None, client_key: str | None = None) -> dict:
+    """Produce the analysis bundle. Raises llm.MissingKeyError if no key available.
 
     `news_items` is already relevance-filtered; `sourcing` reports how much
-    company-specific evidence exists so the agent can be honest about it."""
+    company-specific evidence exists so the agent can be honest about it.
+    `client_key` is the visitor's own Anthropic API key (BYOK)."""
     payload = {
         "ticker": ticker,
         "quote": {k: quote.get(k) for k in ("name", "price", "changePercent", "currency", "exchange")},
@@ -106,7 +107,7 @@ def run(ticker: str, quote: dict, indicators: dict, news_items: list, filings: l
         + json.dumps(payload, indent=2)
         + "\n\nReturn only the JSON object described in your instructions."
     )
-    text = llm.call("TRADE101_ANALYSIS_KEY", SYSTEM, user, effort="high", max_tokens=4000)
+    text = llm.call(client_key, SYSTEM, user, effort="high", max_tokens=4000)
     try:
         result = _extract_json(text)
     except (json.JSONDecodeError, ValueError):

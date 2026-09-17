@@ -99,9 +99,10 @@ A running list so we don't lose ideas. Add freely; we pull from here after the M
 - [x] **M11 — No timeout on the Anthropic client.** Fixed: `agents/llm.py` sets `timeout=` on
   client construction (90s analysis, 45s chat) — a hung request now degrades gracefully instead
   of occupying a worker indefinitely. 3 new tests.
-- [ ] **Deploy to Render**, set `TRADE101_ACCESS_TOKEN` + `TRADE101_DAILY_CAP`, verify the guard
-  from a logged-out browser, then share the link. **This step is the user's own action** (host
-  account signup) — not something that can be done from inside a coding session.
+- [ ] **Deploy to Render**, then share the link. **This step is the user's own action** (host
+  account signup) — not something that can be done from inside a coding session. No env var
+  needs setting first any more — BYOK (2026-09-17, see below) means the link is safe to share
+  the moment it's live.
 
 ## Audit — Wave 3: UI/UX redesign — ✅ DONE 2026-09-17, merged to `master` (commit `897514c`)
 
@@ -344,19 +345,17 @@ planned.
 - [ ] Go live: connect the repo to a host (Render/Fly, needs Pranav's account) → get the URL →
   add it to the repo About/README. (Deferred host signup is the user's step.)
 
-## ⚠️ Pre-share checklist (BLOCKER before distributing the URL — do this right after "Go live" above)
+## ✅ Pre-share checklist — DONE 2026-09-17, superseded by BYOK
 
-The repo is private and the deploy URL is **personal-use only** until this is done.
-
-- [x] **Guard the paid endpoints — code done 2026-09-15.** `/analyze` and `/ask` spent the
-  owner's Claude key with no auth or rate-limit; a public visitor could have run up the bill.
-  Fixed: `services/access.py` gates both behind an optional shared access token
-  (`TRADE101_ACCESS_TOKEN`) and a shared daily cap (`TRADE101_DAILY_CAP`, default 50/day). Both
-  are no-ops until set, so this didn't change local dev at all. Tests in `tests/test_access.py`.
-  - [ ] **User action still required before actually sharing a live link:** set
-    `TRADE101_ACCESS_TOKEN` as an env var on the host (Render, per `docs/DEPLOY.md`), then share
-    the URL once as `?token=<value>` — the frontend saves it locally after that. Optionally also
-    set a spend cap on the Claude key in the Anthropic console as a last-resort backstop.
+**The old shared-token/cap model this section originally described is gone.** `/analyze` and
+`/ask` used to spend the owner's Claude key with an optional shared token + daily cap
+(`services/access.py`) guarding them. Redesigned entirely instead of extended: every visitor now
+supplies their OWN Anthropic API key (BYOK — see `CLAUDE.md`'s "Known bugs" → the 2026-09-17 BYOK
+entry, and `docs/DEPLOY.md`), stored only in their own browser. **There is no user action
+required before sharing a live link any more** — no token to set, no cap to configure, zero cost
+risk to the owner by design. `services/access.py`, `lib/access.js`, and `tests/test_access.py`
+were deleted outright (replaced by `tests/test_byok.py`), not kept as dead code alongside the
+new system.
 
 ## Guardrails (never drop)
 - Numbers are exact (deterministic code); every AI claim is sourced.

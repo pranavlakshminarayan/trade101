@@ -46,8 +46,9 @@ def _render_context(ticker, quote, indicators, news, filings, sourcing) -> str:
     )
 
 
-def answer(ticker, quote, indicators, news, filings, sourcing, history, question) -> dict:
-    """Return {answer, sources}. Raises llm.MissingKeyError if no key set."""
+def answer(ticker, quote, indicators, news, filings, sourcing, history, question, client_key=None) -> dict:
+    """Return {answer, sources}. Raises llm.MissingKeyError if no key available.
+    `client_key` is the visitor's own Anthropic API key (BYOK)."""
     # System = stable guardrails + this ticker's data context. Stable across the
     # conversation, so it's the cached prefix; the Q&A turns vary and come after.
     system = GUARDRAILS + "\n\n" + _render_context(ticker, quote, indicators, news, filings, sourcing)
@@ -60,7 +61,7 @@ def answer(ticker, quote, indicators, news, filings, sourcing, history, question
             messages.append({"role": role, "content": content})
     messages.append({"role": "user", "content": question.strip()})
 
-    text = llm.call_chat("TRADE101_ANALYSIS_KEY", system, messages, effort="medium", max_tokens=1200)
+    text = llm.call_chat(client_key, system, messages, effort="medium", max_tokens=1200)
 
     sources = []
     for it in (news or []):

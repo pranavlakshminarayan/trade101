@@ -8,14 +8,14 @@
 > either way: `render.yaml` (**no Docker** — Render native Python runtime, recommended) or
 > `Dockerfile` (for hosts that want a container). See `docs/DEPLOY.md`.
 >
-> **✅ PRE-SHARE FIX — code done 2026-09-15, merged to `master` 2026-09-16 (PR #2).** `/analyze`
-> and `/ask` are now gated by `services/access.py`: an optional shared access token
-> (`TRADE101_ACCESS_TOKEN`, header `X-Access-Token`) + a shared daily cap (`TRADE101_DAILY_CAP`,
-> default 50/day across both endpoints). Both are **no-ops until set** — local dev is unaffected.
-> **Remaining user action before sharing a live URL:** set `TRADE101_ACCESS_TOKEN` (and
-> optionally tune the cap) as env vars on the host, then share the link as
-> `https://yourapp/?token=<value>` once — the frontend saves it to `localStorage` and strips it
-> from the visible URL. See `docs/DEPLOY.md`.
+> **✅ BYOK — bring-your-own-key (2026-09-17), replaces the old shared-token/daily-cap gate
+> entirely.** Every visitor pastes their OWN Anthropic API key into a first-run gate
+> (`components/ApiKeyGate.jsx`), saved permanently in THEIR browser and sent as `X-Anthropic-Key`
+> on `/analyze`/`/ask` — never the app owner's key, never logged/stored server-side. An open,
+> shared link now carries **zero cost risk** to the owner; nothing needs to be set before
+> sharing. `TRADE101_ACCESS_TOKEN`/`TRADE101_DAILY_CAP`/`services/access.py` are gone —
+> `TRADE101_ANALYSIS_KEY` still works as a local-dev-only fallback (don't set it on a shared
+> host). See `docs/DEPLOY.md`.
 >
 > **📋 CRITICAL AUDIT (2026-09-16): [`docs/AUDIT.md`](docs/AUDIT.md)** — adversarial end-to-end review
 > (functional / logical / executional / UI-UX), 30+ ranked findings with reproductions and a
@@ -105,10 +105,12 @@ shipped, in order:
    shareable link, which packaging doesn't produce).
 3. **More markets**: fixed a currency-display gap (non-US currencies showed no symbol at all —
    see Known bugs) and broadened non-US news with a keyless Google News RSS fallback. Non-US
-   peers (Ecosystem tab) remain gapped, deferred to the paid Firecrawl/Exa tier post-deploy.
-4. **Pre-share fix** (see header callout) — `services/access.py` gates `/analyze` + `/ask`
-   behind an optional access token and a shared daily cap. This was the user's explicit
-   "remind me at the end of Phase 3" item, raised and actioned mid-phase rather than held back.
+   peers (Ecosystem tab) were gapped here — fixed later, 2026-09-17, via a free Yahoo fallback
+   (see Wave 4 in "Known bugs" below).
+4. **Pre-share fix, ORIGINAL version** (superseded 2026-09-17 by BYOK — see header callout) —
+   at the time, `services/access.py` gated `/analyze` + `/ask` behind an optional shared access
+   token and a shared daily cap. This was the user's explicit "remind me at the end of Phase 3"
+   item, raised and actioned mid-phase rather than held back.
 5. **UI/UX + accessibility fixes** (see Known bugs for full detail): fixed the
    invisible-metric-value contrast bug, made browser Back/Forward walk through tab switches
    (not just searches), restyled the Feed/What-it-means toggle (was completely unstyled),
@@ -254,14 +256,22 @@ frontend/ src/{App,api}.jsx · components/{Welcome,Research,PriceChart,Metrics,A
 - **Router**: `App.jsx`'s `routeHash`/`parseRoute`/`goToView` push one browser-history entry per
   navigation (search OR tab switch), so Back/Forward walks through both like a normal site.
   Ticker searches keep `#TICKER`; tab views get `#/compare`, `#/watchlist`, `#/history`.
-- **Pre-share access guard**: `services/access.py::guard_paid_endpoint` is a FastAPI dependency
-  on `/analyze` and `/ask` only (every deterministic endpoint stays open/free). Checks an
-  optional `TRADE101_ACCESS_TOKEN` against the `X-Access-Token` header (401 if set and wrong/
-  missing; a no-op if unset) and a process-wide daily counter (`TRADE101_DAILY_CAP`, default 50,
-  resets at UTC midnight; 429 once exhausted). Frontend half: `lib/access.js` captures a
-  `?token=` URL param into `localStorage` once and sends it as that header on `/analyze`/`/ask`
-  only. Deliberately a single-process in-memory counter, not distributed — right-sized for one
-  free-tier instance, not a multi-tenant product.
+- **BYOK (bring-your-own-key), 2026-09-17** — replaced the shared-token/daily-cap gate entirely.
+  `components/ApiKeyGate.jsx` is a first-run, full-app gate: a visitor pastes their own
+  Anthropic API key (the key itself IS the credential — no separate password), optionally a
+  display name, both saved permanently in `lib/apiKey.js` (localStorage, THEIR browser only).
+  `api.js::authHeaders()` sends the key as `X-Anthropic-Key` on `/analyze`/`/ask` only — every
+  deterministic endpoint stays open/free with no key at all. Backend: `app.py` reads the header
+  and threads it as `client_key` through `orchestrator.analyze()/ask()` →
+  `agents/analysis.py::run()` / `agents/chat.py::answer()` → `agents/llm.py::call()/call_chat()`,
+  which uses it as the actual Anthropic API key for that one call (never stored, never logged).
+  `TRADE101_ANALYSIS_KEY` (env var) is a LOCAL-DEV-ONLY fallback when no visitor key is supplied —
+  must NOT be set on a shared/deployed host, or a keyless visitor silently spends the owner's key.
+  A cache HIT (`orchestrator.analyze()`'s existing `ANALYZE_CACHE_TTL`) never needs a key at all —
+  one visitor's fresh analysis can be served free to the next visitor asking about the same
+  ticker within the TTL. `app.py::_ai_error_reason()` gives a friendly message for the now-most-
+  likely failure mode (a visitor's own key being invalid/expired/rate-limited) instead of
+  surfacing Anthropic's raw SDK error text.
 - **Single-service deploy**: `app.py` mounts `frontend/dist` (built React) via `StaticFiles`
   *after* all API routes, so one process/origin serves both — `api.js` uses same-origin in prod
   (`import.meta.env.DEV` switch), `:8000` directly in dev. Two build paths, no app-code
@@ -290,27 +300,26 @@ both servers are up and **return the local link `http://127.0.0.1:5173`** in the
 checks it on this machine and reports back what works/breaks so we fix issues one by one.
 The app is **local-only for now**; a hosted deploy is config-ready (`docs/DEPLOY.md` — Render,
 either `render.yaml` no-Docker or `Dockerfile`) but not yet live, since going live needs the
-user's own host-account signup. The pre-share code fix is done (see header callout), but **still
-treat any deploy URL as personal-use only until the user has actually set `TRADE101_ACCESS_TOKEN`
-on the host** — the gate is a no-op until that env var is set.
+user's own host-account signup. **Once deployed, the link is safe to share immediately** — BYOK
+(2026-09-17) means every visitor's AI usage is billed to their own Anthropic key, not the
+owner's, so there's no pre-share gate to configure any more.
 
 ## Config / conventions
-- `.env` in project root (git-ignored). `TRADE101_ANALYSIS_KEY` (Claude), `TRADE101_NEWS_KEY` (free Finnhub). `TRADE101_MODEL` default **claude-sonnet-5** (cost); use `claude-opus-5` for max depth. Named per-agent keys per `.env.example`.
+- `.env` in project root (git-ignored). `TRADE101_ANALYSIS_KEY` (Claude — **local-dev-only
+  fallback under BYOK, see below**), `TRADE101_NEWS_KEY` (free Finnhub, still shared/required).
+  `TRADE101_MODEL` default **claude-sonnet-5** (cost); use `claude-opus-5` for max depth.
 - Claude API via the Anthropic SDK; adaptive thinking + `output_config.effort` for non-Haiku models. Models: `claude-opus-5`, `claude-sonnet-5`, `claude-haiku-4-5` (no date suffixes).
 - News provider is pluggable via `TRADE101_NEWS_PROVIDER` (`finnhub` default → Google News →
   Yahoo fallback chain; standalone `yahoo`/`google` also selectable; add `firecrawl` later).
-- Servers pinned to `127.0.0.1` (IPv6 `::1` caused issues); API base `http://127.0.0.1:8000` in
-  dev, overridable via `VITE_API_BASE` in a **local-only, gitignored** `frontend/.env.local` —
-  added 2026-09-17 when port 8000 got stuck holding an orphaned listening socket on this machine
-  (see Gotchas) with no owning process any tool could find/kill; backend ran on 8001 instead as a
-  local workaround. If you hit the same thing, check `frontend/.env.local` for a live override
-  before assuming the backend is down.
-- **Each `/analyze` call spends the user's Claude key — be sparing when testing in the browser.**
-  `/news`, by contrast, is free and unlimited (no Claude call at all) — prefer it for anything
-  that only needs headlines.
-- `TRADE101_ACCESS_TOKEN` / `TRADE101_DAILY_CAP` (both optional, unset = no-op): the pre-share
-  guard on `/analyze` + `/ask` only — every deterministic endpoint (incl. `/news`) stays open.
-  See `services/access.py` and `docs/DEPLOY.md`.
+- Servers pinned to `127.0.0.1` (IPv6 `::1` caused issues); API base overridable via
+  `VITE_API_BASE` in a **local-only, gitignored** `frontend/.env.local` — **check this file for
+  the currently live backend port** (ports 8000 and 8001 have both gotten stuck with an orphaned
+  listening socket on this machine — see Gotchas; don't assume the backend is down before
+  checking here).
+- **BYOK (2026-09-17)**: `/analyze` and `/ask` spend the VISITOR's own Anthropic key (sent as
+  `X-Anthropic-Key`), never the app owner's — see the header callout and the architecture bullet
+  above for the full mechanism. `TRADE101_ACCESS_TOKEN`/`TRADE101_DAILY_CAP`/`services/access.py`
+  no longer exist. `/news` remains free/unlimited (no Claude call at all) regardless.
 - `TRADE101_SEC_CONTACT` (optional): email sent as the SEC EDGAR User-Agent (their fair-access
   policy requires a real contact). Falls back to a generic placeholder if unset — filings lookups
   still work, it's just not a real contact then. Never hardcode a personal email in committed
@@ -324,10 +333,60 @@ on the host** — the gate is a no-op until that env var is set.
 
 ## Known bugs
 **Full ranked list with evidence: [`docs/AUDIT.md`](docs/AUDIT.md) (critical audit, 2026-09-16).**
-Mirrored as checkboxes in `BACKLOG.md` → "Audit — Wave 0/1/2/3". **Waves 0, 1, 2 (code half), and
-3 are all done** — remaining: Wave 2's deploy step (the user's own host signup, not code) and
-Wave 4 (fundamentals/earnings, sharper evidence matching, frontend tests, glossary/watchlist
-notes — in progress, see `BACKLOG.md`). See `docs/AUDIT.md` §10.
+Mirrored as checkboxes in `BACKLOG.md` → "Audit — Wave 0/1/2/3/4". **All waves (0 through 4) are
+done.** Remaining: Wave 2's deploy step (the user's own host signup, not code) — now lower-stakes
+than before, since BYOK (below) means the deploy is safe to share the moment it's live, with
+nothing to configure first. See `docs/AUDIT.md` §10.
+
+### Fixed 2026-09-17 — Comparison tab crashed on load (lightweight-charts v4→v5 leftover)
+Found while capturing README screenshots (see the BYOK entry below — same session): loading two
+stocks in the Comparison tab crashed the whole app (`TypeError: chart.addLineSeries is not a
+function`, caught by `ErrorBoundary`). Root cause: `ComparisonChart.jsx` was never updated when
+the rest of the app moved to **lightweight-charts v5** for the H5 chart-overlay fix (2026-09-17,
+same day) — it still called the removed v4 method `chart.addLineSeries(...)` instead of v5's
+`chart.addSeries(LineSeries, ...)`. `PriceChart.jsx` was migrated correctly at the time;
+`ComparisonChart.jsx` was missed because Comparison wasn't exercised again until now. Swept the
+whole frontend for any other leftover v4 series-creation calls (`addAreaSeries`/
+`addCandlestickSeries`/`addHistogramSeries`/`addBarSeries`) — none found, this was the only one.
+Verified live: AAPL vs MSFT now renders both normalized lines correctly with no crash.
+
+### Fixed 2026-09-17 — BYOK (bring-your-own-key), replaces the shared-token/daily-cap gate
+User is building a genuinely OPEN, publicly-shareable link and didn't want to manage a shared
+access token or worry about a stranger spending their Claude key at all — not even bounded by a
+cap. Redesigned the pre-share model entirely rather than extending it:
+- **The flow**: a first-run, full-app gate (`components/ApiKeyGate.jsx`) — a visitor pastes their
+  own Anthropic API key (the key itself IS the credential; there's no separate password) and
+  optionally a display name. Both saved PERMANENTLY in that visitor's own browser
+  (`lib/apiKey.js`, localStorage) — never asked again on that device, never sent anywhere except
+  as the `X-Anthropic-Key` header on `/analyze`/`/ask`, never logged or stored server-side.
+- **Backend threading**: `app.py` reads the header and passes it as `client_key` through
+  `orchestrator.analyze()/ask()` → `agents/analysis.py::run()` / `agents/chat.py::answer()` →
+  `agents/llm.py::call()/call_chat()`, which uses it as the literal Anthropic API key for that
+  one call. `TRADE101_ANALYSIS_KEY` (env var) is now a LOCAL-DEV-ONLY fallback — explicitly
+  documented not to be set on a shared/deployed host, or a keyless visitor would silently spend
+  the owner's key, defeating the entire point.
+- **Removed, not deprecated**: `services/access.py` (the old token+cap gate) and `lib/access.js`
+  (the frontend half) are deleted outright, along with `tests/test_access.py` — replaced by
+  `tests/test_byok.py`. No dead code, no backward-compat shim.
+- **Friendlier failures**: the most likely failure mode is now a VISITOR's own key being
+  invalid/expired/rate-limited, not a server misconfiguration — `app.py::_ai_error_reason()`
+  catches `anthropic.AuthenticationError`/`PermissionDeniedError`/`RateLimitError` specifically
+  and gives a plain, actionable message instead of surfacing Anthropic's raw SDK error JSON.
+  Verified live with a deliberately invalid key end to end: the key reached the real Anthropic
+  API, was genuinely rejected (401), and degraded to a clean "that key was rejected" message.
+- **Cache behavior unchanged, and it's a nice property here**: `orchestrator.analyze()`'s
+  existing per-ticker TTL cache means a cache HIT never needs any key at all — one visitor's
+  fresh analysis can be served free to the next visitor asking about the same ticker within the
+  cache window. Only a cache MISS actually spends anyone's key.
+- **Personalization, requested alongside this**: the Welcome greeting ("Which stock shall we
+  study today?") now appends the visitor's own stored name when they gave one — the per-visitor
+  equivalent of the old hardcoded "Pranav" greeting that H7 removed, but this time correct for
+  every visitor instead of just the owner.
+- 8 new backend tests (`tests/test_byok.py`). `docs/DEPLOY.md`, `render.yaml`, and this file all
+  updated to match — see `docs/DEPLOY.md` for the full visitor-facing explanation.
+- **Also discussed and decided in the same conversation**: Netlify was considered and rejected
+  for hosting — it's a static-site + serverless-functions platform and can't run this app's
+  persistent FastAPI process without real rearchitecting. Stick with Render (or Fly.io/Railway).
 
 ### Fixed 2026-09-17 — Wave 3 UI/UX redesign + two live feedback rounds — merged to `master` (commit `897514c`)
 Direction discussed and narrowed with the user first (see `docs/AUDIT.md` §8/§10 item 12 for the
@@ -560,6 +619,9 @@ with a candlestick SVG icon replacing the ✦ glyph, per explicit user request a
   (`.cmp-pick`) that removed its focus outline with no replacement.
 
 ### Fixed 2026-09-15 (pre-share endpoint guard — see BACKLOG.md → Pre-share checklist)
+**⚠️ Superseded 2026-09-17 by BYOK — see the header callout at the top of this file.** This
+whole approach (shared token + daily cap) was replaced, not extended; `services/access.py` and
+`lib/access.js` no longer exist. Kept below as a historical record only.
 - ~~`/analyze` and `/ask` had no auth or rate-limit~~ — new `services/access.py`, wired as a
   FastAPI dependency on both routes: an optional shared access token
   (`TRADE101_ACCESS_TOKEN` → `X-Access-Token` header, 401 if wrong/missing when set) plus a

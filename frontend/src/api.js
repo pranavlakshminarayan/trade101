@@ -5,13 +5,14 @@
 // stuck/unavailable on this machine and the backend has to run elsewhere.
 const BASE = import.meta.env.DEV ? (import.meta.env.VITE_API_BASE || 'http://127.0.0.1:8000') : ''
 
-import { getAccessToken } from './lib/access.js'
+import { getApiKey } from './lib/apiKey.js'
 
-// The pre-share access gate only guards /analyze and /ask (the paid calls) —
-// every other endpoint is deterministic and free, so it stays open.
+// BYOK (2026-09-17): only /analyze and /ask (the paid calls) need the
+// visitor's own Anthropic key — every other endpoint is deterministic and
+// free, so it stays open with no header at all.
 function authHeaders() {
-  const token = getAccessToken()
-  return token ? { 'X-Access-Token': token } : {}
+  const key = getApiKey()
+  return key ? { 'X-Anthropic-Key': key } : {}
 }
 
 // Session result cache — the fix for "switch tabs and everything reloads".

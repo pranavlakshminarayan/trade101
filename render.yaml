@@ -10,6 +10,10 @@ services:
     startCommand: "cd backend && uvicorn app:app --host 0.0.0.0 --port $PORT"
     healthCheckPath: /health
     envVars:
+      # BYOK (2026-09-17): each visitor supplies their own Anthropic key from
+      # the app itself, so this is now a LOCAL-DEV-ONLY convenience fallback -
+      # leave it blank on a shared/deployed host, or a visitor without their
+      # own key silently falls back to spending yours. See docs/DEPLOY.md.
       - key: TRADE101_ANALYSIS_KEY
         sync: false
       - key: TRADE101_NEWS_KEY

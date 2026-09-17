@@ -56,12 +56,11 @@ def test_news_returns_feed_with_no_claude_key_at_all(monkeypatch):
     assert "sourcing" in body and "filings" in body
 
 
-def test_news_is_not_gated_by_the_access_token(monkeypatch):
-    # Contrast with /analyze and /ask: /news is deterministic and must stay
-    # free/open even when the pre-share access guard is configured.
-    monkeypatch.setenv("TRADE101_ACCESS_TOKEN", "secret123")
+def test_news_needs_no_api_key_at_all(monkeypatch):
+    # Contrast with /analyze and /ask (BYOK, need X-Anthropic-Key): /news is
+    # deterministic and must stay free/open with no key of any kind.
     _patch_gather(monkeypatch)
-    r = client.get("/news/NEWSTEST")  # no X-Access-Token header sent
+    r = client.get("/news/NEWSTEST")  # no X-Anthropic-Key header sent
     assert r.status_code == 200
     assert r.json()["available"] is True
 

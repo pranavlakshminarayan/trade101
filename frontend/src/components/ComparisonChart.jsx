@@ -1,5 +1,5 @@
 import { useEffect, useRef } from 'react'
-import { createChart } from 'lightweight-charts'
+import { createChart, LineSeries } from 'lightweight-charts'
 
 const A_COLOR = '#34A9BE' // teal — stock A
 const B_COLOR = '#F2A93B' // amber — stock B (deliberately not green/red: no good/bad implied)
@@ -29,11 +29,11 @@ export default function ComparisonChart({ aOhlcv, bOhlcv }) {
     const a = rebased(aOhlcv)
     const b = rebased(bOhlcv)
     if (a.length) {
-      const s = chart.addLineSeries({ color: A_COLOR, lineWidth: 2, priceLineVisible: false, lastValueVisible: true })
+      const s = chart.addSeries(LineSeries, { color: A_COLOR, lineWidth: 2, priceLineVisible: false, lastValueVisible: true })
       s.setData(a)
     }
     if (b.length) {
-      const s = chart.addLineSeries({ color: B_COLOR, lineWidth: 2, priceLineVisible: false, lastValueVisible: true })
+      const s = chart.addSeries(LineSeries, { color: B_COLOR, lineWidth: 2, priceLineVisible: false, lastValueVisible: true })
       s.setData(b)
     }
     chart.timeScale().fitContent()

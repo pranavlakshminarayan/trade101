@@ -142,17 +142,21 @@ def news_bundle(ticker: str) -> dict | None:
     }
 
 
-def analyze(ticker: str) -> dict | None:
+def analyze(ticker: str, client_key: str | None = None) -> dict | None:
     """Full AI narration bundle for `ticker`, or None if the symbol has no data.
-    Raises llm.MissingKeyError if no analysis key is configured. Cached for
-    ANALYZE_CACHE_TTL — a raised exception is never cached (get_or_set only
-    stores a value fn() actually returns), so a missing key or a transient AI
-    error is retried on the very next call rather than sticking around."""
-    return cache.get_or_set(f"analyze:{ticker.upper()}", lambda: _analyze(ticker),
+    Raises llm.MissingKeyError if no key is available (BYOK: `client_key` is
+    the visitor's own Anthropic key). Cached for ANALYZE_CACHE_TTL — a raised
+    exception is never cached (get_or_set only stores a value fn() actually
+    returns), so a missing key or a transient AI error is retried on the very
+    next call rather than sticking around. A cache HIT never needs a key at
+    all (no new API call is made), so one visitor's fresh analysis can be
+    served free to the next visitor asking about the same ticker within the
+    TTL — a cache MISS is the only path that spends anyone's key."""
+    return cache.get_or_set(f"analyze:{ticker.upper()}", lambda: _analyze(ticker, client_key),
                              ttl=ANALYZE_CACHE_TTL)
 
 
-def _analyze(ticker: str) -> dict | None:
+def _analyze(ticker: str, client_key: str | None = None) -> dict | None:
     b = gather(ticker)
     if b is None:
         return None
@@ -160,7 +164,7 @@ def _analyze(ticker: str) -> dict | None:
     kept_news, filings, sourcing = b["news"], b["filings"], b["sourcing"]
     news_note, fil_note = b["news_note"], b["fil_note"]
 
-    result = analysis.run(quote["symbol"], quote, ind, kept_news, filings, sourcing)
+    result = analysis.run(quote["symbol"], quote, ind, kept_news, filings, sourcing, client_key=client_key)
 
     # References list = only the evidence actually admitted to the analysis.
     sources = []
@@ -196,15 +200,17 @@ def _analyze(ticker: str) -> dict | None:
     }
 
 
-def ask(ticker: str, question: str, history: list[dict] | None = None) -> dict | None:
+def ask(ticker: str, question: str, history: list[dict] | None = None,
+        client_key: str | None = None) -> dict | None:
     """Answer a user question about `ticker`, grounded in the same exact data +
     filtered evidence the analysis uses. None if the symbol has no data. Raises
-    llm.MissingKeyError if no key is configured."""
+    llm.MissingKeyError if no key is available (BYOK: `client_key` is the
+    visitor's own Anthropic key)."""
     b = gather(ticker)
     if b is None:
         return None
     return chat.answer(
         ticker=b["quote"]["symbol"], quote=b["quote"], indicators=b["indicators"],
         news=b["news"], filings=b["filings"], sourcing=b["sourcing"],
-        history=history or [], question=question,
+        history=history or [], question=question, client_key=client_key,
     )

@@ -10,7 +10,7 @@ from __future__ import annotations
 from pathlib import Path
 
 from dotenv import load_dotenv
-from fastapi import Depends, FastAPI, HTTPException
+from fastapi import FastAPI, Header, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel
 
@@ -18,10 +18,27 @@ from pydantic import BaseModel
 # API keys are available as environment variables.
 load_dotenv(Path(__file__).resolve().parent.parent / ".env")
 
+import anthropic
+
 from agents import llm, orchestrator
 from services import company, indicators, marketdata, patterns, search
-from services.access import guard_paid_endpoint
 from services.safe import redact_secrets
+
+
+def _ai_error_reason(prefix: str, e: Exception) -> str:
+    """A friendly, actionable reason string for the AI-unavailable degrade
+    path. BYOK (2026-09-17): the most common failure now is a VISITOR's own
+    key being invalid/expired/out of credits, not a server misconfiguration —
+    give that its own plain message instead of Anthropic's raw JSON error
+    body. redact_secrets still runs on the generic fallback: an exception's
+    text can otherwise carry a request URL with a key in it."""
+    if isinstance(e, anthropic.AuthenticationError):
+        return "That Anthropic API key was rejected — double-check you pasted it correctly."
+    if isinstance(e, anthropic.PermissionDeniedError):
+        return "That Anthropic API key doesn't have permission for this — check its plan/scope."
+    if isinstance(e, anthropic.RateLimitError):
+        return "Your Anthropic account hit a rate limit — wait a moment and try again."
+    return redact_secrets(f"{prefix}: {e}")
 
 app = FastAPI(title="Trade101 API", version="0.1.0")
 
@@ -203,43 +220,43 @@ class AskBody(BaseModel):
     history: list[dict] = []
 
 
-@app.post("/ask/{ticker}", dependencies=[Depends(guard_paid_endpoint)])
-def ask(ticker: str, body: AskBody):
+@app.post("/ask/{ticker}")
+def ask(ticker: str, body: AskBody, x_anthropic_key: str | None = Header(default=None)):
     """Ask-Claude chat: answer a question about a stock, grounded in the same exact
     data + filtered evidence as /analyze. Degrades gracefully (no key / error →
-    available:false) so the rest of the app is unaffected. Spends the Claude key.
-    Gated by services.access (pre-share fix): an access token (if configured) and
-    a shared daily cap, so a public visitor can't run up the owner's Claude bill."""
+    available:false) so the rest of the app is unaffected. BYOK (2026-09-17):
+    spends the VISITOR's own Anthropic key, sent as X-Anthropic-Key — never the
+    app owner's, so an open shared link carries no cost risk. See agents/llm.py."""
     q = (body.question or "").strip()
     if not q:
         raise HTTPException(status_code=400, detail="Ask a question first.")
     try:
-        result = orchestrator.ask(ticker, q, body.history)
+        result = orchestrator.ask(ticker, q, body.history, client_key=x_anthropic_key)
     except llm.MissingKeyError as e:
         return {"available": False, "reason": str(e)}
     except Exception as e:
-        return {"available": False, "reason": redact_secrets(f"Ask-Claude error: {e}")}
+        return {"available": False, "reason": _ai_error_reason("Ask-Claude error", e)}
     if result is None:
         raise HTTPException(status_code=404, detail=f"No market data found for '{ticker}'.")
     return {"available": True, **result}
 
 
-@app.get("/analyze/{ticker}", dependencies=[Depends(guard_paid_endpoint)])
-def analyze(ticker: str):
+@app.get("/analyze/{ticker}")
+def analyze(ticker: str, x_anthropic_key: str | None = Header(default=None)):
     """
     AI narration for a ticker: momentum read (sourced), news Feed + "What it
     means" inference. Separate from /research so the chart renders instantly and
     never blocks on the AI. Degrades gracefully: missing key / AI error →
-    available:false with a reason, not a crash. Gated by services.access
-    (pre-share fix): an access token (if configured) and a shared daily cap.
+    available:false with a reason, not a crash. BYOK (2026-09-17): spends the
+    VISITOR's own Anthropic key, sent as X-Anthropic-Key — never the app
+    owner's. See agents/llm.py.
     """
     try:
-        result = orchestrator.analyze(ticker)
+        result = orchestrator.analyze(ticker, client_key=x_anthropic_key)
     except llm.MissingKeyError as e:
         return {"available": False, "reason": str(e)}
     except Exception as e:  # network/API/parse — chart still works without this
-        # redact_secrets: an exception's text can carry a request URL with a key.
-        return {"available": False, "reason": redact_secrets(f"AI narration error: {e}")}
+        return {"available": False, "reason": _ai_error_reason("AI narration error", e)}
     if result is None:
         raise HTTPException(status_code=404, detail=f"No market data found for '{ticker}'.")
     return {"available": True, **result}

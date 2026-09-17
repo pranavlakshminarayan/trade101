@@ -6,10 +6,8 @@ import Compare from './components/Compare.jsx'
 import Watchlist from './components/Watchlist.jsx'
 import PracticeLab from './components/PracticeLab.jsx'
 import Glossary from './components/Glossary.jsx'
+import ApiKeyGate from './components/ApiKeyGate.jsx'
 import { research as fetchResearch, search as searchSymbols } from './api.js'
-import { captureTokenFromUrl } from './lib/access.js'
-
-captureTokenFromUrl()
 
 // One route = one browser-history entry, so the address bar's own Back/Forward
 // walks through every search *and* every tab switch, like a normal site —
@@ -39,6 +37,14 @@ export function looksLikeTicker(s) {
 }
 
 export default function App() {
+  return (
+    <ApiKeyGate>
+      <AppInner />
+    </ApiKeyGate>
+  )
+}
+
+function AppInner() {
   const [data, setData] = useState(null)
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState(null)

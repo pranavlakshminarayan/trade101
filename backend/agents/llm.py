@@ -1,7 +1,14 @@
 """
 Thin wrapper around the Claude API for Trade101's agents.
 
-- Each agent uses its own named key (per-component usage tracking) via env vars.
+- BYOK (bring-your-own-key, added 2026-09-17): each visitor supplies their OWN
+  Anthropic API key from the browser (never the app owner's), so a shared,
+  open link carries zero cost risk to the owner — see docs/DEPLOY.md. The key
+  arrives per-request from app.py (threaded through orchestrator -> analysis/
+  chat -> here) and is used ONLY for that one call; nothing server-side ever
+  stores it. TRADE101_ANALYSIS_KEY (env var) is a LOCAL-DEV-ONLY fallback when
+  no client key is supplied — do NOT set it on a shared/deployed host, or
+  visitors without their own key silently fall back to spending yours.
 - Model is configurable (TRADE101_MODEL, default claude-opus-5). If the user
   points it at Haiku, we drop the adaptive-thinking/effort params it doesn't take.
 - Missing key → MissingKeyError so the endpoint can degrade gracefully (the
@@ -32,8 +39,18 @@ class MissingKeyError(RuntimeError):
     pass
 
 
-def call(key_env: str, system: str, user: str, effort: str = "high", max_tokens: int = 4000) -> str:
-    """Call Claude with the key named by `key_env`. Returns the text response.
+def _resolve_key(client_key: str | None) -> str:
+    key = (client_key or "").strip() or os.environ.get("TRADE101_ANALYSIS_KEY")
+    if not key:
+        raise MissingKeyError(
+            "AI narration unavailable — paste your own Anthropic API key in the app to use "
+            "this feature. The chart and indicators work without it."
+        )
+    return key
+
+
+def call(client_key: str | None, system: str, user: str, effort: str = "high", max_tokens: int = 4000) -> str:
+    """Call Claude with the VISITOR's own key (BYOK). Returns the text response.
 
     The system prompt is sent as a cache_control block: it's byte-identical on
     every call (only the per-ticker `user` payload varies, and it comes after),
@@ -41,14 +58,11 @@ def call(key_env: str, system: str, user: str, effort: str = "high", max_tokens:
     within the 5-min window — cutting spend across tickers/sessions. Effective
     only when the system prompt clears the model's minimum cacheable size
     (512 tok on Opus 5 / Fable; 1024 on Sonnet 5) — ours does. A prefix below the
-    minimum silently won't cache, but the marker is harmless.
+    minimum silently won't cache, but the marker is harmless. Since each
+    visitor's own key is billed separately, the cache benefit is per-visitor,
+    not shared across different people's keys.
     """
-    key = os.environ.get(key_env)
-    if not key:
-        raise MissingKeyError(
-            f"AI narration unavailable — set {key_env} in your .env "
-            f"(a named Claude API key). The chart and indicators work without it."
-        )
+    key = _resolve_key(client_key)
     client = anthropic.Anthropic(api_key=key, timeout=ANALYSIS_TIMEOUT_S)
 
     kwargs = {}
@@ -69,16 +83,13 @@ def call(key_env: str, system: str, user: str, effort: str = "high", max_tokens:
     return "".join(b.text for b in resp.content if b.type == "text").strip()
 
 
-def call_chat(key_env: str, system: str, messages: list[dict],
+def call_chat(client_key: str | None, system: str, messages: list[dict],
               effort: str = "medium", max_tokens: int = 1200) -> str:
     """Multi-turn variant: cached `system` prefix + a full `messages` history.
     Used by the Ask-Claude chat; the cached system (guardrails + the ticker's
-    stable data context) is reused across conversation turns."""
-    key = os.environ.get(key_env)
-    if not key:
-        raise MissingKeyError(
-            f"Ask-Claude is unavailable — set {key_env} in your .env (a named Claude API key)."
-        )
+    stable data context) is reused across conversation turns. Uses the
+    VISITOR's own key (BYOK) — see `call()`'s docstring above."""
+    key = _resolve_key(client_key)
     client = anthropic.Anthropic(api_key=key, timeout=CHAT_TIMEOUT_S)
 
     kwargs = {}

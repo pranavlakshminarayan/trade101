@@ -1,12 +1,18 @@
 import { useState } from 'react'
 import Logo from './Logo.jsx'
 import { SearchIcon, ScaleIcon, StarIcon, ClockIcon, PlusIcon, FlaskIcon, BookIcon } from './Icons.jsx'
+import { getUserName } from '../lib/apiKey.js'
 
 const SUGGEST = ['NVDA', 'Apple', 'Samsung', 'Toyota', 'Tencent', 'Reliance']
 
 export default function Welcome({ onSearch, recent, onNavigate }) {
   const [value, setValue] = useState('')
   const submit = (t) => { const q = (t ?? value).trim(); if (q) onSearch(q) }
+  // Per-visitor personalization (2026-09-17) — each visitor's own name, set
+  // once in the ApiKeyGate, never a hardcoded one (docs/AUDIT.md H7 fixed the
+  // opposite problem: a single hardcoded "Pranav" that broke for every other
+  // visitor). Falls back to the plain greeting when no name was given.
+  const name = getUserName()
 
   return (
     <div className="welcome">
@@ -26,7 +32,7 @@ export default function Welcome({ onSearch, recent, onNavigate }) {
 
       <main className="welc-main">
         <div className="logo" style={{ fontSize: 22 }}><Logo size={34} /> Trade Craft</div>
-        <div className="big">Which stock shall we <span>study</span> today?</div>
+        <div className="big">Which stock shall we <span>study</span> today{name ? `, ${name}` : ''}?</div>
         <div className="sub">
           Just type a <b>company name</b> (or ticker) — any market: US, China, Japan, Korea, Hong Kong, Singapore, India, Europe.
           If several match, you pick. I'll pull the live data and teach the metrics as we go.
