@@ -295,6 +295,23 @@ def get_profile(ticker: str) -> dict:
     }
 
 
+def _looks_like_a_failed_fetch(profile: dict) -> bool:
+    """`get_profile()` never raises — a failed `.info` call degrades internally
+    to `None`s rather than an exception (by design, so a genuinely thin
+    listing degrades gracefully instead of 500ing). That's the right behavior
+    for a caller, but the WRONG thing to cache for 5 minutes: caching a
+    transient failure as if it were a real, thin-coverage result means every
+    request for that ticker in the next 5 min replays the one bad attempt
+    instead of getting its own fresh try (confirmed live 2026-09-18: three
+    separate `/ecosystem` calls, 3s apart, all returned the byte-identical
+    empty profile). `sector`/`industry`/`summary` all come ONLY from the main
+    ticker's `.info` call with no fallback, so all-`None` together is a clean
+    signal that call failed outright, distinct from a listing that
+    legitimately has no peers/fundamentals but DOES have a sector."""
+    return profile.get("sector") is None and profile.get("industry") is None \
+        and profile.get("summary") is None
+
+
 def get_profile_cached(ticker: str) -> dict:
     """`get_profile()`, shared across BOTH `/ecosystem` and `/analyze`'s
     `orchestrator._gather()` (which needs the profile for news relevance
@@ -305,5 +322,10 @@ def get_profile_cached(ticker: str) -> dict:
     ticker at the same moment, doubling the load on Yahoo's already-flaky
     `.info` endpoint right when it's most likely to fail. `cache.get_or_set`'s
     per-key lock means only the first caller actually fetches; the other
-    reuses that one result instead of racing it."""
-    return cache.get_or_set(f"profile:{ticker.upper()}", lambda: get_profile(ticker))
+    reuses that one result instead of racing it. A result that looks like a
+    failed fetch (see `_looks_like_a_failed_fetch`) is never cached, so the
+    next request gets a genuinely fresh attempt instead of the poisoned one."""
+    return cache.get_or_set(
+        f"profile:{ticker.upper()}", lambda: get_profile(ticker),
+        should_cache=lambda p: not _looks_like_a_failed_fetch(p),
+    )

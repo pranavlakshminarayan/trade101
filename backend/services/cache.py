@@ -42,11 +42,25 @@ def _lock_for(key: str) -> threading.Lock:
         return lock
 
 
-def get_or_set(key: str, fn: Callable[[], Any], ttl: float = DEFAULT_TTL) -> Any:
+def get_or_set(
+    key: str, fn: Callable[[], Any], ttl: float = DEFAULT_TTL,
+    should_cache: Callable[[Any], bool] = lambda v: True,
+) -> Any:
     """Return the cached value for `key`, or compute it with `fn()`, store, return.
     A stored `None` is cached too (so we don't re-run a lookup that found nothing).
     Concurrent callers for the same key that both miss the cache block on one
-    shared lock so only one of them actually runs `fn()` — see the note above."""
+    shared lock so only one of them actually runs `fn()` — see the note above.
+
+    Bug (user-reported 2026-09-18, caught right after the lock fix above
+    shipped): `company.get_profile()` never raises — a failed Yahoo `.info`
+    call degrades internally to a dict of `None`s rather than an exception,
+    so the FIRST caller's one bad attempt was getting cached as a normal,
+    successful result for the full 5-min TTL — every subsequent request for
+    that ticker, even ones that would have succeeded on their own, got stuck
+    replaying that one failure. Confirmed live: three separate `/ecosystem`
+    calls, 3s apart, all returned the byte-identical empty profile. `should_cache`
+    lets a caller reject a degraded-looking result so it's never stored — the
+    next request gets a genuinely fresh attempt instead of the poisoned one."""
     now = time.time()
     hit = _store.get(key)
     if hit is not None and hit[0] > now:
@@ -58,7 +72,8 @@ def get_or_set(key: str, fn: Callable[[], Any], ttl: float = DEFAULT_TTL) -> Any
         if hit is not None and hit[0] > now:
             return hit[1]
         value = fn()
-        _store[key] = (now + ttl, value)
+        if should_cache(value):
+            _store[key] = (now + ttl, value)
         return value
 
 

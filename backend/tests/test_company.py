@@ -202,3 +202,42 @@ def test_yahoo_related_degrades_on_provider_error(monkeypatch):
         raise RuntimeError("network down")
     monkeypatch.setattr(company.httpx, "get", boom)
     assert company._yahoo_related("RELIANCE.NS") == []
+
+
+# Bug (user-reported 2026-09-18, live on Render): get_profile_cached() shares
+# ONE profile fetch across /ecosystem and /analyze's gather() via a 5-min
+# cache. get_profile() never raises on a failed Yahoo .info call — it
+# degrades internally to Nones — so a transient failure was getting cached
+# for the full 5 minutes as if it were a real result, and every request for
+# that ticker in that window replayed the same failure. Confirmed live:
+# three separate /ecosystem calls, 3s apart, all returned the byte-identical
+# empty profile.
+def test_looks_like_a_failed_fetch_when_the_main_info_call_produced_nothing():
+    failed = {"sector": None, "industry": None, "summary": None, "peers": ["9988.HK"]}
+    assert company._looks_like_a_failed_fetch(failed) is True
+
+
+def test_does_not_look_like_a_failed_fetch_when_sector_is_present():
+    thin_but_real = {"sector": "Technology", "industry": None, "summary": None, "peers": []}
+    assert company._looks_like_a_failed_fetch(thin_but_real) is False
+
+
+def test_get_profile_cached_does_not_cache_a_failed_looking_result(monkeypatch):
+    from services import cache
+    calls = []
+
+    def fake_get_profile(ticker):
+        calls.append(1)
+        if len(calls) == 1:
+            return {"sector": None, "industry": None, "summary": None, "peers": [], "peerNames": {}}
+        return {"sector": "Communication Services", "industry": "Internet", "summary": "Real data.", "peers": [], "peerNames": {}}
+
+    monkeypatch.setattr(company, "get_profile", fake_get_profile)
+    ticker = f"TESTFAIL{len(calls)}.HK"
+    cache.clear(f"profile:{ticker.upper()}")
+
+    r1 = company.get_profile_cached(ticker)
+    assert r1["sector"] is None  # the failed attempt is returned to its caller...
+    r2 = company.get_profile_cached(ticker)
+    assert r2["sector"] == "Communication Services"  # ...but NOT cached, so this retries fresh
+    assert len(calls) == 2

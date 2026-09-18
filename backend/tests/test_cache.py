@@ -68,3 +68,37 @@ def test_concurrent_misses_for_DIFFERENT_keys_both_run_fn():
     t1.start(); t2.start()
     t1.join(); t2.join()
     assert len(calls) == 2
+
+
+def test_should_cache_false_means_the_next_call_gets_a_fresh_attempt():
+    # Bug (user-reported 2026-09-18, caught right after the lock fix above
+    # shipped): company.get_profile() never raises on a failed Yahoo call —
+    # it degrades to a dict of Nones — so that one bad attempt was getting
+    # cached as if it were a normal result for the full TTL, and every
+    # request in the next 5 min replayed the same failure. Confirmed live:
+    # three separate /ecosystem calls, 3s apart, all returned the identical
+    # empty profile. `should_cache` lets a caller reject a degraded-looking
+    # result so the NEXT call gets its own genuinely fresh attempt.
+    calls = []
+    def flaky_fn():
+        calls.append(1)
+        return {"ok": len(calls) > 1}  # first attempt "fails", second "succeeds"
+
+    key = f"test-should-cache-{time.time()}"
+    r1 = cache.get_or_set(key, flaky_fn, should_cache=lambda v: v["ok"])
+    assert r1 == {"ok": False}
+    r2 = cache.get_or_set(key, flaky_fn, should_cache=lambda v: v["ok"])
+    assert r2 == {"ok": True}, "the failed first result must not have been cached"
+    assert len(calls) == 2
+
+
+def test_should_cache_true_is_cached_normally():
+    calls = []
+    def fn():
+        calls.append(1)
+        return {"ok": True}
+
+    key = f"test-should-cache-ok-{time.time()}"
+    cache.get_or_set(key, fn, should_cache=lambda v: v["ok"])
+    cache.get_or_set(key, fn, should_cache=lambda v: v["ok"])
+    assert len(calls) == 1

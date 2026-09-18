@@ -369,6 +369,26 @@ the app firing the same expensive call twice at once.
   ~7s (reusing the shared cached profile), analyze in ~34s (normal, dominated by the actual Claude
   call, not the data-gathering step). No more empty/failed side on either call.
 
+**Same-day follow-up: the lock fix above shipped a NEW bug — a failed fetch got cached as if it
+were real, for the full 5 minutes.** User insisted (correctly) on checking the LIVE site, not
+curl-in-isolation: three separate `/ecosystem/0700.HK` calls, 3s apart, all came back with the
+byte-identical empty profile — not three independent Yahoo flakes, one cached failure being
+replayed to every caller. Root cause: `company.get_profile()` never raises on a failed `.info`
+call — it degrades internally to a dict of `None`s (by design, so a genuinely thin listing
+degrades gracefully) — so `get_or_set()` was caching that degraded-but-successfully-returned dict
+exactly like a real result. Fixed: `cache.get_or_set()` gained an optional `should_cache`
+predicate; `get_profile_cached()` passes one (`_looks_like_a_failed_fetch()` — `sector`/
+`industry`/`summary` all `None` together, since those three come ONLY from the main ticker's
+`.info` call with no fallback) that skips caching a result that looks like a failed attempt, so
+the next request gets a genuinely fresh try instead of the poisoned one. 5 new tests
+(`tests/test_cache.py` + `tests/test_company.py`). 101 backend tests total. Verified locally by
+reproducing the exact live failure pattern (a fake `get_profile` that fails once then succeeds):
+confirmed the failure is no longer cached and the second call gets a fresh, successful attempt.
+**Worth naming as a pattern for future work**: fixing one concurrency bug (the race) surfaced a
+second, adjacent one (poisoning the fix's own cache with a failure) — caching a call that
+degrades-instead-of-raising needs its own explicit "was this actually good?" check, not just a
+plain TTL.
+
 ### Fixed 2026-09-17 — ecosystem graph showed bare tickers instead of names for non-US listings
 **User-reported, live on Render**: searching Samsung on the Korean market (`005930.KS`) showed the
 peer graph as a ring of raw numeric codes (`000660…`, `005380…`, `035420…`) with the searched
