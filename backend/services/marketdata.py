@@ -14,7 +14,7 @@ from typing import Optional, Tuple
 import pandas as pd
 import yfinance as yf
 
-from services.net import with_timeout, with_retry
+from services.net import with_timeout, with_retry, fetch_info
 
 
 def get(ticker: str, period: str = "1y", interval: str = "1d") -> Optional[Tuple[pd.DataFrame, dict]]:
@@ -71,7 +71,7 @@ def _quote(t: "yf.Ticker", hist: pd.DataFrame, ticker: str) -> dict:
 
     name, exchange, currency = None, None, None
     try:
-        info = with_retry(lambda: t.info, timeout=10)
+        info = fetch_info(t, timeout=10)
         # Prefer the properly-cased full name (longName) over the ALL-CAPS
         # shortName; this is what makes non-US listings show "Nintendo Co., Ltd."
         # instead of the bare ticker.

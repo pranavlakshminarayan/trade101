@@ -11,7 +11,7 @@ an entire tile's worth of real, available data. `with_retry` gives a second
 attempt before giving up."""
 import pytest
 
-from services.net import with_retry, with_timeout
+from services.net import fetch_info, with_retry, with_timeout
 
 
 def test_with_timeout_returns_result_when_fast_enough():
@@ -51,3 +51,43 @@ def test_with_retry_raises_the_last_error_when_every_attempt_fails():
         raise ConnectionError("still failing")
     with pytest.raises(ConnectionError):
         with_retry(fn, timeout=1, attempts=2, backoff=0)
+
+
+class _FakeTicker:
+    """Stands in for yf.Ticker — `.info` returns whatever `_responses` gives
+    on each successive access, simulating yfinance's real behavior of
+    sometimes returning a near-empty dict with no exception at all."""
+    def __init__(self, responses):
+        self._responses = list(responses)
+        self.calls = 0
+
+    @property
+    def info(self):
+        self.calls += 1
+        return self._responses[min(self.calls, len(self._responses)) - 1]
+
+
+_REAL_INFO = {f"key{i}": i for i in range(150)}  # a real, well-covered symbol
+
+
+def test_fetch_info_accepts_a_real_looking_response_immediately():
+    t = _FakeTicker([_REAL_INFO])
+    assert fetch_info(t, timeout=1, attempts=2) == _REAL_INFO
+    assert t.calls == 1
+
+
+def test_fetch_info_retries_a_silently_empty_response_without_raising():
+    # Bug (user-reported 2026-09-18): .info can come back a near-empty dict
+    # WITHOUT throwing at all — a diagnostic confirmed `_infoError: null` on
+    # a genuine live failure. with_retry alone can't catch this since
+    # nothing raised; fetch_info must treat a too-sparse result as a failure
+    # in order to retry it.
+    t = _FakeTicker([{"trailingPegRatio": None}, _REAL_INFO])
+    assert fetch_info(t, timeout=1, attempts=2, backoff=0) == _REAL_INFO
+    assert t.calls == 2
+
+
+def test_fetch_info_raises_when_every_attempt_is_sparse():
+    t = _FakeTicker([{}, {"a": 1}])
+    with pytest.raises(ValueError):
+        fetch_info(t, timeout=1, attempts=2, backoff=0)

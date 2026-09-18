@@ -15,7 +15,7 @@ import numpy as np
 import yfinance as yf
 
 from services import cache
-from services.net import with_timeout, with_retry
+from services.net import with_timeout, with_retry, fetch_info
 
 FINNHUB = "https://finnhub.io/api/v1"
 
@@ -95,7 +95,7 @@ def _peer_names(symbols: list[str]) -> dict[str, str]:
 
     def _one(sym: str) -> tuple[str, str | None]:
         try:
-            info = with_retry(lambda: yf.Ticker(sym).info, timeout=10)
+            info = fetch_info(yf.Ticker(sym), timeout=10)
             return sym, (info.get("shortName") or info.get("longName"))
         except Exception:
             return sym, None
@@ -218,7 +218,7 @@ def get_profile(ticker: str) -> dict:
     info_error = None  # temporary diagnostic (2026-09-18) — see get_profile_cached's docstring
 
     with ThreadPoolExecutor(max_workers=2) as ex:
-        info_fut = ex.submit(lambda: with_retry(lambda: t.info, timeout=12))
+        info_fut = ex.submit(lambda: fetch_info(t, timeout=12))
         peers_fut = ex.submit(_peers, ticker)
         try:
             info = info_fut.result()

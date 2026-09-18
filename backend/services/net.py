@@ -57,3 +57,24 @@ def with_retry(fn, *args, timeout: float = 12, attempts: int = 2, backoff: float
             if i < attempts - 1:
                 time.sleep(backoff)
     raise last_err
+
+
+def fetch_info(ticker_obj, timeout: float = 12, attempts: int = 3, backoff: float = 0.6, min_keys: int = 10):
+    """`.info` specifically, with a content check on top of `with_retry`.
+
+    Bug (user-reported 2026-09-18): a diagnostic added to catch the actual
+    exception from a failed `.info` call showed `_infoError: null` — the call
+    was NOT raising. yfinance's `.info` can come back a near-empty dict
+    (verified: a real, covered symbol normally returns 140-170+ keys) without
+    ever throwing — Yahoo silently short-changing the response instead of
+    erroring it out, seemingly more likely from a shared/cloud IP than a
+    plain rate-limit or auth failure would be. `with_retry` alone can't catch
+    this because nothing failed from its point of view. Raising when the
+    result looks too sparse turns it into the same retryable failure as a
+    real exception."""
+    def _get():
+        info = ticker_obj.info
+        if not info or len(info) < min_keys:
+            raise ValueError(f"yfinance .info returned only {len(info or {})} keys — treating as a failed fetch")
+        return info
+    return with_retry(_get, timeout=timeout, attempts=attempts, backoff=backoff)

@@ -338,6 +338,38 @@ Mirrored as checkboxes in `BACKLOG.md` → "Audit — Wave 0/1/2/3/4". **All wav
 done, including the deploy step** — live at https://trade-craft-qdsw.onrender.com
 (2026-09-17). See `docs/AUDIT.md` §10.
 
+### Fixed 2026-09-18 — `.info` was failing SILENTLY, no exception, so retries never fired
+**Third and (so far) final round on this same class of bug**, found by refusing to accept "seems
+fixed" and testing a completely different ticker (CXMT / `688825.SS`, a Shanghai STAR Market
+listing) live, repeatedly, over several minutes — not a single curl check. It failed 5 separate
+times in a row, several seconds apart, which ruled out the cache-poisoning bug above (each of
+those 5 calls was a genuinely fresh, uncached attempt). To find out WHY without Render dashboard
+log access, added a temporary diagnostic field (`_infoError`) exposing the raw caught exception —
+and it came back **`null`**. The `.info` call was not throwing at all; it was returning
+successfully with a near-empty dict (verified: a real, covered symbol returns 140-170+ keys;
+Render was getting responses with a handful or fewer). Yahoo appears to silently short-change the
+response rather than erroring it out — more likely from a shared/cloud IP than a plain block
+would produce. **`with_retry` (see the 2026-09-17 entry above) only retries on a raised
+exception — a "successful" call with junk content sails straight through untouched, which is
+exactly why the earlier retry fix didn't fully close this out.**
+- Fixed: new `services/net.py::fetch_info()` wraps `.info` specifically — checks the returned
+  dict has at least `min_keys` (10) entries, and raises if not, turning a silently-sparse response
+  into the same retryable failure a real exception would be. Used everywhere `.info` is fetched
+  (`company.py`'s main-ticker fetch, `_peer_names()`, `marketdata.py`'s `_quote()`).
+- 7 new tests (`tests/test_net.py`, including a fake `Ticker` that returns a sparse dict on the
+  first access and a real-looking one on the second, matching the exact live failure pattern).
+  104 backend tests total.
+- The temporary `_infoError` diagnostic field stays in the `/ecosystem` response for now — useful
+  to confirm live whether a future failure is a genuine retry-exhaustion (a real error text) vs.
+  something new, without needing dashboard log access again.
+- **Pattern worth naming, now that this took three rounds to actually close**: a provider that
+  degrades by returning "successful but empty" instead of raising is invisible to any wrapper
+  that only catches exceptions — timeouts and retries both need an explicit content check for
+  this class of failure, not just error handling. Verified live, repeatedly, not by curl alone:
+  the standard for "fixed" on this bug specifically became "the same ticker, tested fresh, several
+  times, several seconds apart, all succeed" — a single successful check was not accepted as
+  proof after this pattern kept resurfacing past single checks earlier the same day.
+
 ### Fixed 2026-09-18 — /analyze and /ecosystem were racing each other for the same flaky resource
 **User pushed back hard, correctly, after the previous entry's retry fix**: "if the ecosystem is
 displayed correctly, then [AI Momentum Read/What it means] are not working" — an inverse

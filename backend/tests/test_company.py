@@ -41,10 +41,19 @@ def test_truncate_summary_never_leaves_dangling_punctuation_before_ellipsis():
     assert not out.rstrip("…").endswith((",", ".", ";", ":"))
 
 
+def _real_looking(info: dict) -> dict:
+    """Pads a fake `.info` dict past `fetch_info`'s `min_keys` content-sanity
+    threshold (services/net.py — a real, covered symbol returns 140-170+
+    keys; a dict this sparse is now correctly treated as a failed fetch and
+    retried, which these fixtures aren't testing) without touching the
+    fields each test actually asserts on."""
+    return {**{f"_pad{i}": i for i in range(15)}, **info}
+
+
 class _FakeTicker:
     """Minimal yf.Ticker stand-in exposing only `.info`."""
     def __init__(self, info):
-        self._info = info
+        self._info = _real_looking(info)
 
     @property
     def info(self):
