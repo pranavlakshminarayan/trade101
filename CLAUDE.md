@@ -338,6 +338,37 @@ Mirrored as checkboxes in `BACKLOG.md` → "Audit — Wave 0/1/2/3/4". **All wav
 done, including the deploy step** — live at https://trade-craft-qdsw.onrender.com
 (2026-09-17). See `docs/AUDIT.md` §10.
 
+### Fixed 2026-09-18 — /analyze and /ecosystem were racing each other for the same flaky resource
+**User pushed back hard, correctly, after the previous entry's retry fix**: "if the ecosystem is
+displayed correctly, then [AI Momentum Read/What it means] are not working" — an inverse
+correlation between the two features on the SAME page load for the SAME ticker (Tencent,
+`0700.HK`, again). Reproduced live in the browser with the real key (not curl): on one load,
+AI Momentum Read succeeded but the ecosystem peer graph came back as raw ticker codes with
+"Fundamentals aren't available"; the pattern flips on other loads. **Root cause, found by reading
+the actual call graph**: `agents/orchestrator.py::_gather()` (which `/analyze` runs) calls
+`company.get_profile(ticker)` AGAIN, independently, for news-relevance filtering — completely
+separate from the call `/ecosystem` makes. The frontend fires both requests within milliseconds
+of each other; both missed the 5-min cache before either had stored a result, so BOTH fired their
+own full ~11-concurrent-call yfinance blitz (info, calendar, up to 8 peer lookups, beta history)
+AT THE SAME TIME for the same ticker — doubling the load on Yahoo's already-flaky crumb-negotiated
+`.info` endpoint right when it's most likely to fail, and making the two features effectively
+race each other for the same fragile resource. **This is the piece the "add a retry" fix in the
+previous entry didn't address** — retrying doesn't help when the contention is self-inflicted by
+the app firing the same expensive call twice at once.
+- Fixed: `services/cache.py::get_or_set()` gained a per-key `threading.Lock` (double-checked
+  locking) — when several callers miss the cache for the same key concurrently, only the FIRST
+  one actually runs `fn()`; the rest block briefly and reuse its result instead of each starting
+  their own redundant fetch. New `company.get_profile_cached()` wraps `get_profile()` through
+  this cache (key `profile:{TICKER}`, 5-min TTL) and is now what BOTH `app.py`'s `/ecosystem`
+  route and `orchestrator._gather()` call, instead of each calling the raw `get_profile()`
+  independently.
+- 3 new tests (`tests/test_cache.py`) — including one that fires 5 concurrent callers at the same
+  key and asserts the slow underlying function only actually runs once. 96 backend tests total.
+- Verified locally by firing `/ecosystem/0700.HK` and `/analyze/0700.HK` (with a real key)
+  CONCURRENTLY, exactly like the frontend does: both returned real, complete data — ecosystem in
+  ~7s (reusing the shared cached profile), analyze in ~34s (normal, dominated by the actual Claude
+  call, not the data-gathering step). No more empty/failed side on either call.
+
 ### Fixed 2026-09-17 — ecosystem graph showed bare tickers instead of names for non-US listings
 **User-reported, live on Render**: searching Samsung on the Korean market (`005930.KS`) showed the
 peer graph as a ring of raw numeric codes (`000660…`, `005380…`, `035420…`) with the searched

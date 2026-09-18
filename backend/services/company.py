@@ -14,6 +14,7 @@ import httpx
 import numpy as np
 import yfinance as yf
 
+from services import cache
 from services.net import with_timeout, with_retry
 
 FINNHUB = "https://finnhub.io/api/v1"
@@ -292,3 +293,17 @@ def get_profile(ticker: str) -> dict:
         "summary": _truncate_summary(info.get("longBusinessSummary")),
         "coverage": coverage,
     }
+
+
+def get_profile_cached(ticker: str) -> dict:
+    """`get_profile()`, shared across BOTH `/ecosystem` and `/analyze`'s
+    `orchestrator._gather()` (which needs the profile for news relevance
+    filtering) via the same 5-min TTL cache `gather()` itself uses. These two
+    endpoints used to each call `get_profile()` independently — the frontend
+    fires both requests within milliseconds of each other, so a SECOND
+    concurrent, redundant ~11-call yfinance blitz was firing for the same
+    ticker at the same moment, doubling the load on Yahoo's already-flaky
+    `.info` endpoint right when it's most likely to fail. `cache.get_or_set`'s
+    per-key lock means only the first caller actually fetches; the other
+    reuses that one result instead of racing it."""
+    return cache.get_or_set(f"profile:{ticker.upper()}", lambda: get_profile(ticker))

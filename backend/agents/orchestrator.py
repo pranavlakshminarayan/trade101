@@ -54,7 +54,7 @@ def _gather(ticker: str) -> dict | None:
     # Deterministic relevance filter BEFORE the model sees anything: drop articles
     # that don't actually relate to the company, so the AI can't build a
     # company-specific claim out of unrelated news. (Phase 1.5 guardrail.)
-    profile = company.get_profile(ticker)
+    profile = company.get_profile_cached(ticker)
     kept_news, sourcing = evidence.filter_news(
         news_items,
         name=quote.get("name"), ticker=quote["symbol"],

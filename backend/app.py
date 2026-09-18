@@ -202,7 +202,7 @@ def ecosystem(ticker: str):
         )
     if data is None:
         raise HTTPException(status_code=404, detail=f"No data for '{ticker}'.")
-    return {"ticker": ticker.upper(), **company.get_profile(ticker)}
+    return {"ticker": ticker.upper(), **company.get_profile_cached(ticker)}
 
 
 @app.get("/patterns/{ticker}")
