@@ -215,14 +215,16 @@ def get_profile(ticker: str) -> dict:
     concurrently in a second round — critical path is roughly the length of
     the two SLOWEST calls, not the sum of all of them."""
     t = yf.Ticker(ticker)
+    info_error = None  # temporary diagnostic (2026-09-18) — see get_profile_cached's docstring
 
     with ThreadPoolExecutor(max_workers=2) as ex:
         info_fut = ex.submit(lambda: with_retry(lambda: t.info, timeout=12))
         peers_fut = ex.submit(_peers, ticker)
         try:
             info = info_fut.result()
-        except Exception:
+        except Exception as e:
             info = {}
+            info_error = f"{type(e).__name__}: {e}"[:300]
         peers, peers_source = peers_fut.result()
 
     beta = info.get("beta")
@@ -292,6 +294,13 @@ def get_profile(ticker: str) -> dict:
         "peerNames": peer_names,
         "summary": _truncate_summary(info.get("longBusinessSummary")),
         "coverage": coverage,
+        # TEMPORARY diagnostic (2026-09-18, remove once the underlying Yahoo
+        # .info reliability question is settled) — the raw exception from a
+        # failed .info call. Never a secret (yfinance/.info is a keyless
+        # public endpoint), only present on a genuine failure, and only
+        # meant to answer "what is Yahoo actually saying from Render's IP"
+        # without needing dashboard log access.
+        "_infoError": info_error,
     }
 
 
