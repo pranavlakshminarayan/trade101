@@ -19,6 +19,7 @@ frees the caller, it doesn't cancel the network request.
 """
 from __future__ import annotations
 
+import time
 from concurrent.futures import ThreadPoolExecutor, TimeoutError as _FutureTimeout
 
 _POOL = ThreadPoolExecutor(max_workers=32, thread_name_prefix="net-timeout")
@@ -32,3 +33,27 @@ def with_timeout(fn, *args, timeout: float = 15, **kwargs):
         return fut.result(timeout=timeout)
     except _FutureTimeout:
         raise TimeoutError(f"provider call exceeded {timeout}s")
+
+
+def with_retry(fn, *args, timeout: float = 12, attempts: int = 2, backoff: float = 0.6, **kwargs):
+    """`with_timeout`, retried on a transient failure.
+
+    Bug (user-reported 2026-09-17): Yahoo's `.info`/`.calendar` endpoints
+    (unlike `.history`, which powers the chart and has never had this
+    problem) need a crumb/cookie handshake that's genuinely flaky from
+    Render's shared IP — an ecosystem call for a perfectly normal, liquid
+    stock (Tencent, 0700.HK) came back with sector/summary/peer-names ALL
+    null, while the exact same call succeeded instantly and completely when
+    run directly, sequentially, moments later from a different network path.
+    A single flaky attempt was silently nullifying an entire tile's worth of
+    real, available data. One retry recovers most of these — the handshake
+    either lands the second time or the transient blip has passed."""
+    last_err = None
+    for i in range(attempts):
+        try:
+            return with_timeout(fn, *args, timeout=timeout, **kwargs)
+        except Exception as e:
+            last_err = e
+            if i < attempts - 1:
+                time.sleep(backoff)
+    raise last_err

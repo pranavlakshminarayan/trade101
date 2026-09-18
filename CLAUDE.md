@@ -350,6 +350,22 @@ show `TICKER — Full Name` so the ticker is still one hover away. Verified live
 graph now reads "Samsung" (center), "SK hynix", "SAMSUNG", "NAVER", etc. instead of numeric codes.
 57 frontend tests pass, build clean.
 
+**Round 2, same day — the frontend fix wasn't enough on its own.** User then tested Tencent
+(`0700.HK`) live and still saw raw peer codes, with only the CENTER node showing "TENCENT"
+correctly. Traced to the actual data source: `/ecosystem/0700.HK` was returning `peerNames: {}`
+AND `sector`/`industry`/`marketCap`/`summary` all `null` — i.e. yfinance's `.info` call for the
+ticker itself was coming back empty on Render, not just for its peers. Verified directly against
+yfinance from a different machine: `.info` for `0700.HK`/`9988.HK`/`1810.HK` all succeeded
+instantly with full data (173 keys, real `shortName`/`longName`). **Root cause: Yahoo's
+`.info`/`.calendar` endpoint needs a crumb/cookie handshake that's genuinely flaky from Render's
+shared IP — `.history()` (which powers the chart and quote) doesn't need this handshake and has
+never shown this problem, which is why price data always worked while `.info`-dependent fields
+(sector, fundamentals, peer names) kept failing intermittently.** Fixed: new
+`services/net.py::with_retry()` (one retry, 0.6s backoff, on top of the existing `with_timeout`)
+applied to every `.info`/`.calendar` call in `company.py` and `marketdata.py`'s `_quote()`. 5 new
+tests (`tests/test_net.py`, including one simulating exactly this bug: first attempt raises,
+second succeeds). 93 backend tests total.
+
 ### Fixed 2026-09-17 — no timeout anywhere on yfinance calls, hung the UI forever on a slow/thin ticker
 **User-reported on the LIVE deployed link** (first bug caught post-deploy): searching "SK hynix"
 (a brand-new NASDAQ listing, `SKHY`, alongside the mature `000660.KS` Korean listing) left the

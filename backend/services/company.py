@@ -14,7 +14,7 @@ import httpx
 import numpy as np
 import yfinance as yf
 
-from services.net import with_timeout
+from services.net import with_timeout, with_retry
 
 FINNHUB = "https://finnhub.io/api/v1"
 
@@ -94,7 +94,7 @@ def _peer_names(symbols: list[str]) -> dict[str, str]:
 
     def _one(sym: str) -> tuple[str, str | None]:
         try:
-            info = with_timeout(lambda: yf.Ticker(sym).info, timeout=10)
+            info = with_retry(lambda: yf.Ticker(sym).info, timeout=10)
             return sym, (info.get("shortName") or info.get("longName"))
         except Exception:
             return sym, None
@@ -178,7 +178,7 @@ def _fundamentals(ticker: str, info: dict) -> dict:
     interpolated, and a genuinely thin listing simply has more `None`s."""
     next_earnings = None
     try:
-        cal = with_timeout(lambda: yf.Ticker(ticker).calendar, timeout=10)
+        cal = with_retry(lambda: yf.Ticker(ticker).calendar, timeout=10)
         dates = (cal or {}).get("Earnings Date")
         if dates:
             d = dates[0] if isinstance(dates, list) else dates
@@ -216,7 +216,7 @@ def get_profile(ticker: str) -> dict:
     t = yf.Ticker(ticker)
 
     with ThreadPoolExecutor(max_workers=2) as ex:
-        info_fut = ex.submit(lambda: with_timeout(lambda: t.info, timeout=12))
+        info_fut = ex.submit(lambda: with_retry(lambda: t.info, timeout=12))
         peers_fut = ex.submit(_peers, ticker)
         try:
             info = info_fut.result()
