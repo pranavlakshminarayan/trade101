@@ -5,6 +5,10 @@ A running list so we don't lose ideas. Add freely; we pull from here after the M
 > **📋 Full critical audit (2026-09-16): [`docs/AUDIT.md`](docs/AUDIT.md)** — adversarial review of
 > the whole app (functional / logical / executional / UI-UX), 30+ ranked findings with a wave-by-wave
 > fix order. The "Audit — Wave 0/1" sections below are pulled from it; the audit is the detail.
+>
+> **📖 User-facing reading guide (2026-09-17/18): [`docs/guide-reading-a-stock.html`](docs/guide-reading-a-stock.html)**
+> (also as a PDF: `docs/reading-a-stock.pdf`) — a plain-English walkthrough of searching a stock
+> and reading every metric on the page, meant to be shared alongside the app link. Not dev docs.
 
 **North-star principle (applies to every phase):** Trade Craft must **extract data and make sense of it** — interpret, connect, and *teach understanding* — not just display labels. Reading a number is something you could do by hand; the app's job is to help you *understand* what the data means, together.
 

@@ -1,0 +1,385 @@
+<title>Reading a Stock</title>
+<meta name="description" content="A plain-English walkthrough of searching a company on Trade Craft and understanding what each number on the page actually means.">
+<style>
+  :root{
+    --bg:#04060B; --bg2:#020306; --surface:#0A0F1A; --surface2:#111A2B; --hair:#1C2740;
+    --ink:#F4F1E9; --muted:#B4C2D2; --faint:#7C90A6;
+    --teal:#3BB6CB; --teal-soft:#0d2733;
+    --up:#12E29A; --up-soft:#0a2b25; --down:#F26B76; --down-soft:#2c181c; --amber:#F2B24B;
+    --pattern:#B58EF2; --pattern-soft:#241a38;
+    --radius:14px;
+  }
+  @media (prefers-color-scheme: light){
+    :root:not([data-theme="dark"]){
+      --bg:#F7F5F0; --bg2:#EFEBE2; --surface:#FFFFFF; --surface2:#F3F0E8; --hair:#E2DCCC;
+      --ink:#1B1F27; --muted:#4B5563; --faint:#7C8494;
+      --teal-soft:#DFF3F6; --up-soft:#E3FBF2; --down-soft:#FDEAEC;
+      --pattern-soft:#F1E9FB;
+    }
+  }
+  :root[data-theme="dark"]{
+    --bg:#04060B; --bg2:#020306; --surface:#0A0F1A; --surface2:#111A2B; --hair:#1C2740;
+    --ink:#F4F1E9; --muted:#B4C2D2; --faint:#7C90A6;
+    --teal-soft:#0d2733; --up-soft:#0a2b25; --down-soft:#2c181c; --pattern-soft:#241a38;
+  }
+
+  * { box-sizing: border-box; print-color-adjust: exact; -webkit-print-color-adjust: exact; }
+  @media print {
+    body { padding-block: 28px; }
+    .step, .metric, .mockcard, .callout { break-inside: avoid; }
+  }
+  body{
+    background: var(--bg);
+    color: var(--ink);
+    margin: 0;
+    padding-block: 56px;
+    font-family: "IBM Plex Sans", -apple-system, "Segoe UI", sans-serif;
+    line-height: 1.6;
+  }
+  .wrap{ max-width: 760px; margin: 0 auto; padding-inline: 20px; }
+
+  .kicker{
+    font-family: "IBM Plex Mono", ui-monospace, monospace;
+    font-size: 12.5px;
+    letter-spacing: 0.14em;
+    text-transform: uppercase;
+    color: var(--teal);
+    margin-bottom: 14px;
+  }
+  h1{
+    font-family: "Fraunces", Georgia, serif;
+    font-size: clamp(34px, 6vw, 48px);
+    font-weight: 600;
+    letter-spacing: -0.01em;
+    margin: 0 0 14px;
+    text-wrap: balance;
+  }
+  .lede{
+    font-size: 17px;
+    color: var(--muted);
+    max-width: 60ch;
+    margin: 0 0 40px;
+  }
+  .lede b{ color: var(--ink); font-weight: 600; }
+
+  h2{
+    font-family: "Fraunces", Georgia, serif;
+    font-size: 25px;
+    font-weight: 600;
+    margin: 0 0 6px;
+    text-wrap: balance;
+  }
+  .section{ margin-top: 56px; }
+  .section-sub{ color: var(--faint); font-size: 14px; margin: 0 0 22px; }
+
+  /* step flow */
+  .steps{ display: flex; flex-direction: column; gap: 14px; }
+  .step{
+    display: grid;
+    grid-template-columns: 34px 1fr;
+    gap: 14px;
+    background: var(--surface);
+    border: 1px solid var(--hair);
+    border-radius: var(--radius);
+    padding: 16px 18px;
+  }
+  .step-n{
+    font-family: "IBM Plex Mono", monospace;
+    font-size: 13px;
+    color: var(--teal);
+    background: var(--teal-soft);
+    width: 30px; height: 30px;
+    border-radius: 9px;
+    display: flex; align-items: center; justify-content: center;
+    font-weight: 600;
+  }
+  .step-t{ font-weight: 600; margin-bottom: 4px; }
+  .step-d{ color: var(--muted); font-size: 14.5px; }
+  .step-d code{
+    font-family: "IBM Plex Mono", monospace;
+    background: var(--surface2);
+    padding: 1px 6px;
+    border-radius: 5px;
+    font-size: 13px;
+    color: var(--ink);
+  }
+
+  /* metric cards */
+  .metric-grid{
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(230px, 1fr));
+    gap: 12px;
+  }
+  .metric{
+    background: var(--surface);
+    border: 1px solid var(--hair);
+    border-left: 3px solid var(--accent, var(--teal));
+    border-radius: var(--radius);
+    padding: 16px 18px;
+  }
+  .metric-name{
+    font-family: "IBM Plex Mono", monospace;
+    font-weight: 600;
+    font-size: 14.5px;
+    margin-bottom: 8px;
+    display: flex; align-items: center; gap: 8px;
+  }
+  .metric-range{
+    font-size: 11px;
+    color: var(--faint);
+    font-family: "IBM Plex Mono", monospace;
+  }
+  .metric-def{ font-size: 14px; color: var(--muted); margin-bottom: 10px; }
+  .metric-read{
+    font-size: 13px;
+    color: var(--ink);
+    background: var(--surface2);
+    border-radius: 9px;
+    padding: 9px 11px;
+  }
+  .metric-read b{ color: var(--teal); }
+
+  /* pattern chips */
+  .pattern-row{ display: flex; flex-wrap: wrap; gap: 8px; margin-top: 4px; }
+  .pchip{
+    font-family: "IBM Plex Mono", monospace;
+    font-size: 12.5px;
+    padding: 6px 12px;
+    border-radius: 999px;
+    background: var(--pattern-soft);
+    color: var(--pattern);
+    border: 1px solid rgba(181,142,242,.35);
+  }
+
+  /* AI read mock */
+  .mockcard{
+    background: var(--surface);
+    border: 1px solid var(--hair);
+    border-radius: var(--radius);
+    padding: 18px 20px;
+  }
+  .pill{
+    display: inline-flex; align-items: center; gap: 6px;
+    font-family: "IBM Plex Mono", monospace;
+    font-size: 12px; font-weight: 600;
+    padding: 4px 10px; border-radius: 999px;
+    background: var(--up-soft); color: var(--up);
+    text-transform: uppercase; letter-spacing: .04em;
+  }
+  .evidence{
+    display: flex; gap: 10px; align-items: flex-start;
+    border-left: 3px solid var(--hair);
+    padding: 8px 12px; margin-top: 10px; font-size: 13.5px; color: var(--muted);
+    border-radius: 0 8px 8px 0; background: var(--surface2);
+  }
+  .evidence.fact{ border-color: var(--up); }
+  .evidence.interp{ border-color: var(--teal); }
+  .tag{
+    font-family: "IBM Plex Mono", monospace;
+    font-size: 10.5px; font-weight: 700; letter-spacing: .05em;
+    padding: 2px 7px; border-radius: 5px; flex: none;
+  }
+  .tag.fact{ background: var(--up-soft); color: var(--up); }
+  .tag.interp{ background: var(--teal-soft); color: var(--teal); }
+
+  /* fundamentals table */
+  .fund-table{ width: 100%; border-collapse: collapse; font-size: 14px; }
+  .fund-table td{ padding: 10px 4px; border-bottom: 1px solid var(--hair); }
+  .fund-table td:first-child{
+    font-family: "IBM Plex Mono", monospace;
+    color: var(--ink); font-weight: 600; width: 40%;
+  }
+  .fund-table td:last-child{ color: var(--muted); }
+
+  /* callout */
+  .callout{
+    background: var(--down-soft);
+    border: 1px solid rgba(242,107,118,.3);
+    border-radius: var(--radius);
+    padding: 16px 20px;
+    font-size: 14.5px;
+    color: var(--ink);
+    margin-top: 56px;
+  }
+  .callout b{ color: var(--down); }
+
+  .footer{
+    margin-top: 44px;
+    padding-top: 20px;
+    border-top: 1px solid var(--hair);
+    font-size: 13px;
+    color: var(--faint);
+    display: flex; justify-content: space-between; flex-wrap: wrap; gap: 10px;
+  }
+  .footer a{ color: var(--teal); text-decoration: none; }
+
+  @media (max-width: 520px){
+    body{ padding-block: 34px; }
+    .step{ grid-template-columns: 26px 1fr; padding: 14px; }
+    .step-n{ width: 24px; height: 24px; font-size: 11px; }
+  }
+</style>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,500;9..144,600&family=IBM+Plex+Sans:wght@400;500;600&family=IBM+Plex+Mono:wght@400;500;600;700&display=swap" rel="stylesheet">
+
+<div class="wrap">
+
+  <div class="kicker">Trade Craft — reading guide</div>
+  <h1>How to search a stock and actually understand what you're looking at</h1>
+  <p class="lede">
+    Type a company name into Trade Craft and you get a chart, a handful of number tiles,
+    and an AI-written paragraph. This is what each part is telling you, and how to read
+    them <b>together</b> rather than one at a time.
+  </p>
+
+  <div class="section">
+    <h2>1. Searching</h2>
+    <p class="section-sub">Getting to the right listing, not just a listing.</p>
+    <div class="steps">
+      <div class="step">
+        <div class="step-n">1</div>
+        <div>
+          <div class="step-t">Type a name or a ticker</div>
+          <div class="step-d">Either works — <code>nvidia</code> and <code>NVDA</code> find the same company. Names work on any exchange in the world, not just the US.</div>
+        </div>
+      </div>
+      <div class="step">
+        <div class="step-n">2</div>
+        <div>
+          <div class="step-t">Pick the right listing if you're asked</div>
+          <div class="step-d">Some companies trade in more than one place — a home listing plus a thin U.S. ADR, say. When it's genuinely ambiguous, you'll see a picker with a badge (<code>OTC</code>, <code>Secondary</code>) on the thinner lines, so you don't land on the wrong one by accident.</div>
+        </div>
+      </div>
+      <div class="step">
+        <div class="step-n">3</div>
+        <div>
+          <div class="step-t">The chart and metrics load first — for free</div>
+          <div class="step-d">Price, indicators, patterns, news, and company info need no key or account. The AI paragraph (below) is the only piece that needs your own free Anthropic key.</div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div class="section">
+    <h2>2. The chart itself</h2>
+    <p class="section-sub">Everything else on the page is explaining what this is showing.</p>
+    <div class="steps">
+      <div class="step">
+        <div class="step-n">→</div>
+        <div>
+          <div class="step-t">Candles vs. Line</div>
+          <div class="step-d">A candle shows open/high/low/close for that bar — green means the price closed above where it opened, red means below. Line just tracks the close, useful for seeing the overall shape without the noise.</div>
+        </div>
+      </div>
+      <div class="step">
+        <div class="step-n">→</div>
+        <div>
+          <div class="step-t">Timeframes (1Y · 1M · 10D · 5D · 1D)</div>
+          <div class="step-d">Same stock, different zoom. A stock can look calm on 1Y and volatile on 1D at the same time — neither view is "more correct," they answer different questions (the trend vs. what's happening right now).</div>
+        </div>
+      </div>
+      <div class="step">
+        <div class="step-n">→</div>
+        <div>
+          <div class="step-t">Patterns</div>
+          <div class="step-d">Tap <b>Patterns</b> to have the app scan the visible chart for a recognizable shape and draw it directly on the candles, with a plain-English explanation underneath.</div>
+          <div class="pattern-row">
+            <span class="pchip">Double Top / Bottom</span>
+            <span class="pchip">Head & Shoulders</span>
+            <span class="pchip">Triangle</span>
+            <span class="pchip">Wedge</span>
+            <span class="pchip">Channel</span>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div class="section">
+    <h2>3. The metric tiles</h2>
+    <p class="section-sub">Tap any tile in the app to get this same explanation written for that stock's own numbers.</p>
+
+    <div class="metric-grid">
+      <div class="metric" style="--accent:var(--teal)">
+        <div class="metric-name">RSI (14) <span class="metric-range">0–100</span></div>
+        <div class="metric-def">Compresses recent up-moves vs. down-moves into one number.</div>
+        <div class="metric-read"><b>Below 30</b> = oversold, selling may be overdone. <b>Above 70</b> = overbought, buying may be overdone. <b>30–70</b> = neutral. A momentum gauge, not a signal on its own.</div>
+      </div>
+
+      <div class="metric" style="--accent:var(--up)">
+        <div class="metric-name">MACD (12,26,9)</div>
+        <div class="metric-def">The gap between a fast and slow moving average, smoothed by a signal line.</div>
+        <div class="metric-read"><b>MACD above signal</b>, histogram growing = momentum building up. <b>Below signal</b>, growing negative = momentum fading or turning down.</div>
+      </div>
+
+      <div class="metric" style="--accent:var(--teal)">
+        <div class="metric-name">SMA 50 / SMA 200</div>
+        <div class="metric-def">The average closing price over the last 50 (medium-term) or 200 (long-term) sessions.</div>
+        <div class="metric-read">Price sitting <b>above both</b> lines generally reads as an intact uptrend; <b>below both</b> as a downtrend. SMA50 crossing above SMA200 is the classic "golden cross."</div>
+      </div>
+
+      <div class="metric" style="--accent:var(--amber)">
+        <div class="metric-name">Bollinger Bands (20,2)</div>
+        <div class="metric-def">A 20-day average with a band drawn two standard deviations above and below it.</div>
+        <div class="metric-read">Price near the <b>upper band</b> = strength, or short-term overextension. Bands <b>widening</b> = rising volatility; <b>squeezing</b> together = calm, often before a move.</div>
+      </div>
+
+      <div class="metric" style="--accent:var(--muted)">
+        <div class="metric-name">Volume vs. 20d</div>
+        <div class="metric-def">Today's shares traded, compared to the 20-day average, as a percentage.</div>
+        <div class="metric-read">This is the <b>confirmation layer</b>. A big price move on volume far above average is trustworthy; the same move on thin volume is weaker — fewer people actually voted with money.</div>
+      </div>
+
+      <div class="metric" style="--accent:var(--pattern)">
+        <div class="metric-name">Beta</div>
+        <div class="metric-def">How much a stock swings for a given move in its benchmark index.</div>
+        <div class="metric-read"><b>1.0</b> = moves in step with the market. <b>Above 1</b> = amplified swings (more volatile). <b>Below 1</b> = muted swings.</div>
+      </div>
+    </div>
+  </div>
+
+  <div class="section">
+    <h2>4. The AI momentum read</h2>
+    <p class="section-sub">Everything above, synthesized into a paragraph — and shown its work.</p>
+    <div class="mockcard">
+      <div class="pill">bullish · confidence: moderate</div>
+      <p style="margin: 12px 0 4px; font-size: 14.5px; color: var(--muted);">
+        Price sits above both moving averages with a positive MACD histogram — an intact
+        uptrend. RSI is neutral, so momentum isn't stretched either way, and today's volume
+        is below average, which tempers confidence in the move.
+      </p>
+      <div class="evidence fact"><span class="tag fact">Fact</span> Price ($213.90) is above SMA50 ($213.67) and SMA200 ($197.81).</div>
+      <div class="evidence interp"><span class="tag interp">Interpretation</span> Being above both averages is generally read as the medium- and long-term trend staying upward.</div>
+    </div>
+    <p class="section-sub" style="margin-top:16px;">
+      Every claim is labeled <b style="color:var(--up)">Fact</b> (a number straight from the data) or
+      <b style="color:var(--teal)">Interpretation</b> (what that number is commonly read to mean) — so
+      you can always tell where the hard data stops and the reading begins. It never says buy or sell.
+    </p>
+  </div>
+
+  <div class="section">
+    <h2>5. Fundamentals &amp; ecosystem</h2>
+    <p class="section-sub">The slower-moving picture — who the company is, not just what the chart did today.</p>
+    <table class="fund-table">
+      <tr><td>P/E ratio</td><td>Share price ÷ earnings per share — roughly, how much investors are paying for each dollar the company earns.</td></tr>
+      <tr><td>EPS</td><td>Net profit ÷ shares outstanding — the company's earnings attributable to one share.</td></tr>
+      <tr><td>Revenue growth</td><td>% change in total sales vs. the prior comparable period.</td></tr>
+      <tr><td>Profit margin</td><td>Net profit as a % of revenue — how much of every sales dollar the company actually keeps.</td></tr>
+      <tr><td>Debt / Equity</td><td>Total debt relative to shareholder equity — how much the company leans on borrowing.</td></tr>
+      <tr><td>Peers</td><td>Other companies shown alongside this one — same-industry competitors where available, or ones investors commonly view together.</td></tr>
+    </table>
+  </div>
+
+  <div class="callout">
+    <b>One thing to keep in mind:</b> nothing on this page is a signal, and nothing tells you
+    to buy or sell. It describes what the numbers are doing and how that's typically read —
+    the interpretation, and the decision, are always yours.
+  </div>
+
+  <div class="footer">
+    <span>A companion guide for <b style="color:var(--ink)">Trade Craft</b></span>
+    <a href="https://trade-craft-qdsw.onrender.com" target="_blank" rel="noreferrer">trade-craft-qdsw.onrender.com →</a>
+  </div>
+
+</div>

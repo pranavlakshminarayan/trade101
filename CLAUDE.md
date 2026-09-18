@@ -26,7 +26,8 @@ Auto-loaded each session in this folder. **This file is the project's living mem
 it as more current than your own assumptions, and keep it that way (see Memory protocol
 below). Full history: `docs/HANDOVER.md`. Phase-by-phase journey + mistakes:
 `docs/DEVELOPMENT-LOG.md`. Backlog: `BACKLOG.md`. Recommendations under review:
-`docs/trade101-phase-2-recommendations.md`. Spec/plan: `docs/superpowers/`.
+`docs/trade101-phase-2-recommendations.md`. Spec/plan: `docs/superpowers/`. User-facing reading
+guide (shareable, not dev docs): `docs/guide-reading-a-stock.html` / `docs/reading-a-stock.pdf`.
 
 ## Memory protocol (hard rule — do this without being asked)
 
